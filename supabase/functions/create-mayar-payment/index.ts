@@ -33,17 +33,29 @@ serve(async (req) => {
       body: JSON.stringify({
         name: name || "Donatur Kopi",
         email: email || "donatur@smpn99.sch.id",
-        amount: Number(amount),
         mobile: mobile || "081234567890",
         description: "Dukungan operasional program budaya ramah lingkungan sekolah.",
         redirectURL: "https://smpn99.sch.id", // Tautan pengalihan sukses
+        items: [
+          {
+            quantity: 1,
+            rate: Number(amount),
+            description: "Traktir Kopi - School Ecosystem"
+          }
+        ]
       }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || data.error || "Gagal membuat tautan pembayaran di Mayar.");
+      console.error("Mayar API error response:", data);
+      throw new Error(
+        data.messages || 
+        data.message || 
+        (typeof data.error === "string" ? data.error : JSON.stringify(data.error)) || 
+        "Gagal membuat tautan pembayaran di Mayar."
+      );
     }
 
     return new Response(JSON.stringify(data), {

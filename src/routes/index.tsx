@@ -156,7 +156,15 @@ function Index() {
         body: { amount: finalAmount }
       });
       
-      if (error) throw error;
+      if (error) {
+        let errMsg = error.message;
+        try {
+          const body = await (error as any).context?.json();
+          if (body?.error) errMsg = body.error;
+          else if (body?.message) errMsg = body.message;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       
       const linkUrl = data?.data?.link || data?.link;
       if (linkUrl) {
