@@ -45,13 +45,18 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
+      let finalEmail = email.trim();
+      if (!finalEmail.includes("@")) {
+        finalEmail = `${finalEmail}@smpn99.sch.id`;
+      }
+
       if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: finalEmail, password });
         if (error) throw error;
         toast.success("Berhasil masuk");
       } else {
         const { error } = await supabase.auth.signUp({
-          email,
+          email: finalEmail,
           password,
           options: {
             emailRedirectTo: window.location.origin,
@@ -132,14 +137,14 @@ function AuthPage() {
               </>
             )}
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{mode === "login" ? "NIS / Email" : "Email"}</Label>
               <Input
                 id="email"
-                type="email"
+                type="text"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@smpn99.sch.id"
+                placeholder={mode === "login" ? "NIS atau email sekolah" : "nama@smpn99.sch.id"}
               />
             </div>
             <div className="space-y-1.5">

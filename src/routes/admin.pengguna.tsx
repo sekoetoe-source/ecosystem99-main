@@ -59,6 +59,7 @@ function PenggunaPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+  const [printClass, setPrintClass] = useState<string | null>(null);
 
   async function downloadQrCode(student: any) {
     try {
@@ -92,6 +93,17 @@ function PenggunaPage() {
         .from("officers")
         .select("id, station, active, profiles(full_name)")
         .order("station");
+      return data ?? [];
+    },
+  });
+
+  const classes = useQuery({
+    queryKey: ["admin-classes"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("classes")
+        .select("id, name")
+        .order("name");
       return data ?? [];
     },
   });
@@ -191,6 +203,19 @@ function PenggunaPage() {
             <Button variant="outline" size="sm" onClick={exportCsv}>
               <Download className="size-4" /> Ekspor CSV
             </Button>
+            <select
+              value={printClass || ""}
+              onChange={(e) => setPrintClass(e.target.value || null)}
+              className="h-9 rounded-xl border border-input bg-background px-3 text-sm font-semibold"
+              aria-label="Cetak Massal QR Kelas"
+            >
+              <option value="">-- Cetak Massal QR Kelas --</option>
+              {(classes.data ?? []).map((c) => (
+                <option key={c.id} value={c.name}>
+                  Cetak QR Kelas {c.name}
+                </option>
+              ))}
+            </select>
           </div>
         </header>
         <p className="mt-2 text-xs text-muted-foreground">
@@ -296,6 +321,55 @@ function PenggunaPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {printClass && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-background p-8">
+          <div className="no-print mb-8 flex justify-between items-center border-b pb-4">
+            <div>
+              <h2 className="text-xl font-extrabold">Cetak Massal QR Kelas {printClass}</h2>
+              <p className="text-xs text-muted-foreground">
+                Gunakan menu print browser (Ctrl + P) untuk mencetak semua kartu di bawah ini.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => window.print()}>
+                <Printer className="size-4" /> Cetak Sekarang
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setPrintClass(null)}>
+                Kembali
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 justify-items-center">
+            {(students.data ?? [])
+              .filter((s) => s.class_name === printClass)
+              .map((s) => (
+                <div
+                  key={s.student_id}
+                  className="flex flex-col items-center border border-border rounded-3xl p-6 bg-card shadow-sm w-full max-w-sm"
+                  style={{ pageBreakInside: "avoid", breakInside: "avoid" }}
+                >
+                  <div className="gradient-hero w-full rounded-2xl p-5 text-primary-foreground shadow-sm">
+                    <span className="label-xs text-primary-foreground/75">KARTU IDENTITAS ECO</span>
+                    <h3 className="mt-1 text-lg font-extrabold">{s.full_name}</h3>
+                    <p className="text-xs opacity-90">
+                      Kelas {s.class_name || "-"} · NIS {s.nis}
+                    </p>
+                    <div className="mt-2 flex flex-col gap-1 border-t border-primary-foreground/20 pt-2 text-[11px] opacity-80">
+                      <p>Username: {s.nis}</p>
+                      <p>Kata Sandi: S!swa@Smpn99jkt</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl bg-white p-3 shadow-md">
+                    <QrImage value={s.nis} size={160} />
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
