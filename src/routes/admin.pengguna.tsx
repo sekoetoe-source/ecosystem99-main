@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Upload, QrCode, Printer } from "lucide-react";
+import { Download, Upload, QrCode, Printer, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,7 @@ function PenggunaPage() {
   const [importing, setImporting] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [printClass, setPrintClass] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   async function downloadQrCode(student: any) {
     try {
@@ -80,10 +81,19 @@ function PenggunaPage() {
       const { data } = await supabase
         .from("student_scores")
         .select("student_id, full_name, nis, class_name, earned_points, total_items")
-        .order("earned_points", { ascending: false })
-        .limit(200);
+        .order("earned_points", { ascending: false });
       return data ?? [];
     },
+  });
+
+  const filteredStudents = (students.data ?? []).filter((s) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (s.full_name ?? "").toLowerCase().includes(q) ||
+      (s.nis ?? "").toLowerCase().includes(q) ||
+      (s.class_name ?? "").toLowerCase().includes(q)
+    );
   });
 
   const officers = useQuery({
@@ -222,6 +232,16 @@ function PenggunaPage() {
           Format impor: kolom <span className="font-semibold">nama, nis, kelas</span>. Data dengan NIS
           sama akan diperbarui.
         </p>
+        <div className="mt-4 flex max-w-sm items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/20">
+          <Search className="size-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Cari nama, NIS, atau kelas..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+          />
+        </div>
         <div className="surface-card mt-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-left">
@@ -235,7 +255,7 @@ function PenggunaPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {(students.data ?? []).map((s) => (
+              {filteredStudents.map((s) => (
                 <tr key={s.student_id}>
                   <td className="px-4 py-3 font-medium">{s.full_name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{s.nis}</td>
@@ -259,7 +279,7 @@ function PenggunaPage() {
               ))}
             </tbody>
           </table>
-          {(students.data ?? []).length === 0 && (
+          {filteredStudents.length === 0 && (
             <p className="px-4 py-8 text-center text-sm text-muted-foreground">Belum ada siswa.</p>
           )}
         </div>
