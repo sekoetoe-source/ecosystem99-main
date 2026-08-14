@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   ArrowRight,
   Coffee,
@@ -136,6 +137,39 @@ function Index() {
   const { me } = useMe();
   const [menuOpen, setMenuOpen] = useState(false);
   const dashHref = me ? homeForRole[me.primaryRole] : "/auth";
+
+  // Payment states
+  const [selectedNominal, setSelectedNominal] = useState<number | "other">(10000);
+  const [customAmount, setCustomAmount] = useState("");
+  const [loadingPayment, setLoadingPayment] = useState(false);
+
+  async function handleTraktir() {
+    setLoadingPayment(true);
+    try {
+      const finalAmount = selectedNominal === "other" ? Number(customAmount) : selectedNominal;
+      if (!finalAmount || finalAmount < 1000) {
+        toast.error("Minimal nominal traktir adalah Rp1.000");
+        return;
+      }
+      
+      const { data, error } = await supabase.functions.invoke("create-mayar-payment", {
+        body: { amount: finalAmount }
+      });
+      
+      if (error) throw error;
+      
+      const linkUrl = data?.data?.link || data?.link;
+      if (linkUrl) {
+        window.open(linkUrl, "_blank");
+      } else {
+        throw new Error("Gagal mengambil link pembayaran.");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Gagal memproses pembayaran");
+    } finally {
+      setLoadingPayment(false);
+    }
+  }
 
   const challenges = useQuery({
     queryKey: ["landing-challenges"],
@@ -581,31 +615,52 @@ function Index() {
           </div>
           <div className="surface-card p-5 sm:p-7">
             <Coffee className="size-9 text-warning" />
-            <h3 className="mt-3 text-xl font-extrabold">Scan untuk traktir kopi</h3>
-            <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-              <QrImage value={KOPI_URL} size={160} />
-              <div className="min-w-0 text-center sm:text-left">
-                <p className="text-sm text-muted-foreground">
-                  Pindai QR dengan kamera ponsel atau buka tautan pembayaran resmi.
-                </p>
-                <Button asChild className="mt-3 w-full sm:w-auto">
-                  <a href={KOPI_URL} target="_blank" rel="noopener noreferrer">
-                    <Coffee className="size-4" /> Buka halaman dukungan
-                  </a>
-                </Button>
-                <p className="mt-2 break-all text-xs text-muted-foreground">{KOPI_URL}</p>
-              </div>
-            </div>
+            <h3 className="mt-3 text-xl font-extrabold">Traktir Kopi secara Instan</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pilih nominal traktir atau masukkan nominal lainnya untuk mendukung program ini.
+            </p>
+            
             <div className="mt-4 flex flex-wrap gap-2">
-              {["Rp5.000", "Rp10.000", "Rp20.000", "Rp50.000", "Nominal lain"].map((a) => (
-                <span
-                  key={a}
-                  className="rounded-full border border-border px-4 py-2 text-xs font-bold"
+              {[
+                { label: "Rp5.000", value: 5000 },
+                { label: "Rp10.000", value: 10000 },
+                { label: "Rp20.000", value: 20000 },
+                { label: "Rp50.000", value: 50000 },
+                { label: "Nominal lain", value: "other" }
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  onClick={() => setSelectedNominal(item.value as any)}
+                  className={`rounded-full border px-4 py-2 text-xs font-bold transition-all ${
+                    selectedNominal === item.value
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "border-border bg-background text-foreground hover:bg-muted"
+                  }`}
                 >
-                  {a}
-                </span>
+                  {item.label}
+                </button>
               ))}
             </div>
+
+            {selectedNominal === "other" && (
+              <div className="mt-3 space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground">Masukkan Nominal (Min: Rp1.000)</label>
+                <input
+                  type="number"
+                  min="1000"
+                  placeholder="Contoh: 15000"
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                />
+              </div>
+            )}
+
+            <Button onClick={handleTraktir} disabled={loadingPayment} className="mt-4 w-full rounded-full gap-2 py-5 font-bold">
+              <Coffee className="size-4" /> 
+              {loadingPayment ? "Memproses..." : "Traktir Kopi Sekarang"}
+            </Button>
+
             <p className="mt-4 text-xs text-muted-foreground">
               Traktir Kopi tidak menghasilkan poin dan tidak memengaruhi ranking, badge, atau Jawara.
             </p>
