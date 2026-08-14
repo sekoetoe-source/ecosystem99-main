@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Leaf, Users, Search, QrCode } from "lucide-react";
+import { Leaf, Users, Search, Check, X } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/routes/siswa.index";
 
 export const Route = createFileRoute("/teacher/")({
   head: () => ({
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/teacher/")({
 
 function TeacherDashboard() {
   const { me } = useMe();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const classInfo = me?.teacherClass;
 
@@ -35,6 +38,44 @@ function TeacherDashboard() {
         .order("earned_points", { ascending: false });
       return data ?? [];
     },
+  });
+
+  const queue = useQuery({
+    queryKey: ["teacher-queue", classInfo?.id],
+    enabled: !!classInfo?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("validations")
+        .select(`
+          id, 
+          status, 
+          created_at, 
+          station, 
+          source, 
+          students!inner(full_name, nis, class_id), 
+          validation_items(item_code, points)
+        `)
+        .eq("status", "pending")
+        .eq("students.class_id", classInfo!.id)
+        .order("created_at", { ascending: false });
+      return (data as any[]) ?? [];
+    },
+  });
+
+  const review = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
+      const { error } = await supabase
+        .from("validations")
+        .update({ status, reviewed_by: me?.userId ?? null, reviewed_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Status validasi diperbarui");
+      queryClient.invalidateQueries({ queryKey: ["teacher-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["teacher-class-students"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal memperbarui"),
   });
 
   const studentsList = classStudents.data ?? [];
@@ -89,6 +130,49 @@ function TeacherDashboard() {
           <p className="label-xs text-muted-foreground">Total Item Terbawa</p>
         </div>
       </div>
+
+      {/* ANTREAN PERSETUJUAN KLAIM KELAS */}
+      <section>
+        <h2 className="text-lg font-bold">Antrean Persetujuan Klaim Kelas {classInfo.name}</h2>
+        <div className="surface-card mt-3 divide-y divide-border">
+          {(queue.data ?? []).map((v) => (
+            <div key={v.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">
+                  {(v.students as any)?.full_name ?? "-"}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    NIS {(v.students as any)?.nis}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {(v.validation_items ?? []).map((i: any) => i.item_code).join(" + ")} ·{" "}
+                  {(v.validation_items ?? []).reduce((a: number, i: any) => a + i.points, 0)} poin ·{" "}
+                  {v.source === "manual" ? "Input manual" : "Scan"} · {v.station ?? "-"}
+                </p>
+              </div>
+              <StatusBadge status={v.status} />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => review.mutate({ id: v.id, status: "approved" })} disabled={review.isPending}>
+                  <Check className="size-4" /> Setujui
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => review.mutate({ id: v.id, status: "rejected" })}
+                  disabled={review.isPending}
+                >
+                  <X className="size-4" /> Tolak
+                </Button>
+              </div>
+            </div>
+          ))}
+          {(queue.data ?? []).length === 0 && (
+            <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+              Tidak ada klaim menunggu persetujuan dari kelas ini.
+            </p>
+          )}
+        </div>
+      </section>
 
       <section>
         <h2 className="text-lg font-bold">Daftar Siswa Kelas {classInfo.name}</h2>

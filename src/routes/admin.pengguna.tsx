@@ -70,6 +70,15 @@ function PenggunaPage() {
   const [officerName, setOfficerName] = useState("");
   const [officerStation, setOfficerStation] = useState("Gerbang Utama");
 
+  // Create User Account state
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [addEmail, setAddEmail] = useState("");
+  const [addPassword, setAddPassword] = useState("");
+  const [addFullName, setAddFullName] = useState("");
+  const [addRole, setAddRole] = useState("student");
+  const [addClassId, setAddClassId] = useState("");
+  const [addStation, setAddStation] = useState("Gerbang Utama");
+
   const [changeRoleUser, setChangeRoleUser] = useState<any | null>(null);
   const [newRole, setNewRole] = useState("");
   const [newClassId, setNewClassId] = useState("");
@@ -196,6 +205,38 @@ function PenggunaPage() {
       (u.role ?? "").toLowerCase().includes(q) ||
       (u.details ?? "").toLowerCase().includes(q)
     );
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: async () => {
+      if (!addEmail || !addPassword || !addFullName) throw new Error("Email, password, dan nama wajib diisi");
+      
+      // Call secure database function to insert into auth.users + roles
+      const { data, error } = await supabase.rpc("admin_create_user", {
+        _email: addEmail,
+        _password: addPassword,
+        _full_name: addFullName,
+        _role: addRole,
+        _class_id: addClassId || null,
+        _station: addStation,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Akun pengguna berhasil dibuat!");
+      setAddUserOpen(false);
+      setAddEmail("");
+      setAddPassword("");
+      setAddFullName("");
+      setAddRole("student");
+      setAddClassId("");
+      setAddStation("Gerbang Utama");
+      queryClient.invalidateQueries({ queryKey: ["admin-all-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-officers"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal membuat akun"),
   });
 
   const createStudent = useMutation({
@@ -517,11 +558,16 @@ function PenggunaPage() {
 
       {activeTab === "semua" && (
         <section>
-          <header>
-            <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">Semua Akun & Role</h2>
-            <p className="text-xs text-muted-foreground">
-              Kelola role pengguna (Admin, Petugas, Wali Kelas, Siswa) untuk akun yang telah terdaftar.
-            </p>
+          <header className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">Semua Akun & Role</h2>
+              <p className="text-xs text-muted-foreground">
+                Kelola role pengguna (Admin, Petugas, Wali Kelas, Siswa) untuk akun yang telah terdaftar.
+              </p>
+            </div>
+            <Button size="sm" onClick={() => setAddUserOpen(true)} className="rounded-full gap-1">
+              <Plus className="size-4" /> Buat Akun Baru
+            </Button>
           </header>
 
           <div className="mt-4 flex max-w-sm items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/20">
@@ -593,6 +639,103 @@ function PenggunaPage() {
           </div>
         </section>
       )}
+
+      {/* DIALOG BUAT AKUN PENGGUNA BARU */}
+      <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Buat Akun Pengguna Baru</DialogTitle>
+            <DialogDescription>Daftarkan akun login guru/petugas/admin secara langsung tanpa verifikasi email.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Nama Lengkap</label>
+              <input
+                type="text"
+                placeholder="Contoh: Indah Novita Sari"
+                value={addFullName}
+                onChange={(e) => setAddFullName(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Email</label>
+              <input
+                type="email"
+                placeholder="Contoh: indah@guru.smp.belajar.id"
+                value={addEmail}
+                onChange={(e) => setAddEmail(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Kata Sandi (Password)</label>
+              <input
+                type="password"
+                placeholder="Minimal 6 karakter"
+                value={addPassword}
+                onChange={(e) => setAddPassword(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Role Pengguna</label>
+              <select
+                value={addRole}
+                onChange={(e) => setAddRole(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              >
+                <option value="student">Siswa</option>
+                <option value="officer">Petugas Pos</option>
+                <option value="teacher">Wali Kelas</option>
+                <option value="admin">Administrator (Admin)</option>
+              </select>
+            </div>
+
+            {addRole === "teacher" && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground">Kelas yang Diampu</label>
+                <select
+                  value={addClassId}
+                  onChange={(e) => setAddClassId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                >
+                  <option value="">-- Pilih Kelas --</option>
+                  {(classes.data ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      Kelas {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {addRole === "officer" && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground">Lokasi Pos Bertugas</label>
+                <select
+                  value={addStation}
+                  onChange={(e) => setAddStation(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                >
+                  <option value="Gerbang Utama">Gerbang Utama</option>
+                  <option value="Kantin">Kantin</option>
+                  <option value="Koperasi">Koperasi</option>
+                  <option value="Greenhouse">Greenhouse</option>
+                </select>
+              </div>
+            )}
+
+            <Button
+              className="w-full rounded-full mt-2"
+              onClick={() => createUserMutation.mutate()}
+              disabled={createUserMutation.isPending}
+            >
+              Buat Akun Sekarang
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* DIALOG TAMBAH SISWA */}
       <Dialog open={addStudentOpen} onOpenChange={setAddStudentOpen}>
