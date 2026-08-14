@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = "student" | "officer" | "admin";
+export type AppRole = "student" | "officer" | "admin" | "teacher";
 
 type AuthContextValue = {
   session: Session | null;
@@ -45,6 +45,7 @@ export type Me = {
   primaryRole: AppRole;
   student: { id: string; nis: string; full_name: string; class_id: string | null } | null;
   officer: { id: string; full_name: string; station: string; active: boolean } | null;
+  teacherClass: { id: string; name: string } | null;
 };
 
 export function useMe() {
@@ -77,7 +78,19 @@ export function useMe() {
         ? "admin"
         : roles.includes("officer")
           ? "officer"
-          : "student";
+          : roles.includes("teacher")
+            ? "teacher"
+            : "student";
+
+      let teacherClass = null;
+      if (roles.includes("teacher")) {
+        const { data } = await supabase
+          .from("classes")
+          .select("id, name")
+          .eq("homeroom_teacher_id", userId)
+          .maybeSingle();
+        teacherClass = data;
+      }
 
       return {
         userId,
@@ -87,6 +100,7 @@ export function useMe() {
         primaryRole,
         student: student ?? null,
         officer: officer ?? null,
+        teacherClass,
       };
     },
   });
@@ -98,6 +112,7 @@ export const homeForRole: Record<AppRole, string> = {
   student: "/siswa",
   officer: "/petugas",
   admin: "/admin",
+  teacher: "/teacher",
 };
 
 export async function signOut() {

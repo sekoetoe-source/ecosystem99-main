@@ -137,6 +137,25 @@ function Index() {
   const [menuOpen, setMenuOpen] = useState(false);
   const dashHref = me ? homeForRole[me.primaryRole] : "/auth";
 
+  const challenges = useQuery({
+    queryKey: ["landing-challenges"],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("challenges")
+        .select("*")
+        .order("created_at", { ascending: false });
+      return (data as any[]) ?? [];
+    },
+  });
+
+  const challengesList = (challenges.data && challenges.data.length > 0)
+    ? challenges.data
+    : [
+        { pill: "ACTIVE", name: "5 Hari Tumbler", title: "Build the streak.", body: "Minimal 5 record valid membawa tumbler dalam periode challenge.", pct: 72 },
+        { pill: "COMING SOON", name: "Full Reusable Class", title: "One class, one goal.", body: "Target reusable untuk kelas dengan progress yang dapat dipantau.", pct: 48 },
+        { pill: "ACTIVE", name: "Most Improved", title: "Progress matters.", body: "Apresiasi peningkatan, bukan hanya posisi tertinggi.", pct: 61 },
+      ];
+
   const stats = [
     { label: "Siswa terdaftar", value: `${data?.studentCount ?? 0}`, icon: Users },
     { label: "Sampah plastik dicegah", value: `${data?.totalItems ?? 0}x`, icon: Droplets },
@@ -432,12 +451,8 @@ function Index() {
             lead="Challenge membuat program bergerak dari rutinitas pencatatan menuju perilaku yang konsisten dan terukur."
           />
           <div className="grid gap-4 md:grid-cols-3">
-            {[
-              ["ACTIVE", "5 Hari Tumbler", "Build the streak.", "Minimal 5 record valid membawa tumbler dalam periode challenge.", 72],
-              ["COMING SOON", "Full Reusable Class", "One class, one goal.", "Target reusable untuk kelas dengan progress yang dapat dipantau.", 48],
-              ["ACTIVE", "Most Improved", "Progress matters.", "Apresiasi peningkatan, bukan hanya posisi tertinggi.", 61],
-            ].map(([pill, name, title, body, pct]) => (
-              <article key={name as string} className="surface-card p-6">
+            {challengesList.map(({ pill, name, title, body, pct }) => (
+              <article key={name} className="surface-card p-6">
                 <div className="flex items-start justify-between gap-2">
                   <span className="label-xs rounded-full bg-accent px-2 py-1 text-accent-foreground">
                     {pill}

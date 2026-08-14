@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Upload, QrCode, Printer, Search } from "lucide-react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/admin/pengguna")({
       { title: "Data Pengguna — School Ecosystem" },
       {
         name: "description",
-        content: "Daftar siswa, kelas, dan petugas pos yang terdaftar dalam ekosistem hijau sekolah.",
+        content: "Daftar siswa, kelas, petugas pos, dan wali kelas yang terdaftar dalam ekosistem hijau sekolah.",
       },
       { property: "og:title", content: "Data Pengguna — School Ecosystem" },
       { property: "og:description", content: "Kelola data siswa dan petugas pos sekolah." },
@@ -38,13 +38,11 @@ function splitCsvLine(line: string): string[] {
     const ch = line[i];
     if (quoted) {
       if (ch === '"') {
-        if (line[i + 1] === '"') {
-          cur += '"';
-          i += 1;
-        } else quoted = false;
+        quoted = false;
       } else cur += ch;
-    } else if (ch === '"') quoted = true;
-    else if (ch === "," || ch === ";") {
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ",") {
       out.push(cur);
       cur = "";
     } else cur += ch;
@@ -54,13 +52,28 @@ function splitCsvLine(line: string): string[] {
 }
 
 function PenggunaPage() {
-  // CSV helpers defined at module scope below
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [printClass, setPrintClass] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"siswa" | "petugas" | "semua">("siswa");
+
+  // Modal form states
+  const [addStudentOpen, setAddStudentOpen] = useState(false);
+  const [studentName, setStudentName] = useState("");
+  const [studentNis, setStudentNis] = useState("");
+  const [studentClassId, setStudentClassId] = useState("");
+
+  const [addOfficerOpen, setAddOfficerOpen] = useState(false);
+  const [officerName, setOfficerName] = useState("");
+  const [officerStation, setOfficerStation] = useState("Gerbang Utama");
+
+  const [changeRoleUser, setChangeRoleUser] = useState<any | null>(null);
+  const [newRole, setNewRole] = useState("");
+  const [newClassId, setNewClassId] = useState("");
+  const [newStation, setNewStation] = useState("Gerbang Utama");
 
   async function downloadQrCode(student: any) {
     try {
@@ -101,7 +114,7 @@ function PenggunaPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("officers")
-        .select("id, station, active, profiles(full_name)")
+        .select("id, station, active, full_name")
         .order("station");
       return data ?? [];
     },
@@ -118,16 +131,173 @@ function PenggunaPage() {
     },
   });
 
+  const allUsers = useQuery({
+    queryKey: ["admin-all-users"],
+    queryFn: async () => {
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("id, full_name, user_roles(role)");
+
+      const [studentsRes, officersRes, classesRes] = await Promise.all([
+        supabase.from("students").select("profile_id, nis, class_id"),
+        supabase.from("officers").select("profile_id, station"),
+        supabase.from("classes").select("id, name, homeroom_teacher_id"),
+      ]);
+
+      const studentsMap = new Map((studentsRes.data ?? []).map(s => [s.profile_id, s]));
+      const officersMap = new Map((officersRes.data ?? []).map(o => [o.profile_id, o]));
+      const classesMap = new Map((classesRes.data ?? []).map(c => [c.id, c]));
+      const teacherClassMap = new Map((classesRes.data ?? []).filter(c => c.homeroom_teacher_id).map(c => [c.homeroom_teacher_id, c]));
+
+      return (profilesData ?? []).map((p) => {
+        const roles = (p.user_roles as any[] | null ?? []).map(r => r.role);
+        const role = roles.includes("admin") 
+          ? "admin" 
+          : roles.includes("officer") 
+            ? "officer" 
+            : roles.includes("teacher") 
+              ? "teacher" 
+              : "student";
+        
+        let details = "";
+        if (role === "student") {
+          const s = studentsMap.get(p.id);
+          if (s) {
+            const cls = classesMap.get(s.class_id);
+            details = `Siswa (NIS: ${s.nis}${cls ? `, Kelas: ${cls.name}` : ""})`;
+          } else {
+            details = "Siswa";
+          }
+        } else if (role === "officer") {
+          const o = officersMap.get(p.id);
+          details = `Petugas (Pos: ${o?.station ?? "-"})`;
+        } else if (role === "teacher") {
+          const cls = teacherClassMap.get(p.id);
+          details = `Wali Kelas${cls ? ` (${cls.name})` : ""}`;
+        } else if (role === "admin") {
+          details = "Administrator";
+        }
+
+        return {
+          id: p.id,
+          full_name: p.full_name,
+          role,
+          details
+        };
+      });
+    }
+  });
+
+  const filteredAllUsers = (allUsers.data ?? []).filter((u) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (u.full_name ?? "").toLowerCase().includes(q) ||
+      (u.role ?? "").toLowerCase().includes(q) ||
+      (u.details ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const createStudent = useMutation({
+    mutationFn: async () => {
+      if (!studentName || !studentNis) throw new Error("Nama dan NIS wajib diisi");
+      const { error } = await supabase.from("students").insert({
+        full_name: studentName,
+        nis: studentNis,
+        class_id: studentClassId || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Siswa berhasil ditambahkan");
+      setAddStudentOpen(false);
+      setStudentName("");
+      setStudentNis("");
+      setStudentClassId("");
+      queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menambahkan siswa"),
+  });
+
+  const createOfficer = useMutation({
+    mutationFn: async () => {
+      if (!officerName) throw new Error("Nama petugas wajib diisi");
+      const { error } = await supabase.from("officers").insert({
+        full_name: officerName,
+        station: officerStation,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Petugas berhasil ditambahkan");
+      setAddOfficerOpen(false);
+      setOfficerName("");
+      setOfficerStation("Gerbang Utama");
+      queryClient.invalidateQueries({ queryKey: ["admin-officers"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menambahkan petugas"),
+  });
+
+  const changeRoleMutation = useMutation({
+    mutationFn: async () => {
+      if (!changeRoleUser || !newRole) return;
+      const userId = changeRoleUser.id;
+
+      // 1. Delete existing roles
+      const { error: delErr } = await supabase.from("user_roles").delete().eq("user_id", userId);
+      if (delErr) throw delErr;
+
+      // 2. Insert new role
+      const { error: insErr } = await supabase.from("user_roles").insert({
+        user_id: userId,
+        role: newRole,
+      });
+      if (insErr) throw insErr;
+
+      // 3. Handle specifics
+      if (newRole === "officer") {
+        await supabase.from("officers").upsert({
+          profile_id: userId,
+          full_name: changeRoleUser.full_name,
+          station: newStation,
+        }, { onConflict: "profile_id" });
+      } else if (newRole === "teacher" && newClassId) {
+        // remove previous homeroom teacher from this teacher
+        await supabase.from("classes").update({ homeroom_teacher_id: null }).eq("homeroom_teacher_id", userId);
+        // assign teacher to new class
+        const { error: classErr } = await supabase.from("classes").update({
+          homeroom_teacher_id: userId
+        }).eq("id", newClassId);
+        if (classErr) throw classErr;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Role pengguna berhasil diubah");
+      setChangeRoleUser(null);
+      setNewRole("");
+      setNewClassId("");
+      setNewStation("Gerbang Utama");
+      queryClient.invalidateQueries({ queryKey: ["admin-all-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-officers"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal mengubah role"),
+  });
+
   function exportCsv() {
-    const rows = students.data ?? [];
     const csv = [
-      "nama,nis,kelas,item,poin",
-      ...rows.map((s) =>
-        [s.full_name, s.nis, s.class_name ?? "", s.total_items ?? 0, s.earned_points ?? 0]
-          .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
-          .join(","),
+      ["nama", "nis", "kelas", "item", "poin"].join(","),
+      ...(students.data ?? []).map((s) =>
+        [
+          `"${s.full_name.replace(/"/g, '""')}"`,
+          `"${s.nis}"`,
+          `"${(s.class_name ?? "").replace(/"/g, '""')}"`,
+          s.total_items ?? 0,
+          s.earned_points ?? 0,
+        ].join(","),
       ),
     ].join("\n");
+
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     a.download = "data-siswa.csv";
@@ -187,123 +357,407 @@ function PenggunaPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <section>
-        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
-          <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">Siswa</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void importCsv(f);
-              }}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={importing}
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload className="size-4" /> {importing ? "Mengimpor..." : "Impor CSV"}
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportCsv}>
-              <Download className="size-4" /> Ekspor CSV
-            </Button>
-            <select
-              value={printClass || ""}
-              onChange={(e) => setPrintClass(e.target.value || null)}
-              className="h-9 rounded-xl border border-input bg-background px-3 text-sm font-semibold"
-              aria-label="Cetak Massal QR Kelas"
-            >
-              <option value="">-- Cetak Massal QR Kelas --</option>
-              {(classes.data ?? []).map((c) => (
-                <option key={c.id} value={c.name}>
-                  Cetak QR Kelas {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </header>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Format impor: kolom <span className="font-semibold">nama, nis, kelas</span>. Data dengan NIS
-          sama akan diperbarui.
-        </p>
-        <div className="mt-4 flex max-w-sm items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/20">
-          <Search className="size-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Cari nama, NIS, atau kelas..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        <div className="surface-card mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/60 text-left">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Nama</th>
-                <th className="px-4 py-3 font-semibold">NIS</th>
-                <th className="px-4 py-3 font-semibold">Kelas</th>
-                <th className="px-4 py-3 text-right font-semibold">Item</th>
-                <th className="px-4 py-3 text-right font-semibold">Poin</th>
-                <th className="px-4 py-3 text-center font-semibold">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredStudents.map((s) => (
-                <tr key={s.student_id}>
-                  <td className="px-4 py-3 font-medium">{s.full_name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{s.nis}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{s.class_name ?? "-"}</td>
-                  <td className="px-4 py-3 text-right">{Number(s.total_items ?? 0)}</td>
-                  <td className="px-4 py-3 text-right font-bold text-primary">
-                    {Number(s.earned_points ?? 0).toLocaleString("id-ID")}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 rounded-full"
-                      onClick={() => setSelectedStudent(s)}
-                    >
-                      <QrCode className="size-3.5" />
-                      QR Code
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredStudents.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">Belum ada siswa.</p>
-          )}
-        </div>
-      </section>
+    <div className="space-y-6">
+      <div className="flex border-b border-border">
+        {[
+          { id: "siswa", label: "Daftar Siswa" },
+          { id: "petugas", label: "Petugas Pos" },
+          { id: "semua", label: "Semua Akun & Role" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              setActiveTab(tab.id as any);
+              setSearch("");
+            }}
+            className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 -mb-[2px] ${
+              activeTab === tab.id
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      <section>
-        <h2 className="text-lg font-bold">Petugas Pos</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(officers.data ?? []).map((o) => (
-            <div key={o.id} className="surface-card p-5">
-              <p className="font-bold">
-                {(o.profiles as { full_name: string | null } | null)?.full_name ?? "Tanpa nama"}
+      {activeTab === "siswa" && (
+        <section>
+          <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
+            <div>
+              <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">Siswa</h1>
+              <p className="text-xs text-muted-foreground">
+                Format impor: kolom <span className="font-semibold">nama, nis, kelas</span>. Data dengan NIS sama akan diperbarui.
               </p>
-              <p className="text-sm text-muted-foreground">Pos {o.station}</p>
-              <span className="label-xs mt-3 inline-block text-eco">
-                {o.active ? "Aktif" : "Nonaktif"}
-              </span>
             </div>
-          ))}
-          {(officers.data ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">Belum ada petugas terdaftar.</p>
-          )}
-        </div>
-      </section>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void importCsv(f);
+                }}
+              />
+              <Button size="sm" onClick={() => setAddStudentOpen(true)} className="rounded-full gap-1">
+                <Plus className="size-4" /> Tambah Siswa
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={importing}
+                onClick={() => fileRef.current?.click()}
+              >
+                <Upload className="size-4" /> {importing ? "Mengimpor..." : "Impor CSV"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportCsv}>
+                <Download className="size-4" /> Ekspor CSV
+              </Button>
+              <select
+                value={printClass || ""}
+                onChange={(e) => setPrintClass(e.target.value || null)}
+                className="h-9 rounded-xl border border-input bg-background px-3 text-sm font-semibold"
+                aria-label="Cetak Massal QR Kelas"
+              >
+                <option value="">-- Cetak Massal QR Kelas --</option>
+                {(classes.data ?? []).map((c) => (
+                  <option key={c.id} value={c.name}>
+                    Cetak QR Kelas {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </header>
+
+          <div className="mt-4 flex max-w-sm items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/20">
+            <Search className="size-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Cari nama, NIS, atau kelas..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+
+          <div className="surface-card mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/60 text-left">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Nama</th>
+                  <th className="px-4 py-3 font-semibold">NIS</th>
+                  <th className="px-4 py-3 font-semibold">Kelas</th>
+                  <th className="px-4 py-3 text-right font-semibold">Item</th>
+                  <th className="px-4 py-3 text-right font-semibold">Poin</th>
+                  <th className="px-4 py-3 text-center font-semibold">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredStudents.map((s) => (
+                  <tr key={s.student_id}>
+                    <td className="px-4 py-3 font-medium">{s.full_name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{s.nis}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{s.class_name ?? "-"}</td>
+                    <td className="px-4 py-3 text-right">{Number(s.total_items ?? 0)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-primary">
+                      {Number(s.earned_points ?? 0).toLocaleString("id-ID")}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 rounded-full"
+                        onClick={() => setSelectedStudent(s)}
+                      >
+                        <QrCode className="size-3.5" />
+                        QR Code
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredStudents.length === 0 && (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">Belum ada siswa.</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "petugas" && (
+        <section className="space-y-4">
+          <header className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">Petugas Pos</h2>
+              <p className="text-xs text-muted-foreground">Kelola petugas pencatatan ramah lingkungan sekolah.</p>
+            </div>
+            <Button size="sm" onClick={() => setAddOfficerOpen(true)} className="rounded-full gap-1">
+              <Plus className="size-4" /> Tambah Petugas
+            </Button>
+          </header>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(officers.data ?? []).map((o) => (
+              <div key={o.id} className="surface-card p-5">
+                <p className="font-bold">{o.full_name ?? "Tanpa nama"}</p>
+                <p className="text-sm text-muted-foreground">Pos {o.station}</p>
+                <span className="label-xs mt-3 inline-block text-eco">
+                  {o.active ? "Aktif" : "Nonaktif"}
+                </span>
+              </div>
+            ))}
+            {(officers.data ?? []).length === 0 && (
+              <p className="text-sm text-muted-foreground">Belum ada petugas terdaftar.</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "semua" && (
+        <section>
+          <header>
+            <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">Semua Akun & Role</h2>
+            <p className="text-xs text-muted-foreground">
+              Kelola role pengguna (Admin, Petugas, Wali Kelas, Siswa) untuk akun yang telah terdaftar.
+            </p>
+          </header>
+
+          <div className="mt-4 flex max-w-sm items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/20">
+            <Search className="size-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Cari akun berdasarkan nama atau role..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+
+          <div className="surface-card mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/60 text-left">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Nama Pengguna</th>
+                  <th className="px-4 py-3 font-semibold">Role</th>
+                  <th className="px-4 py-3 font-semibold">Keterangan Tambahan</th>
+                  <th className="px-4 py-3 text-center font-semibold">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredAllUsers.map((u) => (
+                  <tr key={u.id}>
+                    <td className="px-4 py-3 font-medium">{u.full_name}</td>
+                    <td className="px-4 py-3">
+                      <span className={`label-xs rounded-full px-2.5 py-1 font-bold ${
+                        u.role === "admin" 
+                          ? "bg-red-100 text-red-700" 
+                          : u.role === "officer" 
+                            ? "bg-blue-100 text-blue-700" 
+                            : u.role === "teacher" 
+                              ? "bg-purple-100 text-purple-700" 
+                              : "bg-green-100 text-green-700"
+                      }`}>
+                        {u.role === "admin" 
+                          ? "ADMIN" 
+                          : u.role === "officer" 
+                            ? "PETUGAS" 
+                            : u.role === "teacher" 
+                              ? "WALI KELAS" 
+                              : "SISWA"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{u.details}</td>
+                    <td className="px-4 py-3 text-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 rounded-full"
+                        onClick={() => {
+                          setChangeRoleUser(u);
+                          setNewRole(u.role);
+                        }}
+                      >
+                        <UserCheck className="size-3.5" />
+                        Ubah Role
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredAllUsers.length === 0 && (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">Akun tidak ditemukan.</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* DIALOG TAMBAH SISWA */}
+      <Dialog open={addStudentOpen} onOpenChange={setAddStudentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tambah Siswa Baru</DialogTitle>
+            <DialogDescription>Tambahkan data siswa secara manual ke database.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Nama Siswa</label>
+              <input
+                type="text"
+                placeholder="Contoh: Bilal Lilza"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">NIS (Nomor Induk Siswa)</label>
+              <input
+                type="text"
+                placeholder="Contoh: 21333"
+                value={studentNis}
+                onChange={(e) => setStudentNis(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Kelas</label>
+              <select
+                value={studentClassId}
+                onChange={(e) => setStudentClassId(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              >
+                <option value="">-- Pilih Kelas --</option>
+                {(classes.data ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    Kelas {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button
+              className="w-full rounded-full mt-2"
+              onClick={() => createStudent.mutate()}
+              disabled={createStudent.isPending}
+            >
+              Simpan Data Siswa
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG TAMBAH PETUGAS */}
+      <Dialog open={addOfficerOpen} onOpenChange={setAddOfficerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tambah Petugas Pos Baru</DialogTitle>
+            <DialogDescription>Tambahkan petugas pencatat secara manual.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Nama Petugas</label>
+              <input
+                type="text"
+                placeholder="Contoh: Budi Santoso"
+                value={officerName}
+                onChange={(e) => setOfficerName(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Lokasi Pos Bertugas</label>
+              <select
+                value={officerStation}
+                onChange={(e) => setOfficerStation(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              >
+                <option value="Gerbang Utama">Gerbang Utama</option>
+                <option value="Kantin">Kantin</option>
+                <option value="Koperasi">Koperasi</option>
+                <option value="Greenhouse">Greenhouse</option>
+              </select>
+            </div>
+            <Button
+              className="w-full rounded-full mt-2"
+              onClick={() => createOfficer.mutate()}
+              disabled={createOfficer.isPending}
+            >
+              Simpan Data Petugas
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG UBAH ROLE */}
+      <Dialog open={!!changeRoleUser} onOpenChange={(open) => !open && setChangeRoleUser(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ubah Role Pengguna</DialogTitle>
+            <DialogDescription>
+              Ubah hak akses aplikasi untuk <b>{changeRoleUser?.full_name}</b>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Pilih Role Baru</label>
+              <select
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              >
+                <option value="student">Siswa</option>
+                <option value="officer">Petugas Pos</option>
+                <option value="teacher">Wali Kelas</option>
+                <option value="admin">Administrator (Admin)</option>
+              </select>
+            </div>
+
+            {newRole === "teacher" && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground">Kelas yang Diampu</label>
+                <select
+                  value={newClassId}
+                  onChange={(e) => setNewClassId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                >
+                  <option value="">-- Pilih Kelas --</option>
+                  {(classes.data ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      Kelas {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {newRole === "officer" && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground">Lokasi Pos Bertugas</label>
+                <select
+                  value={newStation}
+                  onChange={(e) => setNewStation(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                >
+                  <option value="Gerbang Utama">Gerbang Utama</option>
+                  <option value="Kantin">Kantin</option>
+                  <option value="Koperasi">Koperasi</option>
+                  <option value="Greenhouse">Greenhouse</option>
+                </select>
+              </div>
+            )}
+
+            <Button
+              className="w-full rounded-full mt-2"
+              onClick={() => changeRoleMutation.mutate()}
+              disabled={changeRoleMutation.isPending}
+            >
+              Simpan Perubahan Role
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
         <DialogContent className="max-w-sm">
@@ -378,12 +832,11 @@ function PenggunaPage() {
                     </p>
                     <div className="mt-2 flex flex-col gap-1 border-t border-primary-foreground/20 pt-2 text-[11px] opacity-80">
                       <p>Username: {s.nis}</p>
-                      <p>Kata Sandi: S!swa@Smpn99jkt</p>
+                      <p>Password default: S!swa@Smpn99jkt</p>
                     </div>
                   </div>
-
-                  <div className="mt-5 rounded-2xl bg-white p-3 shadow-md">
-                    <QrImage value={s.nis} size={160} />
+                  <div className="mt-6 rounded-2xl bg-card p-3 shadow-md border">
+                    <QrImage value={s.nis} size={150} />
                   </div>
                 </div>
               ))}
