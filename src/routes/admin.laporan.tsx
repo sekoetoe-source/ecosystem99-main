@@ -28,7 +28,8 @@ export const Route = createFileRoute("/admin/laporan")({
 const SCHOOL = {
   name: "SMP NEGERI 99 JAKARTA",
   address: "Jalan Sirap, Kelurahan Kayu Putih, Kecamatan Pulo Gadung, Jakarta Timur",
-  contact: "Telp. 021.4891456 Fax. 47881356 Email: smpn99dki@yahoo.co.id Website: https://smpn99jkt.sch.id",
+  contact: "Telp. 021.4891456 Fax. 47881356",
+  emailWebsite: "Email: smpn99dki@yahoo.co.id | Website: https://smpn99jkt.sch.id",
   principal: "Etty Indarti, S.Pd",
   principalNip: "NIP. 19700418 1998022 001",
   coordinator: "Indah Novitasari, S.Pd, M.Si",
@@ -197,124 +198,138 @@ function LaporanPage() {
       </header>
 
       <article className="surface-card px-4 py-6 sm:px-10 sm:py-10">
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 border-b-2 border-foreground pb-5">
-          <img
-            src={logoAsset.url}
-            alt="Logo SMP Negeri 99 Jakarta"
-            className="size-16 shrink-0 object-contain sm:size-20"
-          />
-          <div className="min-w-0 text-center">
-            <h2 className="text-lg font-extrabold tracking-tight sm:text-3xl">{SCHOOL.name}</h2>
-            <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.address}</p>
-            <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.contact}</p>
-          </div>
-        </div>
-
-        <div className="mt-6 text-center">
-          <h3 className="text-base font-extrabold uppercase tracking-tight sm:text-xl">
-            Laporan Bulanan Program Lingkungan
-          </h3>
-          <p className="text-sm text-muted-foreground">Monthly Environmental Program Report</p>
-          <p className="mt-1 text-sm font-bold text-primary">Periode / Period: {monthLabel(month)}</p>
-        </div>
-
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          {[
-            { v: `${d?.tumblerRate ?? 0}%`, t: "Total Tumbler Usage", s: "Penggunaan Tumbler" },
-            { v: `${d?.lunchboxRate ?? 0}%`, t: "Total Lunchbox Usage", s: "Penggunaan Kotak Makan" },
-            { v: d?.topClass ?? "-", t: "Top Performing Class", s: "Kelas Terbaik" },
-          ].map((c) => (
-            <div key={c.t} className="rounded-2xl border border-border bg-surface-low p-5 text-center">
-              <p className="truncate text-2xl font-extrabold sm:text-4xl">{c.v}</p>
-              <p className="mt-2 text-sm font-bold">{c.t}</p>
-              <p className="text-xs text-muted-foreground">{c.s}</p>
-            </div>
-          ))}
-        </div>
-
-        <h4 className="mt-8 text-base font-extrabold sm:text-lg">
-          Tren Partisipasi / Participation Trends
-        </h4>
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <div className="rounded-2xl border border-border p-5">
-            <p className="text-sm font-semibold">Ringkasan Bulan Ini</p>
-            <dl className="mt-3 space-y-2 text-sm">
-              {[
-                ["Siswa aktif terdaftar", (d?.totalStudents ?? 0).toLocaleString("id-ID")],
-                ["Item eco tervalidasi", (d?.totalItems ?? 0).toLocaleString("id-ID")],
-                ["Total Eco-Points", (d?.totalPoints ?? 0).toLocaleString("id-ID")],
-                ["Estimasi CO2 dihemat", `${Math.round(((d?.totalItems ?? 0) * 70) / 1000)} kg`],
-              ].map(([k, v]) => (
-                <div key={k} className="flex items-center justify-between gap-3 border-b border-border pb-2">
-                  <dt className="min-w-0 truncate text-muted-foreground">{k}</dt>
-                  <dd className="shrink-0 font-bold">{v}</dd>
+        <table className="w-full border-collapse table-fixed">
+          <thead>
+            <tr>
+              <td className="w-full">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 border-b-2 border-foreground pb-5 mb-6">
+                  <img
+                    src={logoAsset.url}
+                    alt="Logo SMP Negeri 99 Jakarta"
+                    className="size-16 shrink-0 object-contain sm:size-20"
+                  />
+                  <div className="min-w-0 text-center">
+                    <h2 className="text-lg font-extrabold tracking-tight sm:text-3xl">{SCHOOL.name}</h2>
+                    <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.address}</p>
+                    <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.contact}</p>
+                    <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.emailWebsite}</p>
+                  </div>
                 </div>
-              ))}
-            </dl>
-          </div>
-          <div className="grid place-items-center rounded-2xl border border-border bg-surface-low p-8 text-center">
-            <div>
-              <p className="text-3xl font-extrabold text-eco sm:text-4xl">
-                {d?.growth === null || d?.growth === undefined
-                  ? "—"
-                  : `${d.growth > 0 ? "+" : ""}${d.growth}%`}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">Growth from last month</p>
-            </div>
-          </div>
-        </div>
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="w-full">
+                <div className="text-center">
+                  <h3 className="text-base font-extrabold uppercase tracking-tight sm:text-xl">
+                    Laporan Bulanan Program Lingkungan
+                  </h3>
+                  <p className="text-sm text-muted-foreground">Monthly Environmental Program Report</p>
+                  <p className="mt-1 text-sm font-bold text-primary">Periode / Period: {monthLabel(month)}</p>
+                </div>
 
-        <h4 className="mt-8 text-base font-extrabold sm:text-lg">
-          Peringkat Jawara Lingkungan / Environmental Champion Rankings
-        </h4>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[34rem] text-sm">
-            <thead>
-              <tr className="border-y border-border bg-surface-low text-left">
-                <th className="label-xs px-3 py-3">Rank</th>
-                <th className="label-xs px-3 py-3">Class</th>
-                <th className="label-xs px-3 py-3 text-right">Points</th>
-                <th className="label-xs px-3 py-3 text-right">Tumbler Rate</th>
-                <th className="label-xs px-3 py-3 text-right">Lunchbox Rate</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {(d?.rows ?? []).map((r, i) => (
-                <tr key={r.name}>
-                  <td className={`px-3 py-3 font-bold ${i < 3 ? "text-primary" : ""}`}>{i + 1}</td>
-                  <td className="px-3 py-3 font-semibold">{r.name}</td>
-                  <td className="px-3 py-3 text-right">{r.points.toLocaleString("id-ID")}</td>
-                  <td className="px-3 py-3 text-right">{r.tumbler}%</td>
-                  <td className="px-3 py-3 text-right">{r.lunchbox}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {(d?.rows ?? []).length === 0 && (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Belum ada data pada periode ini.
-            </p>
-          )}
-        </div>
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  {[
+                    { v: `${d?.tumblerRate ?? 0}%`, t: "Total Tumbler Usage", s: "Penggunaan Tumbler" },
+                    { v: `${d?.lunchboxRate ?? 0}%`, t: "Total Lunchbox Usage", s: "Penggunaan Kotak Makan" },
+                    { v: d?.topClass ?? "-", t: "Top Performing Class", s: "Kelas Terbaik" },
+                  ].map((c) => (
+                    <div key={c.t} className="rounded-2xl border border-border bg-surface-low p-5 text-center">
+                      <p className="truncate text-2xl font-extrabold sm:text-4xl">{c.v}</p>
+                      <p className="mt-2 text-sm font-bold">{c.t}</p>
+                      <p className="text-xs text-muted-foreground">{c.s}</p>
+                    </div>
+                  ))}
+                </div>
 
-        <div className="mt-12 grid gap-10 text-center text-sm sm:grid-cols-2">
-          <div>
-            <p>Mengetahui / Acknowledged by,</p>
-            <p>Kepala Sekolah / Principal</p>
-            <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
-              <p className="font-bold">{SCHOOL.principal}</p>
-              <p className="text-xs text-primary">{SCHOOL.principalNip}</p>
-            </div>
-          </div>
-          <div>
-            <p>Jakarta, {monthLabel(month)}</p>
-            <p>Koordinator Program / Program Coordinator</p>
-            <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
-              <p className="font-bold">{SCHOOL.coordinator}</p>
-              <p className="text-xs text-primary">{SCHOOL.coordinatorNip}</p>
-            </div>
-          </div>
-        </div>
+                <h4 className="mt-8 text-base font-extrabold sm:text-lg">
+                  Tren Partisipasi / Participation Trends
+                </h4>
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-border p-5">
+                    <p className="text-sm font-semibold">Ringkasan Bulan Ini</p>
+                    <dl className="mt-3 space-y-2 text-sm">
+                      {[
+                        ["Siswa aktif terdaftar", (d?.totalStudents ?? 0).toLocaleString("id-ID")],
+                        ["Item eco tervalidasi", (d?.totalItems ?? 0).toLocaleString("id-ID")],
+                        ["Total Eco-Points", (d?.totalPoints ?? 0).toLocaleString("id-ID")],
+                        ["Estimasi CO2 dihemat", `${Math.round(((d?.totalItems ?? 0) * 70) / 1000)} kg`],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex items-center justify-between gap-3 border-b border-border pb-2">
+                          <dt className="min-w-0 truncate text-muted-foreground">{k}</dt>
+                          <dd className="shrink-0 font-bold">{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                  <div className="grid place-items-center rounded-2xl border border-border bg-surface-low p-8 text-center">
+                    <div>
+                      <p className="text-3xl font-extrabold text-eco sm:text-4xl">
+                        {d?.growth === null || d?.growth === undefined
+                          ? "—"
+                          : `${d.growth > 0 ? "+" : ""}${d.growth}%`}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">Growth from last month</p>
+                    </div>
+                  </div>
+                </div>
+
+                <h4 className="mt-8 text-base font-extrabold sm:text-lg">
+                  Peringkat Jawara Lingkungan / Environmental Champion Rankings
+                </h4>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full min-w-[34rem] text-sm">
+                    <thead>
+                      <tr className="border-y border-border bg-surface-low text-left">
+                        <th className="label-xs px-3 py-3">Rank</th>
+                        <th className="label-xs px-3 py-3">Class</th>
+                        <th className="label-xs px-3 py-3 text-right">Points</th>
+                        <th className="label-xs px-3 py-3 text-right">Tumbler Rate</th>
+                        <th className="label-xs px-3 py-3 text-right">Lunchbox Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {(d?.rows ?? []).map((r, i) => (
+                        <tr key={r.name}>
+                          <td className={`px-3 py-3 font-bold ${i < 3 ? "text-primary" : ""}`}>{i + 1}</td>
+                          <td className="px-3 py-3 font-semibold">{r.name}</td>
+                          <td className="px-3 py-3 text-right">{r.points.toLocaleString("id-ID")}</td>
+                          <td className="px-3 py-3 text-right">{r.tumbler}%</td>
+                          <td className="px-3 py-3 text-right">{r.lunchbox}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {(d?.rows ?? []).length === 0 && (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      Belum ada data pada periode ini.
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-12 grid gap-10 text-center text-sm sm:grid-cols-2">
+                  <div>
+                    <p>Mengetahui / Acknowledged by,</p>
+                    <p>Kepala Sekolah / Principal</p>
+                    <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
+                      <p className="font-bold">{SCHOOL.principal}</p>
+                      <p className="text-xs text-primary">{SCHOOL.principalNip}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p>Jakarta, {monthLabel(month)}</p>
+                    <p>Koordinator Program / Program Coordinator</p>
+                    <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
+                      <p className="font-bold">{SCHOOL.coordinator}</p>
+                      <p className="text-xs text-primary">{SCHOOL.coordinatorNip}</p>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </article>
     </div>
   );

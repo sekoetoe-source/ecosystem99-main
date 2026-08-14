@@ -206,6 +206,7 @@ function PenggunaPage() {
                 <th className="px-4 py-3 font-semibold">Kelas</th>
                 <th className="px-4 py-3 text-right font-semibold">Item</th>
                 <th className="px-4 py-3 text-right font-semibold">Poin</th>
+                <th className="px-4 py-3 text-center font-semibold">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -217,6 +218,17 @@ function PenggunaPage() {
                   <td className="px-4 py-3 text-right">{Number(s.total_items ?? 0)}</td>
                   <td className="px-4 py-3 text-right font-bold text-primary">
                     {Number(s.earned_points ?? 0).toLocaleString("id-ID")}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 rounded-full"
+                      onClick={() => setSelectedStudent(s)}
+                    >
+                      <QrCode className="size-3.5" />
+                      QR Code
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -247,6 +259,43 @@ function PenggunaPage() {
           )}
         </div>
       </section>
+
+      <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center">Kartu Identitas QR</DialogTitle>
+            <DialogDescription className="text-center">
+              Pindai kode QR di bawah untuk validasi botol tumbler dan lunchbox.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedStudent && (
+            <div className="flex flex-col items-center space-y-6 py-4">
+              <div className="gradient-hero w-full rounded-2xl p-6 text-primary-foreground shadow-lift">
+                <span className="label-xs text-primary-foreground/75">KARTU IDENTITAS ECO</span>
+                <h3 className="mt-1 text-xl font-extrabold">{selectedStudent.full_name}</h3>
+                <p className="text-sm opacity-90">
+                  Kelas {selectedStudent.class_name || "-"} · NIS {selectedStudent.nis}
+                </p>
+                <div className="mt-4 flex items-center justify-between border-t border-primary-foreground/20 pt-4">
+                  <span className="text-xs opacity-75">Eco Score</span>
+                  <span className="text-base font-bold">{selectedStudent.earned_points} poin</span>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-card p-4 shadow-md">
+                <QrImage value={selectedStudent.nis} size={200} />
+              </div>
+
+              <Button
+                className="w-full gap-2 rounded-full"
+                onClick={() => downloadQrCode(selectedStudent)}
+              >
+                <Download className="size-4" /> Unduh QR Code
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
