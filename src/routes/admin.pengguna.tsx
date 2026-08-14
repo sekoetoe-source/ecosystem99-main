@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { QrImage } from "@/components/eco/QrImage";
 import QRCode from "qrcode";
+import * as XLSX from "xlsx";
 import {
   Dialog,
   DialogContent,
@@ -345,13 +346,27 @@ function PenggunaPage() {
     a.click();
   }
 
-  async function importCsv(file: File) {
+  async function importFile(file: File) {
     setImporting(true);
     try {
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-      if (lines.length < 2) throw new Error("File CSV kosong.");
-      const header = splitCsvLine(lines[0]!).map((h) => h.trim().toLowerCase());
+      let rows: string[][] = [];
+      const extension = file.name.split('.').pop()?.toLowerCase();
+
+      if (extension === 'xlsx' || extension === 'xls') {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) throw new Error("File Excel kosong.");
+        const worksheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
+      } else {
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        rows = lines.map(line => splitCsvLine(line));
+      }
+
+      if (rows.length < 2) throw new Error("File kosong.");
+      const header = rows[0]!.map((h) => String(h ?? "").trim().toLowerCase());
       const idxName = header.findIndex((h) => h.includes("nama"));
       const idxNis = header.findIndex((h) => h === "nis" || h.includes("nis"));
       const idxClass = header.findIndex((h) => h.includes("kelas"));
@@ -361,12 +376,12 @@ function PenggunaPage() {
       const classMap = new Map((classRows ?? []).map((c) => [c.name.toLowerCase(), c.id]));
 
       const payload: { nis: string; full_name: string; class_id: string | null }[] = [];
-      for (const line of lines.slice(1)) {
-        const cols = splitCsvLine(line);
-        const nis = (cols[idxNis] ?? "").trim();
-        const full_name = (cols[idxName] ?? "").trim();
+      for (const cols of rows.slice(1)) {
+        if (!cols || cols.length === 0) continue;
+        const nis = String(cols[idxNis] ?? "").trim();
+        const full_name = String(cols[idxName] ?? "").trim();
         if (!nis || !full_name) continue;
-        const className = idxClass >= 0 ? (cols[idxClass] ?? "").trim() : "";
+        const className = idxClass >= 0 ? String(cols[idxClass] ?? "").trim() : "";
         let class_id: string | null = null;
         if (className) {
           const key = className.toLowerCase();
@@ -435,11 +450,11 @@ function PenggunaPage() {
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) void importCsv(f);
+                  if (f) void importFile(f);
                 }}
               />
               <Button size="sm" onClick={() => setAddStudentOpen(true)} className="rounded-full gap-1">
@@ -451,7 +466,7 @@ function PenggunaPage() {
                 disabled={importing}
                 onClick={() => fileRef.current?.click()}
               >
-                <Upload className="size-4" /> {importing ? "Mengimpor..." : "Impor CSV"}
+                <Upload className="size-4" /> {importing ? "Mengimpor..." : "Impor Excel/CSV"}
               </Button>
               <Button variant="outline" size="sm" onClick={exportCsv}>
                 <Download className="size-4" /> Ekspor CSV
