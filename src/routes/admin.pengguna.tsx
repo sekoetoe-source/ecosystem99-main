@@ -1,10 +1,19 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Upload } from "lucide-react";
+import { Download, Upload, QrCode, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { QrImage } from "@/components/eco/QrImage";
+import QRCode from "qrcode";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/admin/pengguna")({
   head: () => ({
@@ -49,6 +58,20 @@ function PenggunaPage() {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+
+  async function downloadQrCode(student: any) {
+    try {
+      const url = await QRCode.toDataURL(student.nis, { width: 720, margin: 2 });
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `qr-${student.nis}-${student.full_name.replace(/\s+/g, "_")}.png`;
+      a.click();
+      toast.success("QR Code berhasil diunduh");
+    } catch (e) {
+      toast.error("Gagal mengunduh QR Code");
+    }
+  }
 
   const students = useQuery({
     queryKey: ["admin-students"],

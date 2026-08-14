@@ -27,12 +27,12 @@ export const Route = createFileRoute("/admin/laporan")({
 
 const SCHOOL = {
   name: "SMP NEGERI 99 JAKARTA",
-  address: "Jl. Pendidikan No. 1, Jakarta Selatan, 12345",
-  contact: "Telp: (021) 555-0199 | Email: info@smpn99jkt.sch.id",
-  principal: "Dr. Budi Santoso, M.Pd.",
-  principalNip: "NIP. 19700101 199512 1 001",
-  coordinator: "Siti Aminah, S.Pd.",
-  coordinatorNip: "NIP. 19850515 201001 2 003",
+  address: "Jalan Sirap, Kelurahan Kayu Putih, Kecamatan Pulo Gadung, Jakarta Timur",
+  contact: "Telp. 021.4891456 Fax. 47881356 Email: smpn99dki@yahoo.co.id Website: https://smpn99jkt.sch.id",
+  principal: "Etty Indarti, S.Pd",
+  principalNip: "NIP. 19700418 1998022 001",
+  coordinator: "Indah Novitasari, S.Pd, M.Si",
+  coordinatorNip: "NIP. 19911115 2023212 028",
 };
 
 function monthKey(d: Date) {
@@ -89,10 +89,10 @@ function LaporanPage() {
           .lt("day", end),
         prev
           ? supabase
-              .from("validation_items")
-              .select("points, validations!inner(status)")
-              .gte("day", monthRange(prev).start)
-              .lt("day", monthRange(prev).end)
+            .from("validation_items")
+            .select("points, validations!inner(status)")
+            .gte("day", monthRange(prev).start)
+            .lt("day", monthRange(prev).end)
           : Promise.resolve({ data: [] as { points: number; validations: { status: string } | null }[] }),
       ]);
 
