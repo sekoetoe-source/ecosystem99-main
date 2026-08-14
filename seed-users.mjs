@@ -3,13 +3,13 @@
  * Jalankan: node seed-users.mjs
  */
 
-const SUPABASE_URL = "https://grwzhnffkacfmlcmybtn.supabase.co";
-const ANON_KEY = "sb_publishable_jfhZzvHjV6Xgqo-2Q2hbFw_pY4POpJT";
+const SUPABASE_URL = "https://xeepznliwxmtnwumlfsm.supabase.co";
+const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlZXB6bmxpd3htdG53dW1sZnNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2OTAwODQsImV4cCI6MjEwMjI2NjA4NH0.OZA2LH0SyFd5oc3hwnfr8fUr4d02ZKJZ6bpOBGHy7Ik";
 
 const USERS = [
-  { email: "admin@smpn99.sch.id",   password: "Adm!n@Smpn99jkt",   role: "admin"   },
-  { email: "siswa@smpn99.sch.id",   password: "S!swa@Smpn99jkt",   role: "student" },
-  { email: "petugas@smpn99.sch.id", password: "P3tugas@Smpn99",    role: "officer" },
+  { email: "admin.smpn99@gmail.com",   password: "Adm!n@Smpn99jkt",   role: "admin"   },
+  { email: "siswa.smpn99@gmail.com",   password: "S!swa@Smpn99jkt",   role: "student" },
+  { email: "petugas.smpn99@gmail.com", password: "P3tugas@Smpn99",    role: "officer" },
 ];
 
 async function signUp(email, password) {
@@ -79,6 +79,6 @@ for (const user of USERS) {
 
 console.log("\n=== Selesai ===");
 console.log("Login di: http://localhost:8080/auth");
-console.log("  Admin   → admin@smpn99.sch.id   / Adm!n@Smpn99jkt");
-console.log("  Siswa   → siswa@smpn99.sch.id   / S!swa@Smpn99jkt");
-console.log("  Petugas → petugas@smpn99.sch.id / P3tugas@Smpn99");
+console.log("  Admin   → admin.smpn99@gmail.com   / Adm!n@Smpn99jkt");
+console.log("  Siswa   → siswa.smpn99@gmail.com   / S!swa@Smpn99jkt");
+console.log("  Petugas → petugas.smpn99@gmail.com / P3tugas@Smpn99");
