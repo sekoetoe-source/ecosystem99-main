@@ -165,7 +165,7 @@ function Index() {
           </nav>
           <div className="flex items-center gap-2">
             <Button asChild className="rounded-full">
-              <Link to={dashHref}>{me ? "Buka Dasbor" : "Login"}</Link>
+              <Link to={dashHref}>Login</Link>
             </Button>
             <Button
               variant="outline"
@@ -636,7 +636,7 @@ function Index() {
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Button asChild size="lg" className="rounded-full">
               <Link to={dashHref}>
-                {me ? "Buka Dasbor" : "Login School Ecosystem"} <ArrowRight className="size-4" />
+                Login School Ecosystem <ArrowRight className="size-4" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="rounded-full">
