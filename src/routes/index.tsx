@@ -521,26 +521,30 @@ function Index() {
           lead="Eco Score memakai rata-rata poin per siswa, bukan jumlah absolut, agar perbandingan antarkelas tetap adil."
         />
         <div className="surface-card overflow-hidden">
-          <div className="grid grid-cols-[60px_1fr_110px_110px] bg-surface-low px-5 py-4">
-            {["Rank", "Kelas", "Siswa", "Rata-rata"].map((h) => (
-              <span key={h} className="label-xs text-muted-foreground">
-                {h}
-              </span>
-            ))}
-          </div>
-          {(data?.classes ?? []).map((c, i) => (
-            <div
-              key={c.class_name ?? i}
-              className="grid grid-cols-[60px_1fr_110px_110px] items-center border-t border-border px-5 py-4 text-sm"
-            >
-              <span className="text-lg font-extrabold text-primary">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <strong>{c.class_name}</strong>
-              <span className="text-muted-foreground">{c.student_count ?? 0}</span>
-              <strong>{Math.round(Number(c.avg_points ?? 0))}</strong>
+          <div className="overflow-x-auto">
+            <div className="min-w-[480px]">
+              <div className="grid grid-cols-[60px_1fr_110px_110px] bg-surface-low px-5 py-4">
+                {["Rank", "Kelas", "Siswa", "Rata-rata"].map((h) => (
+                  <span key={h} className="label-xs text-muted-foreground">
+                    {h}
+                  </span>
+                ))}
+              </div>
+              {(data?.classes ?? []).map((c, i) => (
+                <div
+                  key={c.class_name ?? i}
+                  className="grid grid-cols-[60px_1fr_110px_110px] items-center border-t border-border px-5 py-4 text-sm"
+                >
+                  <span className="text-lg font-extrabold text-primary">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <strong>{c.class_name}</strong>
+                  <span className="text-muted-foreground">{c.student_count ?? 0}</span>
+                  <strong>{Math.round(Number(c.avg_points ?? 0))}</strong>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
           {(data?.classes ?? []).length === 0 && (
             <p className="border-t border-border px-5 py-8 text-center text-sm text-muted-foreground">
               Belum ada data kelas.
