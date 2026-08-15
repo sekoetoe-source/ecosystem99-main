@@ -59,7 +59,7 @@ function PenggunaPage() {
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [printClass, setPrintClass] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"siswa" | "petugas" | "semua">("siswa");
+  const [activeTab, setActiveTab] = useState<"siswa" | "petugas" | "semua" | "persetujuan">("siswa");
 
   // Modal form states
   const [addStudentOpen, setAddStudentOpen] = useState(false);
@@ -485,6 +485,7 @@ function PenggunaPage() {
           { id: "siswa", label: "Daftar Siswa" },
           { id: "petugas", label: "Petugas Pos" },
           { id: "semua", label: "Semua Akun & Role" },
+          { id: "persetujuan", label: "Persetujuan Akun Google" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -736,6 +737,165 @@ function PenggunaPage() {
           </div>
         </section>
       )}
+
+      {activeTab === "persetujuan" && (
+        <section>
+          <header>
+            <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">Persetujuan Akun Google</h2>
+            <p className="text-xs text-muted-foreground">
+              Daftar pengguna baru yang masuk lewat Google (OAuth) dan menunggu persetujuan Admin untuk mendapatkan hak akses.
+            </p>
+          </header>
+
+          <div className="surface-card mt-6 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/60 text-left">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Nama Pengguna</th>
+                  <th className="px-4 py-3 font-semibold">Role yang Diminta</th>
+                  <th className="px-4 py-3 font-semibold">NIS / Keterangan</th>
+                  <th className="px-4 py-3 text-center font-semibold">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(allUsers.data ?? [])
+                  .filter((u) => !u.is_approved && u.requested_role)
+                  .map((u) => (
+                    <tr key={u.id}>
+                      <td className="px-4 py-3 font-medium">{u.full_name}</td>
+                      <td className="px-4 py-3">
+                        <span className="label-xs rounded-full px-2.5 py-1 font-bold bg-amber-100 text-amber-700">
+                          {u.requested_role === "student"
+                            ? "SISWA"
+                            : u.requested_role === "officer"
+                              ? "PETUGAS POS"
+                              : "WALI KELAS"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{u.details}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="h-8 gap-1.5 rounded-full"
+                            onClick={() => {
+                              setApproveUser(u);
+                              setApproveRole(u.requested_role || "student");
+                              setApproveClassId(u.requested_class_id || "");
+                              setApproveNis(u.requested_nis || "");
+                            }}
+                          >
+                            <UserCheck className="size-3.5" />
+                            Tinjau & Setujui
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-8 gap-1.5 rounded-full"
+                            onClick={() => {
+                              if (confirm(`Tolak dan hapus permintaan dari "${u.full_name}"?`)) {
+                                deleteUserMutation.mutate(u.id);
+                              }
+                            }}
+                            disabled={deleteUserMutation.isPending}
+                          >
+                            <Trash2 className="size-3.5" />
+                            Tolak
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+            {(allUsers.data ?? []).filter((u) => !u.is_approved && u.requested_role).length === 0 && (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">Tidak ada permintaan persetujuan baru.</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* DIALOG TINJAU & SETUJUI PENGGUNA GOOGLE */}
+      <Dialog open={!!approveUser} onOpenChange={(open) => !open && setApproveUser(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tinjau Permintaan Akses</DialogTitle>
+            <DialogDescription>
+              Tentukan/sesuaikan data profil akun <b>{approveUser?.full_name}</b> sebelum disetujui.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Role Akun</label>
+              <select
+                value={approveRole}
+                onChange={(e) => setApproveRole(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              >
+                <option value="student">Siswa</option>
+                <option value="officer">Petugas Pos</option>
+                <option value="teacher">Wali Kelas</option>
+              </select>
+            </div>
+
+            {approveRole === "student" && (
+              <>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-muted-foreground">NIS (Nomor Induk Siswa)</label>
+                  <input
+                    type="text"
+                    required
+                    value={approveNis}
+                    onChange={(e) => setApproveNis(e.target.value)}
+                    placeholder="Contoh: 21455"
+                    className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-muted-foreground">Kelas</label>
+                  <select
+                    value={approveClassId}
+                    onChange={(e) => setApproveClassId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                  >
+                    <option value="">-- Pilih Kelas --</option>
+                    {(classes.data ?? []).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        Kelas {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {approveRole === "officer" && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground">Lokasi Pos Bertugas</label>
+                <select
+                  value={approveStation}
+                  onChange={(e) => setApproveStation(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                >
+                  <option value="Gerbang Utama">Gerbang Utama</option>
+                  <option value="Kantin">Kantin</option>
+                  <option value="Koperasi">Koperasi</option>
+                  <option value="Greenhouse">Greenhouse</option>
+                </select>
+              </div>
+            )}
+
+            <Button
+              className="w-full rounded-full mt-2"
+              onClick={() => approveUserMutation.mutate()}
+              disabled={approveUserMutation.isPending}
+            >
+              Setujui & Aktifkan Akun
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* DIALOG BUAT AKUN PENGGUNA BARU */}
       <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
