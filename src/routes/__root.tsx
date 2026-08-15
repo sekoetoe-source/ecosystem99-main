@@ -39,34 +39,52 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+
+    // Deteksi jika error disebabkan oleh chunk JS 404 / gagal muat modul dinamis (akibat deployment baru)
+    const errStr = (error?.message || String(error)).toLowerCase();
+    const isChunkError =
+      errStr.includes("failed to fetch dynamically imported module") ||
+      errStr.includes("importing a module script failed") ||
+      errStr.includes("loading chunk") ||
+      errStr.includes("404");
+
+    if (isChunkError) {
+      const storageKey = "chunk_reload_count";
+      const count = Number(sessionStorage.getItem(storageKey) || 0);
+      if (count < 2) {
+        sessionStorage.setItem(storageKey, String(count + 1));
+        window.location.reload();
+      }
+    }
   }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          Tampilan perlu diperbarui
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          Versi baru aplikasi telah dirilis. Silakan muat ulang halaman untuk mendapatkan pembaruan terbaru.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
-              router.invalidate();
-              reset();
+              sessionStorage.removeItem("chunk_reload_count");
+              window.location.reload();
             }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Try again
+            Muat Ulang Halaman
           </button>
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Go home
+            Kembali ke Beranda
           </a>
         </div>
       </div>
