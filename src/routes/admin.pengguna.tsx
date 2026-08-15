@@ -141,12 +141,45 @@ function PenggunaPage() {
     },
   });
 
+  // State untuk persetujuan akun Google
+  const [approveUser, setApproveUser] = useState<any | null>(null);
+  const [approveRole, setApproveRole] = useState("student");
+  const [approveClassId, setApproveClassId] = useState("");
+  const [approveNis, setApproveNis] = useState("");
+  const [approveStation, setApproveStation] = useState("Gerbang Utama");
+
+  const approveUserMutation = useMutation({
+    mutationFn: async () => {
+      if (!approveUser) return;
+      const { error } = await supabase.rpc("admin_approve_user", {
+        _user_id: approveUser.id,
+        _role: approveRole,
+        _class_id: approveRole === "student" && approveClassId ? approveClassId : null,
+        _nis: approveRole === "student" && approveNis ? approveNis : null,
+        _station: approveRole === "officer" ? approveStation : null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pengguna berhasil disetujui!");
+      setApproveUser(null);
+      setApproveRole("student");
+      setApproveClassId("");
+      setApproveNis("");
+      setApproveStation("Gerbang Utama");
+      queryClient.invalidateQueries({ queryKey: ["admin-all-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-officers"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menyetujui akun"),
+  });
+
   const allUsers = useQuery({
     queryKey: ["admin-all-users"],
     queryFn: async () => {
       const { data: profilesData } = await supabase
         .from("profiles")
-        .select("id, full_name, user_roles(role)");
+        .select("id, full_name, is_approved, requested_role, requested_class_id, requested_nis, user_roles(role)");
 
       const [studentsRes, officersRes, classesRes] = await Promise.all([
         supabase.from("students").select("profile_id, nis, class_id"),
@@ -170,28 +203,45 @@ function PenggunaPage() {
               : "student";
         
         let details = "";
-        if (role === "student") {
-          const s = studentsMap.get(p.id);
-          if (s) {
-            const cls = classesMap.get(s.class_id);
-            details = `Siswa (NIS: ${s.nis}${cls ? `, Kelas: ${cls.name}` : ""})`;
-          } else {
-            details = "Siswa";
+        if (p.is_approved) {
+          if (role === "student") {
+            const s = studentsMap.get(p.id);
+            if (s) {
+              const cls = classesMap.get(s.class_id);
+              details = `Siswa (NIS: ${s.nis}${cls ? `, Kelas: ${cls.name}` : ""})`;
+            } else {
+              details = "Siswa";
+            }
+          } else if (role === "officer") {
+            const o = officersMap.get(p.id);
+            details = `Petugas (Pos: ${o?.station ?? "-"})`;
+          } else if (role === "teacher") {
+            const cls = teacherClassMap.get(p.id);
+            details = `Wali Kelas${cls ? ` (${cls.name})` : ""}`;
+          } else if (role === "admin") {
+            details = "Administrator";
           }
-        } else if (role === "officer") {
-          const o = officersMap.get(p.id);
-          details = `Petugas (Pos: ${o?.station ?? "-"})`;
-        } else if (role === "teacher") {
-          const cls = teacherClassMap.get(p.id);
-          details = `Wali Kelas${cls ? ` (${cls.name})` : ""}`;
-        } else if (role === "admin") {
-          details = "Administrator";
+        } else {
+          const reqClass = p.requested_class_id ? classesMap.get(p.requested_class_id) : null;
+          details = `MENUNGGU PERSETUJUAN - Ingin Jadi: ${
+            p.requested_role === "student" 
+              ? `Siswa (NIS: ${p.requested_nis ?? "-"}, Kelas: ${reqClass?.name ?? "-"})` 
+              : p.requested_role === "officer" 
+                ? "Petugas Pos" 
+                : p.requested_role === "teacher"
+                  ? "Wali Kelas"
+                  : "Belum Mengisi"
+          }`;
         }
 
         return {
           id: p.id,
           full_name: p.full_name,
           role,
+          is_approved: p.is_approved,
+          requested_role: p.requested_role,
+          requested_class_id: p.requested_class_id,
+          requested_nis: p.requested_nis,
           details
         };
       });

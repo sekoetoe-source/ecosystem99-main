@@ -35,10 +35,25 @@ function AuthPage() {
   const [nis, setNis] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  const { me } = useMe();
+  const { me, isLoading } = useMe();
+
+  // Pendaftaran Google states
+  const [requestedRole, setRequestedRole] = useState("student");
+  const [requestedClassId, setRequestedClassId] = useState("");
+  const [requestedNis, setRequestedNis] = useState("");
+
+  const { data: classes } = useQuery({
+    queryKey: ["auth-classes"],
+    queryFn: async () => {
+      const { data } = await supabase.from("classes").select("id, name").order("name");
+      return data ?? [];
+    },
+  });
 
   useEffect(() => {
-    if (me) navigate({ to: homeForRole[me.primaryRole], replace: true });
+    if (me && me.isApproved) {
+      navigate({ to: homeForRole[me.primaryRole], replace: true });
+    }
   }, [me, navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -88,6 +103,127 @@ function AuthPage() {
       toast.error(err instanceof Error ? err.message : "Terjadi kesalahan Google Login");
       setBusy(false);
     }
+  }
+
+  async function handleSaveDetails(e: React.FormEvent) {
+    e.preventDefault();
+    if (!me) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          requested_role: requestedRole,
+          requested_class_id: requestedRole === "student" && requestedClassId ? requestedClassId : null,
+          requested_nis: requestedRole === "student" ? requestedNis : null,
+        })
+        .eq("id", me.userId);
+      if (error) throw error;
+      toast.success("Profil tersimpan. Silakan tunggu persetujuan Admin.");
+      window.location.reload();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan profil");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // JIKA SUDAH LOGIN TAPI BELUM DI-APPROVE ADMIN
+  if (me && !me.isApproved) {
+    const hasRequested = !!me.requestedRole;
+
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 bg-background">
+        <div className="w-full max-w-md surface-card p-8 space-y-6">
+          <div className="flex items-center gap-3 text-lg font-extrabold text-primary">
+            <Leaf className="size-6 animate-pulse" /> School Ecosystem
+          </div>
+
+          {!hasRequested ? (
+            <form onSubmit={handleSaveDetails} className="space-y-4">
+              <div>
+                <h1 className="text-xl font-bold">Lengkapi Data Diri Anda</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Akun Google Anda terdeteksi baru. Tentukan peran Anda sebelum masuk.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="req-role">Saya adalah seorang:</Label>
+                <select
+                  id="req-role"
+                  value={requestedRole}
+                  onChange={(e) => setRequestedRole(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                >
+                  <option value="student">Siswa</option>
+                  <option value="officer">Petugas Pos</option>
+                  <option value="teacher">Wali Kelas</option>
+                </select>
+              </div>
+
+              {requestedRole === "student" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="req-nis">NIS (Nomor Induk Siswa)</Label>
+                    <Input
+                      id="req-nis"
+                      required
+                      placeholder="Contoh: 21455"
+                      value={requestedNis}
+                      onChange={(e) => setRequestedNis(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="req-class">Pilih Kelas</Label>
+                    <select
+                      id="req-class"
+                      required
+                      value={requestedClassId}
+                      onChange={(e) => setRequestedClassId(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                    >
+                      <option value="">-- Pilih Kelas --</option>
+                      {(classes ?? []).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          Kelas {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy && <Loader2 className="size-4 animate-spin mr-2" />}
+                Kirim Permintaan Akses
+              </Button>
+            </form>
+          ) : (
+            <div className="space-y-4 text-center">
+              <h2 className="text-xl font-bold">Menunggu Persetujuan Admin ⏳</h2>
+              <p className="text-sm text-muted-foreground">
+                Data diri Anda ({me.fullName}) sebagai <b>{me.requestedRole === "student" ? "Siswa" : me.requestedRole === "officer" ? "Petugas" : "Wali Kelas"}</b> sedang diperiksa oleh Admin sekolah.
+              </p>
+              <p className="text-xs text-eco bg-green-50 p-3 rounded-xl">
+                Silakan hubungi admin sekolah untuk mempercepat proses persetujuan.
+              </p>
+              <Button variant="outline" className="w-full" onClick={() => supabase.auth.signOut().then(() => window.location.reload())}>
+                Keluar & Masuk Akun Lain
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (

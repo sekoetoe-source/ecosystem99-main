@@ -41,6 +41,10 @@ export type Me = {
   userId: string;
   email: string | null;
   fullName: string;
+  isApproved: boolean;
+  requestedRole: string | null;
+  requestedClassId: string | null;
+  requestedNis: string | null;
   roles: AppRole[];
   primaryRole: AppRole;
   student: { id: string; nis: string; full_name: string; class_id: string | null } | null;
@@ -59,7 +63,7 @@ export function useMe() {
       if (!userId) return null;
       const [{ data: profile }, { data: roleRows }, { data: student }, { data: officer }] =
         await Promise.all([
-          supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+          supabase.from("profiles").select("full_name, is_approved, requested_role, requested_class_id, requested_nis").eq("id", userId).maybeSingle(),
           supabase.from("user_roles").select("role").eq("user_id", userId),
           supabase
             .from("students")
@@ -96,6 +100,10 @@ export function useMe() {
         userId,
         email: session?.user.email ?? null,
         fullName: profile?.full_name ?? session?.user.email ?? "Pengguna",
+        isApproved: profile ? (profile as any).is_approved : false,
+        requestedRole: profile ? (profile as any).requested_role : null,
+        requestedClassId: profile ? (profile as any).requested_class_id : null,
+        requestedNis: profile ? (profile as any).requested_nis : null,
         roles,
         primaryRole,
         student: student ?? null,
