@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { QrImage } from "@/components/eco/QrImage";
@@ -273,17 +274,73 @@ function PenggunaPage() {
     mutationFn: async () => {
       if (!addEmail || !addPassword || !addFullName) throw new Error("Email, password, dan nama wajib diisi");
       
-      // Call secure database function to insert into auth.users + roles
-      const { data, error } = await supabase.rpc("admin_create_user", {
-        _email: addEmail,
+      let finalEmail = addEmail.trim();
+      if (!finalEmail.includes("@")) {
+        finalEmail = `${finalEmail}@smpn99.sch.id`;
+      }
+
+      // 1. Coba panggil RPC database admin_create_user jika sudah ada di Supabase
+      const rpcRes = await supabase.rpc("admin_create_user", {
+        _email: finalEmail,
         _password: addPassword,
         _full_name: addFullName,
         _role: addRole,
         _class_id: addClassId || null,
         _station: addStation,
       });
-      if (error) throw error;
-      return data;
+
+      if (!rpcRes.error) {
+        return rpcRes.data;
+      }
+
+      // 2. Fallback: Buat akun via Client Auth terisolasi (tanpa mempengaruhi sesi Admin)
+      const SUPABASE_URL = (import.meta as any).env['VITE_SUPABASE_URL'] || (process as any).env['SUPABASE_URL'];
+      const SUPABASE_PUBLISHABLE_KEY = (import.meta as any).env['VITE_SUPABASE_PUBLISHABLE_KEY'] || (process as any).env['SUPABASE_PUBLISHABLE_KEY'];
+      
+      const tempSupabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+
+      const { data: signUpData, error: signUpErr } = await tempSupabase.auth.signUp({
+        email: finalEmail,
+        password: addPassword,
+        options: {
+          data: { full_name: addFullName },
+        },
+      });
+
+      if (signUpErr) {
+        throw new Error(signUpErr.message);
+      }
+
+      const newUserId = signUpData.user?.id;
+      if (!newUserId) throw new Error("Gagal mendaftarkan pengguna baru");
+
+      // Set profil diapprove & update nama
+      await supabase.from("profiles").update({ is_approved: true, full_name: addFullName }).eq("id", newUserId);
+
+      // Set user role
+      await supabase.from("user_roles").delete().eq("user_id", newUserId);
+      await supabase.from("user_roles").insert({ user_id: newUserId, role: addRole as any });
+
+      // Set entifikasi khusus role
+      if (addRole === "student") {
+        const generatedNis = 'S' + Date.now().toString().slice(-6);
+        await supabase.from("students").insert({
+          profile_id: newUserId,
+          full_name: addFullName,
+          nis: generatedNis,
+          class_id: addClassId || null,
+        });
+      } else if (addRole === "officer") {
+        await supabase.from("officers").insert({
+          profile_id: newUserId,
+          full_name: addFullName,
+          station: addStation || "Gerbang Utama",
+        });
+      }
+
+      return newUserId;
     },
     onSuccess: () => {
       toast.success("Akun pengguna berhasil dibuat!");
