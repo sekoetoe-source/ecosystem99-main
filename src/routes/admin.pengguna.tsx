@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck } from "lucide-react";
+import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -326,6 +326,22 @@ function PenggunaPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal mengubah role"),
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc("admin_delete_user", {
+        _user_id: userId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Akun pengguna berhasil dihapus");
+      queryClient.invalidateQueries({ queryKey: ["admin-all-users"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-officers"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menghapus akun"),
+  });
+
   function exportCsv() {
     const csv = [
       ["nama", "nis", "kelas", "item", "poin"].join(","),
@@ -631,18 +647,34 @@ function PenggunaPage() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{u.details}</td>
                     <td className="px-4 py-3 text-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 rounded-full"
-                        onClick={() => {
-                          setChangeRoleUser(u);
-                          setNewRole(u.role);
-                        }}
-                      >
-                        <UserCheck className="size-3.5" />
-                        Ubah Role
-                      </Button>
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 rounded-full"
+                          onClick={() => {
+                            setChangeRoleUser(u);
+                            setNewRole(u.role);
+                          }}
+                        >
+                          <UserCheck className="size-3.5" />
+                          Ubah Role
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 gap-1.5 rounded-full"
+                          onClick={() => {
+                            if (confirm(`Apakah Anda yakin ingin menghapus akun "${u.full_name}"? Tindakan ini tidak dapat dibatalkan.`)) {
+                              deleteUserMutation.mutate(u.id);
+                            }
+                          }}
+                          disabled={deleteUserMutation.isPending}
+                        >
+                          <Trash2 className="size-3.5" />
+                          Hapus
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
