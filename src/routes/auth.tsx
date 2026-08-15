@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Leaf, Loader2, ScanLine, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
