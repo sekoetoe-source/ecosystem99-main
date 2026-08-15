@@ -61,9 +61,18 @@ export function useMe() {
     enabled: !loading,
     queryFn: async () => {
       if (!userId) return null;
-      const [{ data: profile }, { data: roleRows }, { data: student }, { data: officer }] =
+      const fetchProfile = async () => {
+        const { data, error } = await supabase.from("profiles").select("full_name, is_approved, requested_role, requested_class_id, requested_nis").eq("id", userId).maybeSingle();
+        if (error) {
+          const { data: fb } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+          return { full_name: fb?.full_name, is_approved: true, requested_role: null, requested_class_id: null, requested_nis: null };
+        }
+        return data;
+      };
+
+      const [profile, { data: roleRows }, { data: student }, { data: officer }] =
         await Promise.all([
-          supabase.from("profiles").select("full_name, is_approved, requested_role, requested_class_id, requested_nis").eq("id", userId).maybeSingle(),
+          fetchProfile(),
           supabase.from("user_roles").select("role").eq("user_id", userId),
           supabase
             .from("students")

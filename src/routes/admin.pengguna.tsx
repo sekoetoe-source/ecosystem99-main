@@ -177,9 +177,20 @@ function PenggunaPage() {
   const allUsers = useQuery({
     queryKey: ["admin-all-users"],
     queryFn: async () => {
-      const { data: profilesData } = await supabase
+      let profilesData: any[] | null = null;
+      const primaryRes = await supabase
         .from("profiles")
         .select("id, full_name, is_approved, requested_role, requested_class_id, requested_nis, user_roles(role)");
+
+      if (primaryRes.error) {
+        // Fallback jika kolom approval belum dibuat di database Supabase Cloud
+        const fallbackRes = await supabase
+          .from("profiles")
+          .select("id, full_name, user_roles(role)");
+        profilesData = (fallbackRes.data ?? []).map(p => ({ ...p, is_approved: true }));
+      } else {
+        profilesData = primaryRes.data;
+      }
 
       const [studentsRes, officersRes, classesRes] = await Promise.all([
         supabase.from("students").select("profile_id, nis, class_id"),
