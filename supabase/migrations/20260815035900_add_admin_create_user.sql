@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION public.admin_create_user(
   _class_id uuid DEFAULT NULL,
   _station text DEFAULT NULL
 )
-RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE
   v_user_id uuid;
   v_encrypted_password text;
@@ -20,8 +20,8 @@ BEGIN
     RAISE EXCEPTION 'Hanya admin yang diperbolehkan membuat akun baru';
   END IF;
 
-  -- Hash password using bcrypt compatible with pgcrypto
-  v_encrypted_password := crypt(_password, gen_salt('bf'));
+  -- Hash password using bcrypt compatible with pgcrypto (prefixed with extensions schema)
+  v_encrypted_password := extensions.crypt(_password, extensions.gen_salt('bf'));
 
   -- Insert directly into auth.users (Supabase Schema)
   INSERT INTO auth.users (
