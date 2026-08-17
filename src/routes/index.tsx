@@ -107,11 +107,8 @@ const useSchoolStats = () => {
           return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas" && Number(s.earned_points ?? 0) > 0);
         });
 
-        const realValItems = valItemsCount ?? 0;
-        const totalPoints = validScores.reduce((a, s) => a + Number(s.earned_points ?? 0), 0);
-
-        // If no active validated scans exist yet, initialize metrics cleanly to 0
-        if (totalPoints === 0 && realValItems === 0) {
+        // If no active students with points exist yet, initialize all metrics including classes to 0
+        if (validScores.length === 0 || totalPoints === 0) {
           return {
             totalPoints: 0,
             totalItems: 0,
