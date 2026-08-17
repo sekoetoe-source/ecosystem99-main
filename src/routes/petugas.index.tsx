@@ -74,21 +74,28 @@ function ScannerPage() {
         .insert({
           student_id: student.id,
           officer_id: me?.officer?.id ?? null,
-          status: source === "scan" ? "approved" : "pending",
+          status: "approved",
           source,
           station: me?.officer?.station ?? "Pos Admin",
-          reviewed_at: source === "scan" ? new Date().toISOString() : null,
+          reviewed_at: new Date().toISOString(),
         })
         .select("id")
         .single();
       if (vError) throw vError;
 
-      const rows = items.map((code2) => ({
-        validation_id: validation.id,
-        item_code: code2,
-        student_id: student.id,
-        points: ecoItems.data?.find((i) => i.code === code2)?.points ?? 0,
-      }));
+      const rows = items.map((code2) => {
+        const itemMatch = ecoItems.data?.find((i) => i.code === code2);
+        const fallbackPoints = code2 === "tumbler" ? 100 : code2 === "lunchbox" ? 50 : 50;
+        return {
+          validation_id: validation.id,
+          item_code: code2,
+          student_id: student.id,
+          points: itemMatch ? itemMatch.points : fallbackPoints,
+        };
+      });
+
+      const totalPointsAdded = rows.reduce((acc, r) => acc + r.points, 0);
+
       const { error: iError } = await supabase.from("validation_items").insert(rows);
       if (iError) {
         await supabase.from("validations").delete().eq("id", validation.id);
@@ -96,16 +103,19 @@ function ScannerPage() {
           throw new Error(`${student.full_name} sudah mendapat poin item tersebut hari ini`);
         throw iError;
       }
-      return { student, source };
+      return { student, source, totalPointsAdded };
     },
-    onSuccess: ({ student, source }) => {
+    onSuccess: ({ student, totalPointsAdded }) => {
       toast.success(
-        source === "scan"
-          ? `Validasi ${student.full_name} disetujui`
-          : `Validasi manual ${student.full_name} menunggu persetujuan admin`,
+        `Validasi +${totalPointsAdded} poin (${student.full_name}) berhasil dicatat & masuk perolehan poin!`
       );
       setNis("");
       queryClient.invalidateQueries({ queryKey: ["officer-recent"] });
+      queryClient.invalidateQueries({ queryKey: ["student-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+      queryClient.invalidateQueries({ queryKey: ["school-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["landing-challenges"] });
+      queryClient.invalidateQueries({ queryKey: ["formal-report"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal memvalidasi"),
   });

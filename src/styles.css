@@ -200,6 +200,10 @@
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 5mm;
+  }
   .no-print, header, nav, sidebar, [role="navigation"] {
     display: none !important;
   }
@@ -208,6 +212,8 @@
     color: #000000 !important;
     overflow: visible !important;
     height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   .print-area {
     position: static !important;
@@ -222,14 +228,22 @@
     page-break-after: always !important;
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
-    gap: 8px !important;
-    padding: 6px !important;
+    grid-template-rows: repeat(4, 1fr) !important;
+    gap: 4px !important;
+    padding: 2px !important;
     margin: 0 !important;
+    height: 282mm !important;
+    max-height: 282mm !important;
+    box-sizing: border-box !important;
   }
   .print-card {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
     box-shadow: none !important;
     border: 1px solid #cbd5e1 !important;
+    height: 68mm !important;
+    max-height: 68mm !important;
+    padding: 4px !important;
+    box-sizing: border-box !important;
   }
 }

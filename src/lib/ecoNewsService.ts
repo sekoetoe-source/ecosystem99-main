@@ -13,6 +13,7 @@ export type EcoNewsItem = {
   date?: string;
   icon?: string;
   badge?: string;
+  is_published?: boolean;
 };
 
 export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
@@ -27,6 +28,7 @@ export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
     date: "Real-time Live",
     icon: "🌫️",
     badge: "AQI Jakarta Real-Time",
+    is_published: true,
   },
   {
     id: "news-1",
@@ -39,6 +41,7 @@ export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
     date: "Hari Ini",
     icon: "🌬️",
     badge: "Lingkungan Jakarta",
+    is_published: true,
   },
   {
     id: "news-2",
@@ -50,6 +53,7 @@ export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
     date: "Rekomendasi Medis",
     icon: "💧",
     badge: "Kesehatan Remaja",
+    is_published: true,
   },
   {
     id: "news-3",
@@ -61,6 +65,7 @@ export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
     date: "Tips Harian",
     icon: "🍱",
     badge: "Kantin Sehat",
+    is_published: true,
   },
   {
     id: "news-4",
@@ -72,6 +77,7 @@ export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
     date: "Info Kompetisi",
     icon: "🏆",
     badge: "Eco Challenge",
+    is_published: true,
   },
   {
     id: "news-5",
@@ -83,6 +89,7 @@ export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
     date: "Tips Kesehatan",
     icon: "🧘‍♂️",
     badge: "Kesehatan Fisik",
+    is_published: true,
   },
   {
     id: "news-6",
@@ -95,27 +102,88 @@ export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
     date: "Fakta Lingkungan",
     icon: "🌍",
     badge: "Jakarta Eco",
+    is_published: true,
   },
 ];
 
+const LOCAL_STORAGE_KEY = "eco_news_items_v2";
+
+export function getAllEcoNewsLocal(): EcoNewsItem[] {
+  if (typeof window === "undefined") return DEFAULT_ECO_NEWS;
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (_) {}
+  return DEFAULT_ECO_NEWS;
+}
+
+export function saveAllEcoNewsLocal(items: EcoNewsItem[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+  } catch (_) {}
+}
+
 export async function fetchEcoNews(): Promise<EcoNewsItem[]> {
+  let list: EcoNewsItem[] = [];
   try {
     const { data, error } = await (supabase as any)
       .from("eco_news")
-      .select("id, category, title, summary, content, source, source_url, date, icon, badge")
-      .eq("is_published", true)
+      .select("id, category, title, summary, content, source, source_url, date, icon, badge, is_published")
       .order("created_at", { ascending: false });
 
     if (!error && data && data.length > 0) {
-      return data.map((d: any) => ({
+      list = data.map((d: any) => ({
         ...d,
         sourceUrl: d.source_url || d.sourceUrl,
+        is_published: d.is_published !== false,
       })) as EcoNewsItem[];
     }
-  } catch (_) {
-    // Fallback jika tabel supabase belum dibuat
+  } catch (_) {}
+
+  if (list.length === 0) {
+    list = getAllEcoNewsLocal();
   }
-  return DEFAULT_ECO_NEWS;
+
+  // Filter only published / active news items for ticker
+  return list.filter((item) => item.is_published !== false);
+}
+
+export function toggleEcoNewsStatusLocal(id: string): EcoNewsItem[] {
+  const current = getAllEcoNewsLocal();
+  const updated = current.map((item) => {
+    if (item.id === id) {
+      return { ...item, is_published: item.is_published === false ? true : false };
+    }
+    return item;
+  });
+  saveAllEcoNewsLocal(updated);
+  return updated;
+}
+
+export function addEcoNewsItemLocal(newItem: Omit<EcoNewsItem, "id">): EcoNewsItem[] {
+  const current = getAllEcoNewsLocal();
+  const created: EcoNewsItem = {
+    ...newItem,
+    id: `custom-news-${Date.now()}`,
+    is_published: true,
+    date: newItem.date || "Baru",
+  };
+  const updated = [created, ...current];
+  saveAllEcoNewsLocal(updated);
+  return updated;
+}
+
+export function deleteEcoNewsItemLocal(id: string): EcoNewsItem[] {
+  const current = getAllEcoNewsLocal();
+  const updated = current.filter((item) => item.id !== id);
+  saveAllEcoNewsLocal(updated);
+  return updated;
 }
 
 export function getCategoryBadgeStyle(category: EcoNewsCategory) {

@@ -17,7 +17,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EcoNewsTicker } from "@/components/eco/EcoNewsTicker";
-import { DEFAULT_ECO_NEWS, getCategoryBadgeStyle, type EcoNewsItem } from "@/lib/ecoNewsService";
+import {
+  DEFAULT_ECO_NEWS,
+  getCategoryBadgeStyle,
+  type EcoNewsItem,
+  type EcoNewsCategory,
+  getAllEcoNewsLocal,
+  toggleEcoNewsStatusLocal,
+  addEcoNewsItemLocal,
+  deleteEcoNewsItemLocal,
+} from "@/lib/ecoNewsService";
 
 export const Route = createFileRoute("/admin/pengguna")({
   head: () => ({
@@ -99,6 +108,59 @@ function PenggunaPage() {
   const [newRole, setNewRole] = useState("");
   const [newClassId, setNewClassId] = useState("");
   const [newStation, setNewStation] = useState("Gerbang Utama");
+
+  // Running Text Management State
+  const [allNews, setAllNews] = useState<EcoNewsItem[]>(() => getAllEcoNewsLocal());
+  const [addNewsOpen, setAddNewsOpen] = useState(false);
+  const [newsTitle, setNewsTitle] = useState("");
+  const [newsCategory, setNewsCategory] = useState<EcoNewsCategory>("lingkungan");
+  const [newsIcon, setNewsIcon] = useState("🌿");
+  const [newsSummary, setNewsSummary] = useState("");
+  const [newsContent, setNewsContent] = useState("");
+  const [newsSource, setNewsSource] = useState("");
+  const [newsSourceUrl, setNewsSourceUrl] = useState("");
+
+  const handleToggleNewsStatus = (id: string) => {
+    const updated = toggleEcoNewsStatusLocal(id);
+    setAllNews(updated);
+    queryClient.invalidateQueries({ queryKey: ["eco-news-items"] });
+    toast.success("Status headline running text diperbarui");
+  };
+
+  const handleAddNews = () => {
+    if (!newsTitle.trim() || !newsSummary.trim()) {
+      toast.error("Judul dan ringkasan berita wajib diisi");
+      return;
+    }
+    const updated = addEcoNewsItemLocal({
+      title: newsTitle.trim(),
+      category: newsCategory,
+      icon: newsIcon || "🌿",
+      summary: newsSummary.trim(),
+      content: newsContent.trim() || newsSummary.trim(),
+      source: newsSource.trim() || "SMPN 99 Eco Care",
+      ...(newsSourceUrl.trim() ? { sourceUrl: newsSourceUrl.trim() } : {}),
+      badge: newsCategory === "lingkungan" ? "Lingkungan" : newsCategory === "kesehatan" ? "Kesehatan Remaja" : newsCategory === "aqi" ? "AQI Real-Time" : "Info Sekolah",
+    });
+    setAllNews(updated);
+    setAddNewsOpen(false);
+    setNewsTitle("");
+    setNewsSummary("");
+    setNewsContent("");
+    setNewsSource("");
+    setNewsSourceUrl("");
+    queryClient.invalidateQueries({ queryKey: ["eco-news-items"] });
+    toast.success("Headline running text baru berhasil ditambahkan!");
+  };
+
+  const handleDeleteNews = (id: string) => {
+    if (confirm("Hapus headline running text ini?")) {
+      const updated = deleteEcoNewsItemLocal(id);
+      setAllNews(updated);
+      queryClient.invalidateQueries({ queryKey: ["eco-news-items"] });
+      toast.success("Headline running text berhasil dihapus");
+    }
+  };
 
   async function downloadQrCode(student: any) {
     try {
@@ -1193,6 +1255,12 @@ function PenggunaPage() {
                 Headline berita & tips kesehatan remaja/sekolah (AQI Jakarta, bebas plastik, hidrasi, dll) yang berjalan di beranda dan dasbor.
               </p>
             </div>
+            <Button
+              onClick={() => setAddNewsOpen(true)}
+              className="gap-2 rounded-full font-bold shadow-sm"
+            >
+              <Plus className="size-4" /> Tambah Running Text Baru
+            </Button>
           </header>
 
           <div className="surface-card p-4 rounded-2xl border border-emerald-500/20">
@@ -1205,37 +1273,71 @@ function PenggunaPage() {
           <div className="surface-card rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-border bg-muted/40 flex items-center justify-between">
               <div>
-                <h3 className="font-extrabold text-sm text-foreground">Daftar Tips & Berita AI Lingkungan & Kesehatan Remaja</h3>
-                <p className="text-xs text-muted-foreground">Otomatis dirotasi secara halus di halaman depan & dasbor siswa</p>
+                <h3 className="font-extrabold text-sm text-foreground">Daftar Tips & Berita Running Text</h3>
+                <p className="text-xs text-muted-foreground">Aktifkan atau nonaktifkan informasi yang tampil di running text beranda & dasbor</p>
               </div>
-              <span className="text-xs font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
-                {DEFAULT_ECO_NEWS.length} Berita Aktif
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/20">
+                  {allNews.filter((i) => i.is_published !== false).length} Aktif
+                </span>
+                <span className="text-xs font-bold bg-muted text-muted-foreground px-3 py-1 rounded-full">
+                  Total {allNews.length} Berita
+                </span>
+              </div>
             </div>
             <div className="divide-y divide-border">
-              {DEFAULT_ECO_NEWS.map((item) => (
-                <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-muted/20 transition-colors">
-                  <div className="flex items-start gap-3.5">
-                    <span className="text-3xl shrink-0 p-2 rounded-2xl bg-muted/60">{item.icon || "🌿"}</span>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${getCategoryBadgeStyle(item.category)}`}>
-                          {item.badge || item.category}
-                        </span>
-                        <span className="text-xs text-muted-foreground font-medium">{item.source}</span>
+              {allNews.map((item) => {
+                const isActive = item.is_published !== false;
+                const isCustom = item.id.startsWith("custom-news-");
+                return (
+                  <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-muted/20 transition-colors">
+                    <div className="flex items-start gap-3.5">
+                      <span className="text-3xl shrink-0 p-2 rounded-2xl bg-muted/60">{item.icon || "🌿"}</span>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${getCategoryBadgeStyle(item.category)}`}>
+                            {item.badge || item.category}
+                          </span>
+                          <span className="text-xs text-muted-foreground font-medium">{item.source}</span>
+                          {isCustom && (
+                            <span className="text-[10px] bg-purple-500/10 text-purple-600 px-2 py-0.5 rounded-full font-bold">
+                              Kustom
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="font-bold text-sm sm:text-base text-foreground leading-snug">{item.title}</h4>
+                        <p className="text-xs text-muted-foreground max-w-2xl">{item.summary}</p>
                       </div>
-                      <h4 className="font-bold text-sm sm:text-base text-foreground leading-snug">{item.title}</h4>
-                      <p className="text-xs text-muted-foreground max-w-2xl">{item.summary}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <Button
+                        variant={isActive ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleToggleNewsStatus(item.id)}
+                        className={`rounded-full gap-1.5 text-xs font-bold ${
+                          isActive
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            : "border-slate-300 text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <span className={`size-2 rounded-full ${isActive ? "bg-white animate-pulse" : "bg-slate-400"}`} />
+                        {isActive ? "Aktif di Running Text" : "Nonaktif (Klik utk Aktifkan)"}
+                      </Button>
+                      {isCustom && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteNews(item.id)}
+                          className="size-8 text-destructive hover:bg-destructive/10 rounded-full"
+                          title="Hapus berita kustom ini"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/80 dark:text-emerald-300 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
-                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Aktif di Running Text
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
@@ -1639,40 +1741,94 @@ function PenggunaPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
-        <DialogContent className="max-w-sm">
+      {/* DIALOG TAMBAH RUNNING TEXT BARU */}
+      <Dialog open={addNewsOpen} onOpenChange={setAddNewsOpen}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-center">Kartu Identitas QR</DialogTitle>
-            <DialogDescription className="text-center">
-              Pindai kode QR di bawah untuk validasi botol tumbler dan lunchbox.
+            <DialogTitle>Tambah Running Text / Headline Baru</DialogTitle>
+            <DialogDescription>
+              Tambahkan berita atau tips kesehatan & lingkungan baru untuk running text di beranda dan dasbor.
             </DialogDescription>
           </DialogHeader>
-          {selectedStudent && (
-            <div className="flex flex-col items-center space-y-6 py-4">
-              <div className="gradient-hero w-full rounded-2xl p-6 text-primary-foreground shadow-lift">
-                <span className="label-xs text-primary-foreground/75">KARTU IDENTITAS ECO</span>
-                <h3 className="mt-1 text-xl font-extrabold">{selectedStudent.full_name}</h3>
-                <p className="text-sm opacity-90">
-                  Kelas {selectedStudent.class_name || "-"} · NIS {selectedStudent.nis}
-                </p>
-                <div className="mt-4 flex items-center justify-between border-t border-primary-foreground/20 pt-4">
-                  <span className="text-xs opacity-75">Eco Score</span>
-                  <span className="text-base font-bold">{selectedStudent.earned_points} poin</span>
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-card p-4 shadow-md">
-                <QrImage value={selectedStudent.nis} size={200} />
-              </div>
-
-              <Button
-                className="w-full gap-2 rounded-full"
-                onClick={() => downloadQrCode(selectedStudent)}
-              >
-                <Download className="size-4" /> Unduh QR Code
-              </Button>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Judul Headline / Berita</label>
+              <input
+                type="text"
+                placeholder="Contoh: 🥤 Tips Hidrasi Remaja Saat Jam Istirahat"
+                value={newsTitle}
+                onChange={(e) => setNewsTitle(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
             </div>
-          )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground">Kategori</label>
+                <select
+                  value={newsCategory}
+                  onChange={(e) => setNewsCategory(e.target.value as EcoNewsCategory)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                >
+                  <option value="lingkungan">Lingkungan</option>
+                  <option value="kesehatan">Kesehatan</option>
+                  <option value="sekolah">Sekolah</option>
+                  <option value="aqi">AQI / Udara</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground">Ikon Emoji</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 🌿"
+                  value={newsIcon}
+                  onChange={(e) => setNewsIcon(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Ringkasan Singkat (Sub-Headline Ticker)</label>
+              <input
+                type="text"
+                placeholder="Contoh: Minum air putih 2 liter per hari bantu konsentrasi belajar."
+                value={newsSummary}
+                onChange={(e) => setNewsSummary(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Isi Informasi Lengkap (Modal Baca Detail)</label>
+              <textarea
+                rows={3}
+                placeholder="Penjelasan rinci mengenai informasi atau tips kesehatan..."
+                value={newsContent}
+                onChange={(e) => setNewsContent(e.target.value)}
+                className="w-full p-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Sumber Informasi (Opsional)</label>
+              <input
+                type="text"
+                placeholder="Contoh: Tim Eco-School SMPN 99 Jakarta"
+                value={newsSource}
+                onChange={(e) => setNewsSource(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              />
+            </div>
+
+            <Button
+              className="w-full rounded-full mt-2 font-bold"
+              onClick={handleAddNews}
+            >
+              Simpan & Aktifkan Running Text
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1702,7 +1858,7 @@ function PenggunaPage() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => window.print()} className="rounded-full gap-1.5">
+                <Button size="sm" onClick={() => window.print()} className="rounded-full gap-1.5 font-bold">
                   <Printer className="size-4" /> Cetak Sekarang
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setPrintClass(null)} className="rounded-full">
@@ -1732,20 +1888,20 @@ function PenggunaPage() {
                     {pageStudents.map((s) => (
                       <div
                         key={s.student_id}
-                        className="print-card flex flex-col items-center justify-between border border-border rounded-2xl p-2.5 bg-card shadow-sm w-full max-w-[210px] mx-auto text-foreground text-center"
+                        className="print-card flex flex-col items-center justify-between border border-border rounded-xl p-2 bg-card shadow-sm w-full max-w-[200px] mx-auto text-foreground text-center"
                         style={{ breakInside: "avoid", pageBreakInside: "avoid" }}
                       >
-                        <div className="gradient-hero w-full rounded-xl p-2 text-primary-foreground shadow-sm">
-                          <span className="label-xs text-primary-foreground/80 text-[8px]">ECO TAG • SMPN 99</span>
-                          <h3 className="mt-0.5 text-xs font-extrabold truncate">{s.full_name}</h3>
-                          <p className="text-[10px] opacity-90">
+                        <div className="gradient-hero w-full rounded-lg p-1.5 text-primary-foreground shadow-sm">
+                          <span className="label-xs text-primary-foreground/80 text-[7px] block">ECO TAG • SMPN 99</span>
+                          <h3 className="mt-0.5 text-[11px] font-extrabold truncate leading-tight">{s.full_name}</h3>
+                          <p className="text-[9px] opacity-90 leading-tight">
                             Kelas {s.class_name || "-"} · NIS {s.nis}
                           </p>
                         </div>
-                        <div className="my-1.5 rounded-lg bg-card p-1.5 shadow-sm border border-border flex justify-center">
-                          <QrImage value={s.nis ?? ""} size={95} />
+                        <div className="my-1 rounded-lg bg-card p-1 shadow-sm border border-border flex justify-center">
+                          <QrImage value={s.nis ?? ""} size={75} />
                         </div>
-                        <div className="w-full text-[9px] text-muted-foreground border-t border-border/60 pt-1 flex justify-between px-1">
+                        <div className="w-full text-[8px] text-muted-foreground border-t border-border/60 pt-0.5 flex justify-between px-1 font-mono">
                           <span>User: {s.nis}</span>
                           <span>Pass: S!swa@Smpn99jkt</span>
                         </div>

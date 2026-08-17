@@ -5,14 +5,17 @@ import { toast } from "sonner";
 import {
   ArrowRight,
   BarChart2,
+  BookOpen,
   Building2,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Coffee,
   CreditCard,
   Droplets,
   ExternalLink,
   Flame,
+  HelpCircle,
   Home,
   Leaf,
   Lock,
@@ -22,7 +25,9 @@ import {
   QrCode,
   RefreshCw,
   ScanLine,
+  ShieldAlert,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   Trophy,
   Users,
@@ -75,6 +80,7 @@ const NAV = [
   { href: "#leaderboard", label: "Leaderboard" },
   { href: "#jawara", label: "Jawara" },
   { href: "#challenge", label: "Challenge" },
+  { href: "#panduan", label: "Panduan HP & FAQ" },
   { href: "#tentang", label: "Tentang Program" },
   { href: "#kopi", label: "Traktir Kopi" },
 ];
@@ -165,6 +171,290 @@ function FaqItem({ q, a }: { q: string; a: string }) {
       </button>
       {open && <p className="px-5 pb-5 text-sm text-muted-foreground">{a}</p>}
     </div>
+  );
+}
+
+function MobileUserGuideSection() {
+  const [activeRoleTab, setActiveRoleTab] = useState<"siswa" | "petugas" | "walikelas">("siswa");
+
+  return (
+    <section id="panduan" className="mx-auto max-w-6xl px-4 py-16 sm:py-24 border-t border-border/60">
+      <SectionHead
+        kicker="Mobile Guide & Account Support"
+        title="Panduan Penggunaan HP & Troubleshooting Akun"
+        lead="Langkah awal pendaftaran, panduan tampilan layar HP, hingga solusi masalah akun untuk role Siswa, Petugas Pos, dan Wali Kelas."
+      />
+
+      {/* ROLE SWITCHER TABS */}
+      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-muted/60 border border-border w-fit mb-8">
+        <button
+          type="button"
+          onClick={() => setActiveRoleTab("siswa")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all",
+            activeRoleTab === "siswa"
+              ? "bg-primary text-primary-foreground shadow-md scale-105"
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+          )}
+        >
+          <Smartphone className="size-4" /> Role Siswa 📱
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveRoleTab("petugas")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all",
+            activeRoleTab === "petugas"
+              ? "bg-primary text-primary-foreground shadow-md scale-105"
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+          )}
+        >
+          <ScanLine className="size-4" /> Role Petugas Pos 🔍
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveRoleTab("walikelas")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all",
+            activeRoleTab === "walikelas"
+              ? "bg-primary text-primary-foreground shadow-md scale-105"
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+          )}
+        >
+          <BarChart2 className="size-4" /> Role Wali Kelas 📊
+        </button>
+      </div>
+
+      {/* TAB CONTENT: SISWA */}
+      {activeRoleTab === "siswa" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="surface-card p-6 border-l-4 border-l-eco">
+              <span className="label-xs text-eco">Langkah 1</span>
+              <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
+                <LogIn className="size-4 text-eco" /> Pendaftaran & Login HP
+              </h3>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                Buka website <strong className="text-foreground">ecosystem99.web.id</strong> di browser HP (Chrome/Safari). Klik <strong>Login</strong>.
+              </p>
+              <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                <li><strong>NIS Default:</strong> Masukkan NIS Anda (misal: <code className="text-primary font-bold">20762</code>) & Password bawaan <code className="text-primary font-bold">S!swa@Smpn99jkt</code>.</li>
+                <li><strong>Akun Google:</strong> Klik "Masuk dengan Google", pilih Role "Siswa", isi NIS & Kelas. Tunggu persetujuan Admin/Wali Kelas.</li>
+              </ul>
+            </div>
+
+            <div className="surface-card p-6 border-l-4 border-l-primary">
+              <span className="label-xs text-primary">Langkah 2</span>
+              <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
+                <Smartphone className="size-4 text-primary" /> Keterangan Layar HP Siswa
+              </h3>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                Fitur-fitur di Dasbor Mobile Siswa:
+              </p>
+              <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                <li><strong>Kartu QR Eco Tag:</strong> Tunjukkan kode QR di layar HP ke Petugas di pos sekolah untuk di-scan.</li>
+                <li><strong>Total Perolehan Poin:</strong> Poin akumulasi dari membawa Tumbler (+100) dan Kotak Makan (+50).</li>
+                <li><strong>Eco Streak (🔥):</strong> Jumlah hari berturut-turut Anda aktif membawa wadah ramah lingkungan.</li>
+                <li><strong>Tukar Reward:</strong> Tukar poin Anda dengan voucher jajan kantin atau piagam penghargaan.</li>
+              </ul>
+            </div>
+
+            <div className="surface-card p-6 border-l-4 border-l-amber-500">
+              <span className="label-xs text-amber-600">Langkah 3</span>
+              <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
+                <ShieldCheck className="size-4 text-amber-500" /> Bawa Tumbler & Lunchbox
+              </h3>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                Setiap pagi & jam istirahat, tunjukkan wadah makan ke Pos Kantin / Gerbang Utama:
+              </p>
+              <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                <li>Petugas akan meng-scan QR HP Anda atau memasukkan NIS Anda.</li>
+                <li>Poin +100 (Tumbler) dan +50 (Kotak Makan) <strong>langsung bertambah otomatis</strong> ke perolehan poin Anda!</li>
+                <li>Bantu kelasmu meraih posisi <strong>Jawara Lingkungan</strong>!</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* TROUBLESHOOTING SISWA */}
+          <div className="surface-card p-6 rounded-3xl bg-amber-500/5 border-amber-500/20">
+            <h4 className="text-base font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-2 mb-3">
+              <ShieldAlert className="size-5 text-amber-600" /> FAQ & Troubleshooting Masalah Akun Siswa
+            </h4>
+            <div className="grid gap-3 sm:grid-cols-2 text-xs">
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Gagal login dengan NIS atau Password Salah?</strong>
+                <p className="text-muted-foreground">Pastikan NIS ditulis angka tanpa spasi. Password default siswa adalah <code className="font-bold text-primary">S!swa@Smpn99jkt</code> (perhatikan huruf besar/kecil & simbol!).</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Mengapa Poin Belum Bertambah Setelah Petugas Scan?</strong>
+                <p className="text-muted-foreground">Refresh halaman dasbor Anda. Validasi petugas pos langsung ter-approve secara realtime sehingga poin (+100/+50) masuk seketika.</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Akun Google Masih "Menunggu Persetujuan Admin"?</strong>
+                <p className="text-muted-foreground">Minta Wali Kelas atau Admin Sekolah untuk membuka menu "Persetujuan Akun Google" di dashboard admin dan menyetujui akun Anda.</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: HP Mati / Tidak Ada Kuota Internet saat Scan?</strong>
+                <p className="text-muted-foreground">Tidak masalah! Cukup sebutkan NIS Anda kepada Petugas di pos, petugas akan memasukkan NIS manual Anda di HP petugas.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: PETUGAS POS */}
+      {activeRoleTab === "petugas" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="surface-card p-6 border-l-4 border-l-blue-500">
+              <span className="label-xs text-blue-600">Langkah 1</span>
+              <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
+                <LogIn className="size-4 text-blue-500" /> Login & Pilih Pos
+              </h3>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                Petugas pos membuka website di browser HP dan login dengan akun Petugas Pos yang terdaftar.
+              </p>
+              <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                <li>Pos lokasi bertugas Anda (Gerbang Utama, Kantin, Koperasi, Greenhouse) akan tampil otomatis di atas halaman.</li>
+                <li>Gunakan HP Android / iPhone yang terhubung ke jaringan internet.</li>
+              </ul>
+            </div>
+
+            <div className="surface-card p-6 border-l-4 border-l-eco">
+              <span className="label-xs text-eco">Langkah 2</span>
+              <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
+                <ScanLine className="size-4 text-eco" /> Keterangan Layar Scanner HP
+              </h3>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                Fitur utama pada layar HP Petugas Pos:
+              </p>
+              <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                <li><strong>Checklist Item yang Dibawa:</strong> Centang <span className="font-bold text-foreground">Tumbler (+100 poin)</span> dan/atau <span className="font-bold text-foreground">Kotak Makan (+50 poin)</span> sesuai barang fisik yang ditunjukkan siswa.</li>
+                <li><strong>Tombol Kamera / Scanner:</strong> Klik untuk mengaktifkan pemindai kamera HP secara langsung.</li>
+                <li><strong>Input NIS Manual:</strong> Ketik nomor NIS siswa jika QR tidak dapat di-scan.</li>
+                <li><strong>Aktivitas Terakhir:</strong> Riwayat hasil scan siswa yang berhasil divalidasi.</li>
+              </ul>
+            </div>
+
+            <div className="surface-card p-6 border-l-4 border-l-emerald-500">
+              <span className="label-xs text-emerald-600">Langkah 3</span>
+              <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
+                <CheckCircle2 className="size-4 text-emerald-500" /> Proses Validasi Poin
+              </h3>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                Validasi dilakukan secara instan:
+              </p>
+              <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                <li>Arahkan kamera HP ke QR siswa. Sistem akan otomatis mendeteksi NIS.</li>
+                <li>Notifikasi hijau akan muncul menandakan poin berhasil ditambahkan ke perolehan siswa.</li>
+                <li>Satu siswa hanya dapat di-validasi 1x per jenis item dalam sehari untuk mencegah pengulangan.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* TROUBLESHOOTING PETUGAS */}
+          <div className="surface-card p-6 rounded-3xl bg-blue-500/5 border-blue-500/20">
+            <h4 className="text-base font-extrabold text-blue-900 dark:text-blue-200 flex items-center gap-2 mb-3">
+              <ShieldAlert className="size-5 text-blue-600" /> FAQ & Troubleshooting Masalah Akun Petugas Pos
+            </h4>
+            <div className="grid gap-3 sm:grid-cols-2 text-xs">
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Kamera HP Tidak Bisa Terbuka saat Klik "Kamera"?</strong>
+                <p className="text-muted-foreground">Pastikan Anda telah memberikan izin kamera (Allow Camera) pada browser HP (Chrome/Safari) Anda. Jika terblokir, buka Pengaturan Browser → Site Settings → Camera → Izinkan ecosystem99.web.id.</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Muncul Pesan "Siswa sudah mendapat poin item tersebut hari ini"?</strong>
+                <p className="text-muted-foreground">Sistem mencegah pencatatan ganda. Berarti siswa tersebut sudah tervalidasi membawa item tumbler/lunchbox di pos lain pada hari ini.</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: QR Code di Layar HP Siswa Buram atau Terlalu Gelap?</strong>
+                <p className="text-muted-foreground">Gunakan fitur <strong>Input NIS Manual</strong> di bagian bawah scanner. Masukkan NIS siswa (misal: 20762) lalu klik "Validasi". Poin tetap akan bertambah langsung!</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Apakah Input NIS Manual Butuh Persetujuan Admin Lagi?</strong>
+                <p className="text-muted-foreground">Tidak! Input NIS manual oleh Petugas Pos terotorisasi kini langsung berstatus <span className="font-bold text-emerald-600">Approved</span> sehingga poin siswa langsung bertambah saat itu juga.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: WALI KELAS */}
+      {activeRoleTab === "walikelas" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="surface-card p-6 border-l-4 border-l-purple-500">
+              <span className="label-xs text-purple-600">Langkah 1</span>
+              <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
+                <LogIn className="size-4 text-purple-500" /> Akses Dasbor Wali Kelas
+              </h3>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                Wali Kelas mengakses platform melalui browser HP dengan akun guru/wali kelas yang telah terdaftar.
+              </p>
+              <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                <li>Sistem akan otomatis mengenali kelas yang Anda ampu (misal: Kelas 7A, 8B, atau 9A).</li>
+                <li>Tampilan layar HP dioptimalkan untuk memantau grafik partisipasi kelas secara ringkas.</li>
+              </ul>
+            </div>
+
+            <div className="surface-card p-6 border-l-4 border-l-primary">
+              <span className="label-xs text-primary">Langkah 2</span>
+              <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
+                <BarChart2 className="size-4 text-primary" /> Keterangan Layar HP Wali Kelas
+              </h3>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                Fitur pemantauan di HP Wali Kelas:
+              </p>
+              <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                <li><strong>Eco Score Kelas:</strong> Rata-rata poin per siswa di kelas Anda yang menentukan posisi di Leaderboard Sekolah.</li>
+                <li><strong>Tingkat Partisipasi Harian:</strong> Persentase siswa kelas Anda yang hari ini membawa tumbler & lunchbox.</li>
+                <li><strong>Daftar Perolehan Poin Siswa:</strong> Rincian poin individual tiap siswa untuk evaluasi bimbingan.</li>
+                <li><strong>Cetak QR Massal Kelas:</strong> Mengunduh/mencetak ulang kartu tag QR untuk seluruh siswa di kelas Anda.</li>
+              </ul>
+            </div>
+
+            <div className="surface-card p-6 border-l-4 border-l-amber-500">
+              <span className="label-xs text-amber-600">Langkah 3</span>
+              <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
+                <Trophy className="size-4 text-amber-500" /> Bimbingan Jawara Lingkungan
+              </h3>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                Mendorong motivasi kelas:
+              </p>
+              <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                <li>Berikan apresiasi kepada siswa dengan streak tertinggi di kelas Anda.</li>
+                <li>Dorong siswa yang belum aktif membawa tumbler untuk meningkatkan Eco Score kelas bersama-sama.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* TROUBLESHOOTING WALI KELAS */}
+          <div className="surface-card p-6 rounded-3xl bg-purple-500/5 border-purple-500/20">
+            <h4 className="text-base font-extrabold text-purple-900 dark:text-purple-200 flex items-center gap-2 mb-3">
+              <ShieldAlert className="size-5 text-purple-600" /> FAQ & Troubleshooting Masalah Akun Wali Kelas
+            </h4>
+            <div className="grid gap-3 sm:grid-cols-2 text-xs">
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Dasbor Menampilkan "Belum Ada Kelas yang Diampu"?</strong>
+                <p className="text-muted-foreground">Admin Sekolah belum menautkan ID Kelas ke profil akun Wali Kelas Anda. Hubungi Admin Sekolah untuk menetapkan kelas ampunan Anda (misal: 9A).</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Ada Siswa Baru di Kelas yang Belum Terdaftar di Sistem?</strong>
+                <p className="text-muted-foreground">Wali Kelas atau Admin dapat menambahkan siswa baru melalui menu Admin Pengguna → Tambah Siswa Baru / Impor Excel.</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Bagaimana Cara Mencetak Ulang Kartu QR Siswa Satu Kelas?</strong>
+                <p className="text-muted-foreground">Buka menu Data Pengguna / Wali Kelas, pilih tombol <strong>Cetak Massal QR</strong>. Sistem akan otomatis membagi 12 siswa per lembar kertas A4 secara rapi siap cetak!</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-background border border-border">
+                <strong className="text-foreground block mb-1">Q: Siswa Mengaku Sudah Bawa Tumbler Tapi Poin Belum Masuk?</strong>
+                <p className="text-muted-foreground">Pastikan siswa sudah mendatangi Petugas Pos di gerbang/kantin untuk di-scan atau diinput NIS-nya. Poin hanya dihitung setelah adanya catatan validasi dari petugas pos.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1098,6 +1388,9 @@ function Index() {
           </DialogContent>
         </Dialog>
       </section>
+
+      {/* PANDUAN HP & TROUBLESHOOTING AKUN */}
+      <MobileUserGuideSection />
 
       {/* FAQ */}
       <section className="bg-surface-low py-20">
