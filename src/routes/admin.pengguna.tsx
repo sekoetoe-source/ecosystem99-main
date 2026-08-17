@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil } from "lucide-react";
+import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil, Filter, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +61,12 @@ function PenggunaPage() {
   const [printClass, setPrintClass] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"siswa" | "petugas" | "semua" | "persetujuan">("siswa");
+
+  // Filter, Sort, & Pagination states untuk Daftar Siswa
+  const [filterClass, setFilterClass] = useState<string>("ALL");
+  const [sortBy, setSortBy] = useState<string>("nama-asc");
+  const [pageSize, setPageSize] = useState<number | "all">(50);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Modal form states
   const [addStudentOpen, setAddStudentOpen] = useState(false);
@@ -140,15 +146,34 @@ function PenggunaPage() {
     },
   });
 
-  const filteredStudents = (students.data ?? []).filter((s) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      (s.full_name ?? "").toLowerCase().includes(q) ||
-      (s.nis ?? "").toLowerCase().includes(q) ||
-      (s.class_name ?? "").toLowerCase().includes(q)
-    );
-  });
+  const processedStudents = (students.data ?? [])
+    .filter((s) => {
+      const q = search.trim().toLowerCase();
+      const matchSearch =
+        !q ||
+        (s.full_name ?? "").toLowerCase().includes(q) ||
+        (s.nis ?? "").toLowerCase().includes(q) ||
+        (s.class_name ?? "").toLowerCase().includes(q);
+      const matchClass =
+        filterClass === "ALL" || (s.class_name ?? "").toUpperCase() === filterClass.toUpperCase();
+      return matchSearch && matchClass;
+    })
+    .sort((a, b) => {
+      if (sortBy === "nama-asc") return (a.full_name ?? "").localeCompare(b.full_name ?? "");
+      if (sortBy === "nama-desc") return (b.full_name ?? "").localeCompare(a.full_name ?? "");
+      if (sortBy === "kelas-asc") return (a.class_name ?? "").localeCompare(b.class_name ?? "");
+      if (sortBy === "kelas-desc") return (b.class_name ?? "").localeCompare(a.class_name ?? "");
+      if (sortBy === "nis-asc") return (a.nis ?? "").localeCompare(b.nis ?? "", undefined, { numeric: true });
+      if (sortBy === "poin-desc") return (b.earned_points ?? 0) - (a.earned_points ?? 0);
+      return 0;
+    });
+
+  const totalFilteredCount = processedStudents.length;
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(totalFilteredCount / (pageSize as number)));
+  const paginatedStudents =
+    pageSize === "all"
+      ? processedStudents
+      : processedStudents.slice((currentPage - 1) * (pageSize as number), currentPage * (pageSize as number));
 
   const officers = useQuery({
     queryKey: ["admin-officers"],
@@ -716,15 +741,81 @@ function PenggunaPage() {
             </div>
           </header>
 
-          <div className="mt-4 flex max-w-sm items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/20">
-            <Search className="size-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Cari nama, NIS, atau kelas..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
-            />
+          {/* SEARCH & FILTERS BAR */}
+          <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex max-w-sm flex-1 items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/20">
+              <Search className="size-4 text-muted-foreground shrink-0" />
+              <input
+                type="text"
+                placeholder="Cari nama, NIS, atau kelas..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filter Kelas */}
+              <div className="flex items-center gap-1.5 bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs font-semibold">
+                <Filter className="size-3.5 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground hidden sm:inline">Kelas:</span>
+                <select
+                  value={filterClass}
+                  onChange={(e) => {
+                    setFilterClass(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="bg-transparent outline-none cursor-pointer font-bold text-foreground"
+                >
+                  <option value="ALL">Semua Kelas</option>
+                  {(classes.data ?? []).map((c) => (
+                    <option key={c.id} value={c.name}>
+                      Kelas {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Urutkan / Sort */}
+              <div className="flex items-center gap-1.5 bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs font-semibold">
+                <ArrowUpDown className="size-3.5 text-muted-foreground shrink-0" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="bg-transparent outline-none cursor-pointer font-bold text-foreground"
+                >
+                  <option value="nama-asc">Urutkan: Nama (A - Z)</option>
+                  <option value="nama-desc">Urutkan: Nama (Z - A)</option>
+                  <option value="kelas-asc">Urutkan: Kelas (7A → 9G)</option>
+                  <option value="kelas-desc">Urutkan: Kelas (9G → 7A)</option>
+                  <option value="nis-asc">Urutkan: NIS</option>
+                  <option value="poin-desc">Urutkan: Poin Terbanyak</option>
+                </select>
+              </div>
+
+              {/* Limit Tampilan (50, 100, Semua) */}
+              <div className="flex items-center gap-1.5 bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs font-semibold">
+                <span className="text-muted-foreground hidden sm:inline">Tampilan:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(e.target.value === "all" ? "all" : Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-transparent outline-none cursor-pointer font-bold text-foreground"
+                >
+                  <option value={50}>50 / halaman</option>
+                  <option value={100}>100 / halaman</option>
+                  <option value="all">Semua User ({totalFilteredCount})</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div className="surface-card mt-3 overflow-x-auto">
@@ -740,7 +831,7 @@ function PenggunaPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredStudents.map((s) => (
+                {paginatedStudents.map((s) => (
                   <tr key={s.student_id}>
                     <td className="px-4 py-3 font-medium">{s.full_name}</td>
                     <td className="px-4 py-3 text-muted-foreground">{s.nis}</td>
@@ -764,8 +855,51 @@ function PenggunaPage() {
                 ))}
               </tbody>
             </table>
-            {filteredStudents.length === 0 && (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">Belum ada siswa.</p>
+            {paginatedStudents.length === 0 && (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">Tidak ada data siswa sesuai filter.</p>
+            )}
+          </div>
+
+          {/* PAGINATION TOOLBAR */}
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground px-2">
+            <div>
+              Menampilkan{" "}
+              <span className="font-bold text-foreground">
+                {pageSize === "all" || totalFilteredCount === 0
+                  ? totalFilteredCount
+                  : (currentPage - 1) * (pageSize as number) + 1}
+                {pageSize !== "all" && totalFilteredCount > 0
+                  ? ` - ${Math.min(currentPage * (pageSize as number), totalFilteredCount)}`
+                  : ""}
+              </span>{" "}
+              dari <span className="font-bold text-foreground">{totalFilteredCount}</span> siswa
+              {filterClass !== "ALL" && <span> (Filtered: Kelas {filterClass})</span>}
+            </div>
+
+            {pageSize !== "all" && totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="h-8 w-8 p-0 rounded-lg"
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <span className="px-2 font-semibold">
+                  Halaman {currentPage} dari {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="h-8 w-8 p-0 rounded-lg"
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
             )}
           </div>
         </section>
