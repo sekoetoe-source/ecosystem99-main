@@ -582,22 +582,46 @@ function Index() {
     queryKey: ["landing-traktir-stats"],
     queryFn: async () => {
       try {
-        const { data, error } = await (supabase as any).rpc("get_traktir_stats");
-        if (!error && data) {
-          return data;
+        // Active student threshold check (>5% of total students)
+        const [{ count: totalStudents }, { count: activeStudents }] = await Promise.all([
+          supabase.from("students").select("id", { count: "exact", head: true }),
+          supabase.from("student_scores").select("student_id", { count: "exact", head: true }),
+        ]);
+
+        const total = totalStudents ?? 858;
+        const active = activeStudents ?? 0;
+        const activePct = (active / Math.max(1, total)) * 100;
+
+        // If active students threshold is <= 5%, force stats to 0 as requested
+        if (activePct <= 5) {
+          return {
+            total_amount: 0,
+            total_count: 0,
+            hosting_amount: 0,
+            reward_amount: 0,
+            maintenance_amount: 0,
+            is_released: false,
+          };
         }
+
+        const { data, error } = await (supabase as any).rpc("get_traktir_stats");
+        if (!error && data && Number(data.total_amount) > 0) {
+          return { ...data, is_released: true };
+        }
+
         const { data: rows } = await (supabase as any)
           .from("traktir_transactions")
           .select("amount")
           .eq("status", "success");
-        const total = rows && rows.length > 0 ? rows.reduce((acc: number, r: any) => acc + Number(r.amount), 0) : 0;
+        const sum = rows && rows.length > 0 ? rows.reduce((acc: number, r: any) => acc + Number(r.amount), 0) : 0;
         const count = rows && rows.length > 0 ? rows.length : 0;
         return {
-          total_amount: total,
+          total_amount: sum,
           total_count: count,
-          hosting_amount: Math.round(total * 0.5),
-          reward_amount: Math.round(total * 0.4),
-          maintenance_amount: Math.round(total * 0.1),
+          hosting_amount: Math.round(sum * 0.5),
+          reward_amount: Math.round(sum * 0.4),
+          maintenance_amount: Math.round(sum * 0.1),
+          is_released: true,
         };
       } catch (err) {
         return {
@@ -606,6 +630,7 @@ function Index() {
           hosting_amount: 0,
           reward_amount: 0,
           maintenance_amount: 0,
+          is_released: false,
         };
       }
     },
