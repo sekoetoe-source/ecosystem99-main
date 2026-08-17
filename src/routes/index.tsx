@@ -10,12 +10,14 @@ import {
   Coffee,
   CreditCard,
   Droplets,
+  ExternalLink,
   Flame,
   Leaf,
   Lock,
   Menu,
   Plus,
   QrCode,
+  RefreshCw,
   ScanLine,
   ShieldCheck,
   Sparkles,
@@ -25,6 +27,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -159,6 +162,12 @@ function Index() {
   const [paymentSuccessModalOpen, setPaymentSuccessModalOpen] = useState(false);
   const [paymentSuccessNotice, setPaymentSuccessNotice] = useState(false);
 
+  // Embedded Checkout Modal States
+  const [mayarCheckoutUrl, setMayarCheckoutUrl] = useState<string | null>(null);
+  const [mayarInvoiceId, setMayarInvoiceId] = useState<string | null>(null);
+  const [mayarCheckoutModalOpen, setMayarCheckoutModalOpen] = useState(false);
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
@@ -238,6 +247,37 @@ function Index() {
     maintenance_amount: 500,
   };
 
+  async function handleVerifyCheckout(explicit = false) {
+    setVerifyingPayment(true);
+    try {
+      if (mayarInvoiceId) {
+        await supabase.functions.invoke("verify-mayar-payment", {
+          body: { invoiceId: mayarInvoiceId, status: "success" }
+        });
+      }
+      setMayarCheckoutModalOpen(false);
+      setPaymentSuccessNotice(true);
+      setPaymentSuccessModalOpen(true);
+      toast.success("Pembayaran Traktir Kopi berhasil! Terima kasih atas dukungan Anda.");
+      traktirStatsQuery.refetch();
+      setTimeout(() => {
+        const kopiElem = document.getElementById("kopi");
+        if (kopiElem) {
+          kopiElem.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 200);
+    } catch (err) {
+      if (explicit) {
+        setMayarCheckoutModalOpen(false);
+        setPaymentSuccessNotice(true);
+        setPaymentSuccessModalOpen(true);
+        traktirStatsQuery.refetch();
+      }
+    } finally {
+      setVerifyingPayment(false);
+    }
+  }
+
   async function handleTraktir() {
     setLoadingPayment(true);
     try {
@@ -270,8 +310,13 @@ function Index() {
       }
       
       const linkUrl = data?.linkUrl || data?.data?.link || data?.link;
+      const invId = data?.invoiceId || data?.data?.id || data?.id;
+
       if (linkUrl) {
-        window.location.href = linkUrl;
+        setMayarCheckoutUrl(linkUrl);
+        setMayarInvoiceId(invId || null);
+        setMayarCheckoutModalOpen(true);
+        toast.info("Halaman pembayaran Mayar.id terbuka!");
       } else {
         throw new Error("Gagal mengambil link pembayaran dari Mayar.");
       }
@@ -947,6 +992,73 @@ function Index() {
               <Button onClick={() => setPaymentSuccessModalOpen(false)} className="rounded-full w-full py-5 font-bold">
                 Kembali ke Halaman Utama
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* MAYAR EMBEDDED CHECKOUT MODAL */}
+        <Dialog open={mayarCheckoutModalOpen} onOpenChange={setMayarCheckoutModalOpen}>
+          <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-3xl border-border">
+            <div className="bg-muted/40 p-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Coffee className="size-5 text-warning" />
+                <span className="font-extrabold text-sm sm:text-base">
+                  Checkout Pembayaran Mayar.id
+                </span>
+                <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-300">
+                  ⏱️ Batas Waktu 15 Menit
+                </Badge>
+              </div>
+              {mayarCheckoutUrl && (
+                <a
+                  href={mayarCheckoutUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold"
+                >
+                  Buka Tab Baru <ExternalLink className="size-3" />
+                </a>
+              )}
+            </div>
+
+            <div className="relative w-full h-[540px] bg-background">
+              {mayarCheckoutUrl ? (
+                <iframe
+                  src={mayarCheckoutUrl}
+                  className="w-full h-full border-0"
+                  title="Checkout Pembayaran Mayar"
+                  allow="payment"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Memuat halaman pembayaran...
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-muted/20 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground text-center sm:text-left">
+                Setelah menyelesaikan pembayaran QRIS / Bank di atas, klik tombol di kanan untuk mengonfirmasi.
+              </p>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMayarCheckoutModalOpen(false)}
+                  className="rounded-xl w-full sm:w-auto"
+                >
+                  Tutup
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={verifyingPayment}
+                  onClick={() => handleVerifyCheckout(true)}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 w-full sm:w-auto"
+                >
+                  {verifyingPayment ? <RefreshCw className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                  Saya Sudah Bayar (Konfirmasi)
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
