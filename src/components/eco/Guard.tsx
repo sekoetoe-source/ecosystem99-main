@@ -14,7 +14,7 @@ export function Guard({ roles, children }: { roles: AppRole[]; children: ReactNo
     );
   }
 
-  if (!me) return <Navigate to="/auth" replace />;
+  if (!me || !me.isApproved) return <Navigate to="/auth" replace />;
 
   const allowed = me.roles.some((r) => roles.includes(r));
   if (!allowed) {

@@ -161,26 +161,54 @@ function AuthPage() {
               <div>
                 <h1 className="text-xl font-bold">Lengkapi Data Diri Anda</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Akun Google Anda terdeteksi baru. Tentukan peran Anda sebelum masuk.
+                  Akun Google Anda ({me.email}) terdeteksi baru. Pilih peran Anda untuk diproses oleh Admin.
                 </p>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="req-role">Saya adalah seorang:</Label>
-                <select
-                  id="req-role"
-                  value={requestedRole}
-                  onChange={(e) => setRequestedRole(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
-                >
-                  <option value="student">Siswa</option>
-                  <option value="officer">Petugas Pos</option>
-                  <option value="teacher">Wali Kelas</option>
-                </select>
+              <div className="space-y-2">
+                <Label>Saya adalah seorang:</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRequestedRole("officer")}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-bold transition-all ${
+                      requestedRole === "officer"
+                        ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
+                        : "border-border bg-background hover:bg-muted/50 text-muted-foreground"
+                    }`}
+                  >
+                    <span className="text-xl mb-1">👮</span>
+                    Petugas Pos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestedRole("student")}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-bold transition-all ${
+                      requestedRole === "student"
+                        ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
+                        : "border-border bg-background hover:bg-muted/50 text-muted-foreground"
+                    }`}
+                  >
+                    <span className="text-xl mb-1">🎒</span>
+                    Siswa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestedRole("teacher")}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-bold transition-all ${
+                      requestedRole === "teacher"
+                        ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
+                        : "border-border bg-background hover:bg-muted/50 text-muted-foreground"
+                    }`}
+                  >
+                    <span className="text-xl mb-1">👨‍🏫</span>
+                    Wali Kelas
+                  </button>
+                </div>
               </div>
 
               {requestedRole === "student" && (
-                <>
+                <div className="space-y-3 pt-1 border-t border-border">
                   <div className="space-y-1.5">
                     <Label htmlFor="req-nis">NIS (Nomor Induk Siswa)</Label>
                     <Input
@@ -208,12 +236,18 @@ function AuthPage() {
                       ))}
                     </select>
                   </div>
-                </>
+                </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={busy}>
+              {requestedRole === "officer" && (
+                <p className="text-xs text-blue-600 bg-blue-50 p-3 rounded-xl leading-relaxed">
+                  📌 Permintaan akses sebagai <b>Petugas Pos</b> akan langsung masuk ke daftar persetujuan Admin sekolah.
+                </p>
+              )}
+
+              <Button type="submit" className="w-full font-bold" disabled={busy}>
                 {busy && <Loader2 className="size-4 animate-spin mr-2" />}
-                Kirim Permintaan Akses
+                Kirim Permintaan Akses ({requestedRole === "officer" ? "Petugas Pos" : requestedRole === "student" ? "Siswa" : "Wali Kelas"})
               </Button>
             </form>
           ) : (
