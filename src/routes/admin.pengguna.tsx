@@ -1474,9 +1474,9 @@ function PenggunaPage() {
           return (s.class_name ?? "").trim().toLowerCase() === printClass.trim().toLowerCase();
         });
 
-        // Group into A4 pages (6 cards per page)
+        // Group into A4 pages (12 cards per page: 3 columns x 4 rows)
         const pages: typeof printableStudents[] = [];
-        const pageSize = 6;
+        const pageSize = 12;
         for (let i = 0; i < printableStudents.length; i += pageSize) {
           pages.push(printableStudents.slice(i, i + pageSize));
         }
@@ -1489,7 +1489,7 @@ function PenggunaPage() {
                   Cetak Massal QR {printClass === "SEMUA" ? "Semua Kelas" : `Kelas ${printClass}`} ({printableStudents.length} Siswa — {pages.length} Halaman A4)
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Format A4 otomatis: 6 kartu per halaman. Gunakan tombol di samping atau menu print browser (Ctrl + P).
+                  Format Tag Tumbler/Lunchbox A4 (12 kartu per lembar: 3x4). Gunakan tombol cetak atau menu Ctrl + P.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -1517,28 +1517,28 @@ function PenggunaPage() {
                 {pages.map((pageStudents, pageIdx) => (
                   <div
                     key={pageIdx}
-                    className="print-page grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border border-dashed border-border rounded-3xl bg-card/50 print:border-none print:bg-transparent print:p-0"
+                    className="print-page grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-4 border border-dashed border-border rounded-3xl bg-card/50 print:border-none print:bg-transparent print:p-0"
                     style={{ breakAfter: "page", pageBreakAfter: "always" }}
                   >
                     {pageStudents.map((s) => (
                       <div
                         key={s.student_id}
-                        className="print-card flex flex-col items-center border border-border rounded-2xl p-4 bg-card shadow-sm w-full max-w-[320px] mx-auto text-foreground"
+                        className="print-card flex flex-col items-center justify-between border border-border rounded-2xl p-2.5 bg-card shadow-sm w-full max-w-[210px] mx-auto text-foreground text-center"
                         style={{ breakInside: "avoid", pageBreakInside: "avoid" }}
                       >
-                        <div className="gradient-hero w-full rounded-xl p-3.5 text-primary-foreground shadow-sm">
-                          <span className="label-xs text-primary-foreground/75 text-[10px]">KARTU IDENTITAS ECO</span>
-                          <h3 className="mt-0.5 text-sm font-extrabold truncate">{s.full_name}</h3>
-                          <p className="text-[11px] opacity-90">
+                        <div className="gradient-hero w-full rounded-xl p-2 text-primary-foreground shadow-sm">
+                          <span className="label-xs text-primary-foreground/80 text-[8px]">ECO TAG • SMPN 99</span>
+                          <h3 className="mt-0.5 text-xs font-extrabold truncate">{s.full_name}</h3>
+                          <p className="text-[10px] opacity-90">
                             Kelas {s.class_name || "-"} · NIS {s.nis}
                           </p>
-                          <div className="mt-1.5 flex flex-col gap-0.5 border-t border-primary-foreground/20 pt-1.5 text-[10px] opacity-85">
-                            <p>Username: {s.nis}</p>
-                            <p>Password: S!swa@Smpn99jkt</p>
-                          </div>
                         </div>
-                        <div className="mt-3 rounded-xl bg-card p-2 shadow-sm border border-border">
-                          <QrImage value={s.nis ?? ""} size={130} />
+                        <div className="my-1.5 rounded-lg bg-card p-1.5 shadow-sm border border-border flex justify-center">
+                          <QrImage value={s.nis ?? ""} size={95} />
+                        </div>
+                        <div className="w-full text-[9px] text-muted-foreground border-t border-border/60 pt-1 flex justify-between px-1">
+                          <span>User: {s.nis}</span>
+                          <span>Pass: S!swa@Smpn99jkt</span>
                         </div>
                       </div>
                     ))}
