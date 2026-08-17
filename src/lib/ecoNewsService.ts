@@ -252,5 +252,18 @@ export function generateAiEcoNews(promptKey?: string): AiPromptTopic {
     if (found) return found;
   }
   const randomIndex = Math.floor(Math.random() * AI_NEWS_PROMPTS.length);
-  return AI_NEWS_PROMPTS[randomIndex] ?? AI_NEWS_PROMPTS[0];
+  const item = AI_NEWS_PROMPTS[randomIndex];
+  if (item) return item;
+  const fallback = AI_NEWS_PROMPTS[0];
+  if (fallback) return fallback;
+  return {
+    key: "default",
+    label: "🥤 Hidrasi & Tumbler",
+    category: "kesehatan",
+    icon: "💧",
+    title: "🥤 AI Health Tip: Hidrasi 2 Liter Air Putih dari Tumbler",
+    summary: "Asupan air putih yang cukup dari tumbler pribadi meningkatkan fokus otak & fungsi sel tubuh.",
+    content: "Minum air putih 2 liter per hari dari tumbler pribadi.",
+    source: "AI Eco-Health Intelligence SMPN 99",
+  };
 }
