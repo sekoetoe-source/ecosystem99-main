@@ -247,6 +247,12 @@ function AuthPage() {
                 </p>
               )}
 
+              {requestedRole === "teacher" && (
+                <p className="text-xs text-blue-600 bg-blue-50 p-3 rounded-xl leading-relaxed">
+                  📌 Permintaan akses sebagai <b>Wali Kelas</b> akan langsung masuk ke daftar persetujuan Admin sekolah.
+                </p>
+              )}
+
               <Button type="submit" className="w-full font-bold" disabled={busy}>
                 {busy && <Loader2 className="size-4 animate-spin mr-2" />}
                 Kirim Permintaan Akses ({requestedRole === "officer" ? "Petugas Pos" : requestedRole === "student" ? "Siswa" : "Wali Kelas"})

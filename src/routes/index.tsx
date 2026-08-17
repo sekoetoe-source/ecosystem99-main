@@ -186,7 +186,7 @@ function Index() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       if (window.location.hash.includes("access_token") || window.location.hash.includes("error")) {
-        window.location.href = "/auth" + window.location.hash;
+        window.location.href = `${window.location.origin}/auth${window.location.hash}`;
         return;
       }
 

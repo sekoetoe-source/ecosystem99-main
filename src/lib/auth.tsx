@@ -27,6 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session);
       setLoading(false);
     });
+
+    if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
+      setTimeout(() => {
+        if (window.location.hash.includes("access_token")) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+      }, 500);
+    }
+
     return () => sub.subscription.unsubscribe();
   }, [queryClient]);
 
