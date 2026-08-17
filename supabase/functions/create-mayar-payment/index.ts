@@ -29,7 +29,7 @@ serve(async (req) => {
     const donorName = name || "Donatur Kopi";
     const donorEmail = email || "donatur@smpn99.sch.id";
     const donorMobile = mobile || "081234567890";
-    const targetRedirectUrl = redirectUrl || "https://ecosystem99.web.id/#kopi";
+    const targetRedirectUrl = redirectUrl || "https://ecosystem99.web.id/?status=success#kopi";
     const expirationMs = 15 * 60 * 1000; // 15 minutes
     const expiredAtDate = new Date(Date.now() + expirationMs).toISOString();
 

@@ -157,14 +157,18 @@ function Index() {
   const [customAmount, setCustomAmount] = useState("");
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentSuccessModalOpen, setPaymentSuccessModalOpen] = useState(false);
+  const [paymentSuccessNotice, setPaymentSuccessNotice] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
-      const status = urlParams.get("status");
+      const hashParams = new URLSearchParams(window.location.hash.replace("#", "?"));
+
+      const status = urlParams.get("status") || hashParams.get("status") || urlParams.get("payment");
       const invoiceId = urlParams.get("invoice_id") || urlParams.get("id");
 
       if (status === "success" || status === "paid" || status === "berhasil") {
+        setPaymentSuccessNotice(true);
         setPaymentSuccessModalOpen(true);
         toast.success("Pembayaran Traktir Kopi berhasil! Terima kasih atas dukungan Anda.");
         if (invoiceId) {
@@ -699,6 +703,42 @@ function Index() {
 
       {/* TRAKTIR KOPI */}
       <section id="kopi" className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+        {/* NOTIFIKASI SUKSES PEMBAYARAN DI SECTION TRAKTIR KOPI */}
+        {paymentSuccessNotice && (
+          <div className="mb-8 rounded-2xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 p-5 shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-emerald-500/20 p-2.5 text-emerald-600 dark:text-emerald-400 shrink-0">
+                <CheckCircle2 className="size-6" />
+              </div>
+              <div>
+                <h4 className="text-base font-extrabold text-emerald-900 dark:text-emerald-100">
+                  Pembayaran Traktir Kopi Berhasil! 🎉
+                </h4>
+                <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+                  Terima kasih atas dukungan Anda! Pembayaran via Mayar.id telah diverifikasi dan alokasi dana telah ditambahkan.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                onClick={() => setPaymentSuccessModalOpen(true)}
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2"
+              >
+                <Sparkles className="size-4" /> Lihat Resi
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setPaymentSuccessNotice(false)}
+                className="rounded-xl text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200/50 dark:hover:bg-emerald-900/50"
+              >
+                Tutup
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="grid items-start gap-10 lg:grid-cols-[1fr_.85fr] lg:gap-12">
           <div>
             <div className="mb-4 flex min-w-0 items-center gap-3">
