@@ -62,10 +62,20 @@ export function useMe() {
     queryFn: async () => {
       if (!userId) return null;
       const fetchProfile = async () => {
-        const { data, error } = await supabase.from("profiles").select("full_name, is_approved, requested_role, requested_class_id, requested_nis").eq("id", userId).maybeSingle();
-        if (error) {
-          const { data: fb } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
-          return { full_name: fb?.full_name, is_approved: true, requested_role: null, requested_class_id: null, requested_nis: null };
+        const { data } = await supabase
+          .from("profiles")
+          .select("full_name, is_approved, requested_role, requested_class_id, requested_nis")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (!data) {
+          const defaultName = (session?.user?.user_metadata as any)?.["full_name"] || session?.user?.email || "Pengguna";
+          const { data: inserted } = await supabase
+            .from("profiles")
+            .upsert({ id: userId, full_name: defaultName, is_approved: false }, { onConflict: "id" })
+            .select("full_name, is_approved, requested_role, requested_class_id, requested_nis")
+            .single();
+          return inserted ?? { full_name: defaultName, is_approved: false, requested_role: null, requested_class_id: null, requested_nis: null };
         }
         return data;
       };

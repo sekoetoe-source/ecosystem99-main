@@ -218,7 +218,10 @@ function PenggunaPage() {
         const fallbackRes = await supabase
           .from("profiles")
           .select("id, full_name, user_roles(role)");
-        profilesData = (fallbackRes.data ?? []).map(p => ({ ...p, is_approved: true }));
+        profilesData = (fallbackRes.data ?? []).map(p => ({
+          ...p,
+          is_approved: Array.isArray(p.user_roles) && p.user_roles.length > 0,
+        }));
       } else {
         profilesData = primaryRes.data;
       }
@@ -244,8 +247,10 @@ function PenggunaPage() {
               ? "teacher" 
               : "student";
         
+        const isApproved = p.is_approved === true;
+
         let details = "";
-        if (p.is_approved) {
+        if (isApproved) {
           if (role === "student") {
             const s = studentsMap.get(p.id);
             if (s) {
@@ -280,7 +285,7 @@ function PenggunaPage() {
           id: p.id,
           full_name: p.full_name,
           role,
-          is_approved: p.is_approved,
+          is_approved: isApproved,
           requested_role: p.requested_role,
           requested_class_id: p.requested_class_id,
           requested_nis: p.requested_nis,

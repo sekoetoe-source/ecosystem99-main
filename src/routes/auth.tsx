@@ -121,14 +121,16 @@ function AuthPage() {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({
+        .upsert({
+          id: me.userId,
+          full_name: me.fullName,
           requested_role: requestedRole,
           requested_class_id: requestedRole === "student" && requestedClassId ? requestedClassId : null,
           requested_nis: requestedRole === "student" ? requestedNis : null,
-        })
-        .eq("id", me.userId);
+          is_approved: false,
+        }, { onConflict: "id" });
       if (error) throw error;
-      toast.success("Profil tersimpan. Silakan tunggu persetujuan Admin.");
+      toast.success("Permintaan profil tersimpan. Silakan tunggu persetujuan Admin.");
       window.location.reload();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal menyimpan profil");
