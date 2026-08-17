@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,18 +13,25 @@ serve(async (req) => {
   }
 
   try {
-    const { amount, name, email, mobile } = await req.json();
+    const { amount, name, email, mobile, redirectUrl } = await req.json();
     const mayarApiKey = Deno.env.get("MAYAR_SECRET_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!mayarApiKey) {
       throw new Error("MAYAR_SECRET_KEY belum dikonfigurasi di Supabase environment.");
     }
 
-    if (!amount || amount < 1000) {
+    if (!amount || Number(amount) < 1000) {
       throw new Error("Minimal nominal traktir adalah Rp1.000");
     }
 
-    // Panggil API Mayar untuk membuat invoice/link pembayaran (Headless API)
+    const donorName = name || "Donatur Kopi";
+    const donorEmail = email || "donatur@smpn99.sch.id";
+    const donorMobile = mobile || "081234567890";
+    const targetRedirectUrl = redirectUrl || "https://ecosystem99.web.id/#kopi";
+
+    // Call Mayar Headless API to create invoice
     const response = await fetch("https://api.mayar.id/hl/v1/invoice/create", {
       method: "POST",
       headers: {
@@ -31,11 +39,11 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        name: name || "Donatur Kopi",
-        email: email || "donatur@smpn99.sch.id",
-        mobile: mobile || "081234567890",
+        name: donorName,
+        email: donorEmail,
+        mobile: donorMobile,
         description: "Dukungan operasional program budaya ramah lingkungan sekolah.",
-        redirectURL: "https://smpn99.sch.id", // Tautan pengalihan sukses
+        redirectURL: targetRedirectUrl,
         items: [
           {
             quantity: 1,
@@ -58,10 +66,39 @@ serve(async (req) => {
       );
     }
 
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    const linkUrl = data?.data?.link || data?.link || data?.data?.payUrl || data?.payUrl;
+    const invoiceId = data?.data?.id || data?.id || data?.data?.invoiceId || data?.invoiceId;
+
+    // Save transaction record to DB if Supabase keys are present
+    if (supabaseUrl && supabaseServiceKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        await supabase.from("traktir_transactions").insert({
+          mayar_invoice_id: invoiceId || `MYR-${Date.now()}`,
+          donor_name: donorName,
+          donor_email: donorEmail,
+          donor_mobile: donorMobile,
+          amount: Number(amount),
+          payment_method: "Mayar PG",
+          status: "pending",
+          pay_url: linkUrl,
+        });
+      } catch (dbErr) {
+        console.error("Failed to log traktir_transaction to DB:", dbErr);
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        ...data,
+        linkUrl,
+        invoiceId,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -209,6 +209,51 @@ export type Database = {
         }
         Relationships: []
       }
+      traktir_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          donor_email: string | null
+          donor_mobile: string | null
+          donor_name: string
+          id: string
+          mayar_invoice_id: string | null
+          notes: string | null
+          pay_url: string | null
+          payment_method: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          donor_email?: string | null
+          donor_mobile?: string | null
+          donor_name?: string
+          id?: string
+          mayar_invoice_id?: string | null
+          notes?: string | null
+          pay_url?: string | null
+          payment_method?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          donor_email?: string | null
+          donor_mobile?: string | null
+          donor_name?: string
+          id?: string
+          mayar_invoice_id?: string | null
+          notes?: string | null
+          pay_url?: string | null
+          payment_method?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       students: {
         Row: {
           active: boolean

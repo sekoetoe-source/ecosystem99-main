@@ -1,23 +1,36 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  Building2,
+  CheckCircle2,
   Coffee,
+  CreditCard,
   Droplets,
   Flame,
   Leaf,
+  Lock,
   Menu,
   Plus,
   QrCode,
   ScanLine,
   ShieldCheck,
+  Sparkles,
   Trophy,
   Users,
+  Wallet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Brand } from "@/components/eco/Brand";
 import { QrImage } from "@/components/eco/QrImage";
 import { homeForRole, useMe } from "@/lib/auth";
@@ -138,10 +151,64 @@ function Index() {
   const [menuOpen, setMenuOpen] = useState(false);
   const dashHref = me ? homeForRole[me.primaryRole] : "/auth";
 
-  // Payment states
+  // Payment states & URL redirect handler
   const [selectedNominal, setSelectedNominal] = useState<number | "other">(10000);
   const [customAmount, setCustomAmount] = useState("");
   const [loadingPayment, setLoadingPayment] = useState(false);
+  const [paymentSuccessModalOpen, setPaymentSuccessModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const status = urlParams.get("status");
+      const invoiceId = urlParams.get("invoice_id") || urlParams.get("id");
+
+      if (status === "success" || status === "paid" || status === "berhasil") {
+        setPaymentSuccessModalOpen(true);
+        toast.success("Pembayaran Traktir Kopi berhasil! Terima kasih atas dukungan Anda.");
+        if (invoiceId) {
+          supabase.functions.invoke("verify-mayar-payment", {
+            body: { invoiceId, status: "success" }
+          });
+        }
+        // Clean URL query params
+        window.history.replaceState({}, document.title, window.location.pathname + "#kopi");
+      } else if (status === "failed" || status === "canceled") {
+        toast.error("Pembayaran tidak berhasil atau dibatalkan. Anda dapat mengulanginya kapan saja.");
+        window.history.replaceState({}, document.title, window.location.pathname + "#kopi");
+      }
+    }
+  }, []);
+
+  const traktirStatsQuery = useQuery({
+    queryKey: ["landing-traktir-stats"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("get_traktir_stats");
+      if (error) {
+        const { data: rows } = await (supabase as any)
+          .from("traktir_transactions")
+          .select("amount")
+          .eq("status", "success");
+        const total = rows ? rows.reduce((acc: number, r: any) => acc + Number(r.amount), 0) : 0;
+        return {
+          total_amount: total,
+          total_count: rows ? rows.length : 0,
+          hosting_amount: Math.round(total * 0.5),
+          reward_amount: Math.round(total * 0.4),
+          maintenance_amount: Math.round(total * 0.1),
+        };
+      }
+      return data;
+    },
+  });
+
+  const traktirStats = traktirStatsQuery.data || {
+    total_amount: 0,
+    total_count: 0,
+    hosting_amount: 0,
+    reward_amount: 0,
+    maintenance_amount: 0,
+  };
 
   async function handleTraktir() {
     setLoadingPayment(true);
@@ -152,8 +219,16 @@ function Index() {
         return;
       }
       
+      const currentOrigin = window.location.origin;
+      const redirectUrl = `${currentOrigin}/?status=success#kopi`;
+
       const { data, error } = await supabase.functions.invoke("create-mayar-payment", {
-        body: { amount: finalAmount }
+        body: {
+          amount: finalAmount,
+          redirectUrl,
+          name: me?.fullName || "Donatur Kopi",
+          email: me?.email || (me?.userId ? `${me.userId}@smpn99.sch.id` : undefined),
+        }
       });
       
       if (error) {
@@ -166,11 +241,11 @@ function Index() {
         throw new Error(errMsg);
       }
       
-      const linkUrl = data?.data?.link || data?.link;
+      const linkUrl = data?.linkUrl || data?.data?.link || data?.link;
       if (linkUrl) {
-        window.open(linkUrl, "_blank");
+        window.location.href = linkUrl;
       } else {
-        throw new Error("Gagal mengambil link pembayaran.");
+        throw new Error("Gagal mengambil link pembayaran dari Mayar.");
       }
     } catch (e: any) {
       toast.error(e.message || "Gagal memproses pembayaran");
@@ -600,7 +675,7 @@ function Index() {
 
       {/* TRAKTIR KOPI */}
       <section id="kopi" className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
-        <div className="grid items-center gap-10 lg:grid-cols-[1fr_.8fr] lg:gap-12">
+        <div className="grid items-start gap-10 lg:grid-cols-[1fr_.85fr] lg:gap-12">
           <div>
             <div className="mb-4 flex min-w-0 items-center gap-3">
               <img
@@ -620,12 +695,68 @@ function Index() {
               title="Traktir Kopi, Dukung Sekolah Lebih Hijau."
               lead="Dukungan kecil membantu School Ecosystem tetap online sekaligus mendukung reward untuk siswa dan kelas yang konsisten."
             />
-            <p className="font-extrabold">“Secangkir kopi untuk developer, semangat untuk siswa.”</p>
-            <p className="label-xs mt-4 text-muted-foreground">
+            <p className="font-extrabold text-primary">“Secangkir kopi untuk developer, semangat untuk siswa.”</p>
+            <p className="label-xs mt-2 text-muted-foreground">
               Traktir Kopi bersifat sukarela dan bukan biaya akses.
             </p>
+
+            {/* TABEL ALOKASI PERSENTASE DANA */}
+            <div className="mt-8 rounded-2xl border border-border/80 bg-background/60 p-5 shadow-sm">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Section ini menampilkan total dukungan bulan berjalan, target kebutuhan operasional, alokasi dana, periode penggunaan, dan total dana reward.
+              </p>
+              
+              <div className="mt-4 overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <thead className="bg-muted/60 font-bold text-foreground">
+                    <tr>
+                      <th className="px-4 py-3 border-b border-border">Alokasi</th>
+                      <th className="px-4 py-3 border-b border-border text-center">Persentase</th>
+                      <th className="px-4 py-3 border-b border-border text-right">Estimasi Dana</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    <tr className="hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium flex items-center gap-2">
+                        <Building2 className="size-4 text-blue-500 shrink-0" />
+                        Hosting & domain
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-primary">50%</td>
+                      <td className="px-4 py-3 text-right font-mono">
+                        Rp {traktirStats.hosting_amount.toLocaleString("id-ID")}
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium flex items-center gap-2">
+                        <Trophy className="size-4 text-amber-500 shrink-0" />
+                        Reward siswa & kelas
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-primary">40%</td>
+                      <td className="px-4 py-3 text-right font-mono">
+                        Rp {traktirStats.reward_amount.toLocaleString("id-ID")}
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium flex items-center gap-2">
+                        <Sparkles className="size-4 text-emerald-500 shrink-0" />
+                        Maintenance/operasional pengembangan
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-primary">10%</td>
+                      <td className="px-4 py-3 text-right font-mono">
+                        Rp {traktirStats.maintenance_amount.toLocaleString("id-ID")}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="mt-3 text-[11px] italic text-muted-foreground">
+                Persentase tersebut merupakan contoh awal dan harus ditetapkan pengelola sebelum fitur diluncurkan.
+              </p>
+            </div>
           </div>
-          <div className="surface-card p-5 sm:p-7">
+
+          <div className="surface-card p-5 sm:p-7 shadow-lg border-primary/20">
             <Coffee className="size-9 text-warning" />
             <h3 className="mt-3 text-xl font-extrabold">Traktir Kopi secara Instan</h3>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -645,7 +776,7 @@ function Index() {
                   onClick={() => setSelectedNominal(item.value as any)}
                   className={`rounded-full border px-4 py-2 text-xs font-bold transition-all ${
                     selectedNominal === item.value
-                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm scale-105"
                       : "border-border bg-background text-foreground hover:bg-muted"
                   }`}
                 >
@@ -668,19 +799,89 @@ function Index() {
               </div>
             )}
 
-            <Button onClick={handleTraktir} disabled={loadingPayment} className="mt-4 w-full rounded-full gap-2 py-5 font-bold">
+            <Button onClick={handleTraktir} disabled={loadingPayment} className="mt-4 w-full rounded-full gap-2 py-5 font-bold shadow-md hover:shadow-lg transition-all">
               <Coffee className="size-4" /> 
-              {loadingPayment ? "Memproses..." : "Traktir Kopi Sekarang"}
+              {loadingPayment ? "Memproses Ke Mayar.id..." : "Traktir Kopi Sekarang"}
             </Button>
+
+            {/* CHECKOUT MAYAR INFORMATION */}
+            <div className="mt-5 rounded-2xl border border-border/80 bg-muted/40 p-4 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Lock className="size-3.5 text-emerald-600" /> Checkout Pembayaran dengan Mayar
+                </span>
+                <span className="font-extrabold tracking-wider text-[10px] text-muted-foreground uppercase bg-background px-2 py-0.5 rounded border border-border">
+                  POWERED BY MAYAR.ID
+                </span>
+              </div>
+              <p className="text-muted-foreground text-[11px] leading-relaxed">
+                Pembayaran diproses secara instant & aman via Mayar.id. Mendukung QRIS (GoPay, OVO, Dana, ShopeePay), Virtual Account, & Transfer Bank.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="inline-flex items-center gap-1 text-[10px] bg-background px-2 py-1 rounded-md border text-muted-foreground">
+                  <QrCode className="size-3 text-primary" /> QRIS Instan
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] bg-background px-2 py-1 rounded-md border text-muted-foreground">
+                  <Wallet className="size-3 text-blue-500" /> E-Wallet
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] bg-background px-2 py-1 rounded-md border text-muted-foreground">
+                  <CreditCard className="size-3 text-purple-500" /> VA & Bank
+                </span>
+              </div>
+            </div>
 
             <p className="mt-4 text-xs text-muted-foreground">
               Traktir Kopi tidak menghasilkan poin dan tidak memengaruhi ranking, badge, atau Jawara.
             </p>
-            <p className="mt-4 rounded-2xl bg-accent px-4 py-3 text-xs font-extrabold text-accent-foreground">
-              No pay-to-win.
+            <p className="mt-3 rounded-2xl bg-accent px-4 py-2.5 text-xs font-extrabold text-accent-foreground text-center">
+              No pay-to-win. Sukarela 100%.
             </p>
           </div>
         </div>
+
+        {/* PAYMENT SUCCESS RECEIPT MODAL */}
+        <Dialog open={paymentSuccessModalOpen} onOpenChange={setPaymentSuccessModalOpen}>
+          <DialogContent className="sm:max-w-md text-center p-6 rounded-3xl">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 mb-2">
+              <CheckCircle2 className="size-9" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-extrabold text-emerald-600 text-center">
+                Pembayaran Sukses
+              </DialogTitle>
+              <DialogDescription className="text-center text-sm mt-1">
+                Terima kasih! Dukungan Traktir Kopi Anda telah kami terima dengan sukses via Mayar.id.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-4 rounded-2xl border border-dashed border-border bg-muted/30 p-4 text-left space-y-2">
+              <div className="flex justify-between text-xs py-1 border-b border-border/50">
+                <span className="text-muted-foreground">Status Pembayaran</span>
+                <span className="font-bold text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 className="size-3" /> Berhasil (Lunas)
+                </span>
+              </div>
+              <div className="flex justify-between text-xs py-1 border-b border-border/50">
+                <span className="text-muted-foreground">Gateway</span>
+                <span className="font-semibold">Mayar.id Headless PG</span>
+              </div>
+              <div className="flex justify-between text-xs py-1">
+                <span className="text-muted-foreground">Dukungan Untuk</span>
+                <span className="font-semibold text-primary">School Ecosystem SMPN 99</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-2">
+              Dukungan Anda sangat berharga untuk kelangsungan operasional server dan program kebersihan lingkungan sekolah.
+            </p>
+
+            <div className="mt-4 flex justify-center">
+              <Button onClick={() => setPaymentSuccessModalOpen(false)} className="rounded-full w-full py-5 font-bold">
+                Kembali ke Halaman Utama
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </section>
 
       {/* FAQ */}
