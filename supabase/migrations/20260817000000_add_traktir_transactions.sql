@@ -106,3 +106,23 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;
+
+-- Insert initial Mayar transactions from dashboard export
+INSERT INTO public.traktir_transactions (
+    mayar_invoice_id,
+    donor_name,
+    donor_email,
+    donor_mobile,
+    amount,
+    payment_method,
+    status,
+    pay_url,
+    created_at,
+    updated_at
+) VALUES 
+('INV-05e5c3', 'Donatur Kopi', 'donatur@smpn99.sch.id', '081234567890', 1000, 'QRIS', 'success', NULL, '2026-08-17 11:56:04+07', '2026-08-17 11:56:04+07'),
+('INV-e21763', 'Donatur Kopi', 'donatur@smpn99.sch.id', '081234567890', 1000, 'QRIS', 'success', NULL, '2026-08-17 11:14:06+07', '2026-08-17 11:14:06+07'),
+('INV-007bdb', 'Donatur Kopi', 'donatur@smpn99.sch.id', '081234567890', 3000, 'QRIS', 'success', NULL, '2026-08-17 11:09:58+07', '2026-08-17 11:09:58+07')
+ON CONFLICT (mayar_invoice_id) DO UPDATE 
+SET status = EXCLUDED.status, amount = EXCLUDED.amount, updated_at = now();
+

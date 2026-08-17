@@ -231,6 +231,59 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
     setTimeout(() => setCopied(false), 3000);
   }
 
+  async function handleSyncMayarData() {
+    try {
+      const seedTransactions = [
+        {
+          mayar_invoice_id: "INV-05e5c3",
+          donor_name: "Donatur Kopi",
+          donor_email: "donatur@smpn99.sch.id",
+          donor_mobile: "081234567890",
+          amount: 1000,
+          payment_method: "QRIS",
+          status: "success",
+          created_at: "2026-08-17T11:56:04+07:00",
+          updated_at: "2026-08-17T11:56:04+07:00",
+        },
+        {
+          mayar_invoice_id: "INV-e21763",
+          donor_name: "Donatur Kopi",
+          donor_email: "donatur@smpn99.sch.id",
+          donor_mobile: "081234567890",
+          amount: 1000,
+          payment_method: "QRIS",
+          status: "success",
+          created_at: "2026-08-17T11:14:06+07:00",
+          updated_at: "2026-08-17T11:14:06+07:00",
+        },
+        {
+          mayar_invoice_id: "INV-007bdb",
+          donor_name: "Donatur Kopi",
+          donor_email: "donatur@smpn99.sch.id",
+          donor_mobile: "081234567890",
+          amount: 3000,
+          payment_method: "QRIS",
+          status: "success",
+          created_at: "2026-08-17T11:09:58+07:00",
+          updated_at: "2026-08-17T11:09:58+07:00",
+        },
+      ];
+
+      const { error } = await supabase
+        .from("traktir_transactions")
+        .upsert(seedTransactions, { onConflict: "mayar_invoice_id" });
+
+      if (error) throw error;
+
+      toast.success("3 transaksi Mayar berhasil disinkronkan ke Dasbor Admin!");
+      queryClient.invalidateQueries({ queryKey: ["admin-traktir-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-traktir-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["landing-traktir-stats"] });
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menyinkronkan data transaksi Mayar");
+    }
+  }
+
   return (
     <div className="space-y-8 pb-12">
       {/* WARNING BANNER FOR MISSING TABLE */}
@@ -297,6 +350,14 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
             className="gap-2 rounded-xl"
           >
             <RefreshCw className="size-4" /> Segarkan Data
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncMayarData}
+            className="gap-2 rounded-xl border-primary text-primary hover:bg-primary/10"
+          >
+            <CreditCard className="size-4" /> Sinkron 3 Transaksi Mayar
           </Button>
           <Button
             size="sm"
