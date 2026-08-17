@@ -677,27 +677,11 @@ function Index() {
     }
   }
 
-  const challenges = useQuery({
-    queryKey: ["landing-challenges"],
-    queryFn: async () => {
-      try {
-        const { data, error } = await (supabase as any)
-          .from("challenges")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (!error && data) return (data as any[]);
-      } catch (_) {}
-      return [];
-    },
-  });
-
-  const challengesList = (challenges.data && challenges.data.length > 0)
-    ? challenges.data
-    : [
-        { pill: "ACTIVE", name: "5 Hari Tumbler", title: "Build the streak.", body: "Minimal 5 record valid membawa tumbler dalam periode challenge.", pct: 72 },
-        { pill: "COMING SOON", name: "Full Reusable Class", title: "One class, one goal.", body: "Target reusable untuk kelas dengan progress yang dapat dipantau.", pct: 48 },
-        { pill: "ACTIVE", name: "Most Improved", title: "Progress matters.", body: "Apresiasi peningkatan, bukan hanya posisi tertinggi.", pct: 61 },
-      ];
+  const challengesList = [
+    { pill: "ACTIVE", name: "5 Hari Tumbler", title: "Build the streak.", body: "Minimal 5 record valid membawa tumbler dalam periode challenge.", pct: 72 },
+    { pill: "COMING SOON", name: "Full Reusable Class", title: "One class, one goal.", body: "Target reusable untuk kelas dengan progress yang dapat dipantau.", pct: 48 },
+    { pill: "ACTIVE", name: "Most Improved", title: "Progress matters.", body: "Apresiasi peningkatan, bukan hanya posisi tertinggi.", pct: 61 },
+  ];
 
   const stats = [
     { label: "Siswa terdaftar", value: `${data?.studentCount ?? 0}`, icon: Users },

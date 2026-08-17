@@ -130,26 +130,7 @@ export function saveAllEcoNewsLocal(items: EcoNewsItem[]): void {
 }
 
 export async function fetchEcoNews(): Promise<EcoNewsItem[]> {
-  let list: EcoNewsItem[] = [];
-  try {
-    const { data, error } = await (supabase as any)
-      .from("eco_news")
-      .select("id, category, title, summary, content, source, source_url, date, icon, badge, is_published")
-      .order("created_at", { ascending: false });
-
-    if (!error && data && data.length > 0) {
-      list = data.map((d: any) => ({
-        ...d,
-        sourceUrl: d.source_url || d.sourceUrl,
-        is_published: d.is_published !== false,
-      })) as EcoNewsItem[];
-    }
-  } catch (_) {}
-
-  if (list.length === 0) {
-    list = getAllEcoNewsLocal();
-  }
-
+  const list = getAllEcoNewsLocal();
   // Filter only published / active news items for ticker
   return list.filter((item) => item.is_published !== false);
 }
