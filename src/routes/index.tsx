@@ -110,12 +110,12 @@ const useSchoolStats = () => {
         const realValItems = valItemsCount ?? 0;
         const totalPoints = validScores.reduce((a, s) => a + Number(s.earned_points ?? 0), 0);
 
-        // If no active students with points exist yet, initialize all metrics including classes to 0
+        // If no active students with points exist yet, initialize scan metrics to 0 while maintaining real registered student count
         if (validScores.length === 0 || totalPoints === 0) {
           return {
             totalPoints: 0,
             totalItems: 0,
-            studentCount: 0,
+            studentCount: totalStudentsCount ?? 0,
             co2Kg: 0,
             classes: [],
           };
