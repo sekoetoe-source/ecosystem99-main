@@ -68,8 +68,8 @@ export function EcoNewsTicker({ compact = false, className = "" }: EcoNewsTicker
   return (
     <>
       <div
-        className={`w-full overflow-hidden bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white shadow-md transition-all ${
-          compact ? "py-1.5 px-3 text-xs" : "py-2 px-4 border-b border-emerald-800/40"
+        className={`w-full overflow-hidden bg-slate-950 text-white border-b border-emerald-500/30 shadow-lg transition-all ${
+          compact ? "py-2 px-3 text-xs" : "py-2.5 px-4"
         } ${className}`}
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
@@ -81,30 +81,30 @@ export function EcoNewsTicker({ compact = false, className = "" }: EcoNewsTicker
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span className="font-extrabold tracking-wider uppercase text-[10px] sm:text-xs text-emerald-300 flex items-center gap-1.5 bg-emerald-900/60 px-2.5 py-1 rounded-full border border-emerald-500/30 shadow-inner">
+            <span className="font-extrabold tracking-wider uppercase text-[10px] sm:text-xs text-emerald-300 flex items-center gap-1.5 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-500/40 shadow-inner shrink-0">
               <Sparkles className="size-3 text-amber-300 animate-pulse" />
               <span>Info Sehat & Lingkungan</span>
             </span>
           </div>
 
           {/* Headline Berjalan (Running Text Content) */}
-          <div className="flex-1 overflow-hidden cursor-pointer group" onClick={() => setSelectedNews(activeItem)}>
-            <div className="flex items-center gap-2.5 transition-all duration-500 ease-in-out transform">
-              <span className="text-base sm:text-lg shrink-0">{activeItem.icon || "🌿"}</span>
+          <div className="flex-1 min-w-0 overflow-hidden cursor-pointer group" onClick={() => setSelectedNews(activeItem)}>
+            <div className="flex items-center gap-2.5 transition-all duration-500 ease-in-out">
+              <span className="text-base sm:text-lg shrink-0 flex items-center">{activeItem.icon || "🌿"}</span>
               <span
-                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${getCategoryBadgeStyle(
+                className={`inline-flex items-center text-[10px] sm:text-xs ${getCategoryBadgeStyle(
                   activeItem.category
                 )}`}
               >
                 {activeItem.badge || activeItem.category}
               </span>
-              <p className="text-xs sm:text-sm font-semibold truncate group-hover:text-emerald-300 transition-colors">
+              <p className="text-xs sm:text-sm font-extrabold text-white truncate group-hover:text-amber-300 transition-colors">
                 {activeItem.title}
               </p>
-              <span className="hidden md:inline-block text-xs text-emerald-200/70 truncate max-w-xs">
+              <span className="hidden md:inline-block text-xs text-emerald-200/80 truncate max-w-xs shrink-0">
                 — {activeItem.summary}
               </span>
-              <span className="hidden lg:inline-flex text-[10px] bg-white/10 hover:bg-white/20 text-white px-2 py-0.5 rounded-full font-bold transition-all ml-1">
+              <span className="hidden lg:inline-flex shrink-0 text-[11px] bg-amber-400 hover:bg-amber-300 text-slate-950 px-2.5 py-0.5 rounded-full font-extrabold shadow whitespace-nowrap transition-all ml-1">
                 Baca Detail →
               </span>
             </div>

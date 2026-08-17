@@ -121,14 +121,14 @@ export async function fetchEcoNews(): Promise<EcoNewsItem[]> {
 export function getCategoryBadgeStyle(category: EcoNewsCategory) {
   switch (category) {
     case "aqi":
-      return "bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/40 font-black animate-pulse";
+      return "bg-purple-600 text-white font-black px-2.5 py-0.5 rounded-full shadow border border-purple-300 shrink-0 whitespace-nowrap animate-pulse";
     case "lingkungan":
-      return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
+      return "bg-emerald-600 text-white font-bold px-2.5 py-0.5 rounded-full shadow border border-emerald-300 shrink-0 whitespace-nowrap";
     case "kesehatan":
-      return "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30";
+      return "bg-sky-600 text-white font-bold px-2.5 py-0.5 rounded-full shadow border border-sky-300 shrink-0 whitespace-nowrap";
     case "sekolah":
-      return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30";
+      return "bg-amber-500 text-slate-950 font-extrabold px-2.5 py-0.5 rounded-full shadow border border-amber-300 shrink-0 whitespace-nowrap";
     default:
-      return "bg-primary/15 text-primary border-primary/30";
+      return "bg-emerald-700 text-white font-bold px-2.5 py-0.5 rounded-full border border-emerald-400 shrink-0 whitespace-nowrap";
   }
 }
