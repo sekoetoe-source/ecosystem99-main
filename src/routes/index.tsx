@@ -102,29 +102,35 @@ const useSchoolStats = () => {
           supabase.from("validation_items").select("id", { count: "exact", head: true }),
         ]);
 
-        const studentCount = totalStudentsCount ?? 0;
-
         const validScores = (scores ?? []).filter((s) => {
           const c = (s.class_name ?? "").trim();
-          return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
+          return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas" && Number(s.earned_points ?? 0) > 0);
         });
 
-        // Calculate total items scanned (plastic waste prevented)
-        const calcTotalItems = (valItemsCount ?? 0) > 0 
-          ? (valItemsCount ?? 0) 
-          : validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
-
-        // Calculate total eco points earned by all students
+        const realValItems = valItemsCount ?? 0;
         const totalPoints = validScores.reduce((a, s) => a + Number(s.earned_points ?? 0), 0);
 
-        // Average CO2 grams saved per item
+        // If no active validated scans exist yet, initialize metrics cleanly to 0
+        if (totalPoints === 0 && realValItems === 0) {
+          return {
+            totalPoints: 0,
+            totalItems: 0,
+            studentCount: 0,
+            co2Kg: 0,
+            classes: [],
+          };
+        }
+
+        const calcTotalItems = realValItems > 0 
+          ? realValItems 
+          : validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
+
         const avgCo2 = (items ?? []).length > 0
           ? (items ?? []).reduce((a, i) => a + i.co2_grams, 0) / Math.max(1, (items ?? []).length)
           : 68;
 
         const co2Kg = Math.round((calcTotalItems * avgCo2) / 1000);
 
-        // Real-time calculation of class rankings from student_scores
         const classMap = new Map<string, { class_name: string; total_points: number; student_count: number }>();
 
         validScores.forEach((s) => {
@@ -148,7 +154,7 @@ const useSchoolStats = () => {
         return {
           totalPoints,
           totalItems: calcTotalItems,
-          studentCount,
+          studentCount: totalStudentsCount ?? 0,
           co2Kg,
           classes: computedClasses.slice(0, 5),
         };
