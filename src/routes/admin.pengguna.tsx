@@ -975,7 +975,7 @@ function PenggunaPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {(allUsers.data ?? [])
-                  .filter((u) => !u.is_approved && u.requested_role)
+                  .filter((u) => !u.is_approved)
                   .map((u) => (
                     <tr key={u.id}>
                       <td className="px-4 py-3 font-medium">{u.full_name}</td>
@@ -985,7 +985,9 @@ function PenggunaPage() {
                             ? "SISWA"
                             : u.requested_role === "officer"
                               ? "PETUGAS POS"
-                              : "WALI KELAS"}
+                              : u.requested_role === "teacher"
+                                ? "WALI KELAS"
+                                : "BELUM PILIH (GOOGLE)"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{u.details}</td>
@@ -997,7 +999,7 @@ function PenggunaPage() {
                             className="h-8 gap-1.5 rounded-full"
                             onClick={() => {
                               setApproveUser(u);
-                              setApproveRole(u.requested_role || "student");
+                              setApproveRole(u.requested_role || "officer");
                               setApproveClassId(u.requested_class_id || "");
                               setApproveNis(u.requested_nis || "");
                             }}
@@ -1025,7 +1027,7 @@ function PenggunaPage() {
                   ))}
               </tbody>
             </table>
-            {(allUsers.data ?? []).filter((u) => !u.is_approved && u.requested_role).length === 0 && (
+            {(allUsers.data ?? []).filter((u) => !u.is_approved).length === 0 && (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">Tidak ada permintaan persetujuan baru.</p>
             )}
           </div>

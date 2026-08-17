@@ -52,6 +52,14 @@ function AuthPage() {
   });
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace("#", "?"));
+      const err = params.get("error_description") || hashParams.get("error_description") || params.get("error");
+      if (err) {
+        toast.error(`Google Login Notice: ${err}`);
+      }
+    }
     if (me && me.isApproved) {
       navigate({ to: homeForRole[me.primaryRole], replace: true });
     }
