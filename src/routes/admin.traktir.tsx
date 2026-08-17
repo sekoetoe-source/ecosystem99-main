@@ -87,37 +87,7 @@ function AdminTraktirPage() {
   const statsQuery = useQuery({
     queryKey: ["admin-traktir-stats"],
     queryFn: async () => {
-      try {
-        const [{ count: totalStudents }, { count: activeStudents }] = await Promise.all([
-          supabase.from("students").select("id", { count: "exact", head: true }),
-          supabase.from("student_scores").select("student_id", { count: "exact", head: true }),
-        ]);
-
-        const total = totalStudents ?? 858;
-        const active = activeStudents ?? 0;
-        const activePct = (active / Math.max(1, total)) * 100;
-
-        if (activePct <= 5) {
-          return {
-            total_amount: 0,
-            total_count: 0,
-            hosting_amount: 0,
-            reward_amount: 0,
-            maintenance_amount: 0,
-            hosting_pct: 50,
-            reward_pct: 40,
-            maintenance_pct: 10,
-          };
-        }
-
-        const { data, error } = await (supabase as any).rpc("get_traktir_stats");
-        if (!error && data && Number(data.total_amount) > 0) {
-          return data;
-        }
-      } catch (err) {
-        console.warn("RPC get_traktir_stats fallback:", err);
-      }
-
+      // Set to 0 for now as requested ("tetapkan 0 terlebih dahulu")
       return {
         total_amount: 0,
         total_count: 0,
@@ -150,8 +120,8 @@ function AdminTraktirPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const pendingCount = transactions.filter((t: any) => t.status === "pending").length;
-  const successCount = transactions.filter((t: any) => t.status === "success" || t.status === "paid").length;
+  const pendingCount = 0;
+  const successCount = 0;
 
   const [copied, setCopied] = useState(false);
 
