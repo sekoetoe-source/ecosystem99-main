@@ -200,10 +200,23 @@
 }
 
 @media print {
-  .no-print {
+  .no-print, header, nav, sidebar, [role="navigation"] {
     display: none !important;
   }
-  body {
-    background: #fff;
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+  .print-area {
+    position: static !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .print-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }

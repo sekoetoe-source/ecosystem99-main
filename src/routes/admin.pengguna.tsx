@@ -108,11 +108,35 @@ function PenggunaPage() {
   const students = useQuery({
     queryKey: ["admin-students"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("student_scores")
-        .select("student_id, full_name, nis, class_name, earned_points, total_items")
-        .order("earned_points", { ascending: false });
-      return data ?? [];
+      const [scoresRes, studentsRes] = await Promise.all([
+        supabase
+          .from("student_scores")
+          .select("student_id, full_name, nis, class_name, earned_points, total_items"),
+        supabase
+          .from("students")
+          .select("id, full_name, nis, class_id, classes(name)")
+          .order("full_name"),
+      ]);
+
+      const scoresMap = new Map(
+        (scoresRes.data ?? []).map((s) => [s.student_id, s])
+      );
+
+      if (studentsRes.data && studentsRes.data.length > 0) {
+        return studentsRes.data.map((s) => {
+          const sc = scoresMap.get(s.id);
+          return {
+            student_id: s.id,
+            full_name: s.full_name,
+            nis: s.nis,
+            class_name: sc?.class_name ?? (s.classes as any)?.name ?? null,
+            earned_points: sc?.earned_points ?? 0,
+            total_items: sc?.total_items ?? 0,
+          };
+        });
+      }
+
+      return scoresRes.data ?? [];
     },
   });
 
@@ -677,6 +701,7 @@ function PenggunaPage() {
                 aria-label="Cetak Massal QR Kelas"
               >
                 <option value="">-- Cetak Massal QR Kelas --</option>
+                <option value="SEMUA">Cetak Massal (SEMUA KELAS)</option>
                 {(classes.data ?? []).map((c) => (
                   <option key={c.id} value={c.name}>
                     Cetak QR Kelas {c.name}
@@ -1442,53 +1467,73 @@ function PenggunaPage() {
         </DialogContent>
       </Dialog>
 
-      {printClass && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-background p-8">
-          <div className="no-print mb-8 flex justify-between items-center border-b pb-4">
-            <div>
-              <h2 className="text-xl font-extrabold">Cetak Massal QR Kelas {printClass}</h2>
-              <p className="text-xs text-muted-foreground">
-                Gunakan menu print browser (Ctrl + P) untuk mencetak semua kartu di bawah ini.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => window.print()}>
-                <Printer className="size-4" /> Cetak Sekarang
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setPrintClass(null)}>
-                Kembali
-              </Button>
-            </div>
-          </div>
+      {printClass && (() => {
+        const printableStudents = (students.data ?? []).filter((s) => {
+          if (!printClass) return false;
+          if (printClass === "SEMUA") return true;
+          return (s.class_name ?? "").trim().toLowerCase() === printClass.trim().toLowerCase();
+        });
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 justify-items-center">
-            {(students.data ?? [])
-              .filter((s) => s.class_name === printClass)
-              .map((s) => (
-                <div
-                  key={s.student_id}
-                  className="flex flex-col items-center border border-border rounded-3xl p-6 bg-card shadow-sm w-full max-w-sm"
-                  style={{ pageBreakInside: "avoid", breakInside: "avoid" }}
-                >
-                  <div className="gradient-hero w-full rounded-2xl p-5 text-primary-foreground shadow-sm">
-                    <span className="label-xs text-primary-foreground/75">KARTU IDENTITAS ECO</span>
-                    <h3 className="mt-1 text-lg font-extrabold">{s.full_name}</h3>
-                    <p className="text-xs opacity-90">
-                      Kelas {s.class_name || "-"} · NIS {s.nis}
-                    </p>
-                    <div className="mt-2 flex flex-col gap-1 border-t border-primary-foreground/20 pt-2 text-[11px] opacity-80">
-                      <p>Username: {s.nis}</p>
-                      <p>Password default: S!swa@Smpn99jkt</p>
+        return (
+          <div className="print-area fixed inset-0 z-50 overflow-y-auto bg-background p-6 sm:p-8">
+            <div className="no-print mb-6 flex flex-wrap justify-between items-center border-b pb-4 gap-4 bg-card p-4 rounded-2xl shadow-sm">
+              <div>
+                <h2 className="text-xl font-extrabold">
+                  Cetak Massal QR {printClass === "SEMUA" ? "Semua Kelas" : `Kelas ${printClass}`} ({printableStudents.length} Siswa)
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Gunakan tombol di bawah atau menu print browser (Ctrl + P) untuk mencetak semua kartu di bawah ini.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => window.print()} className="rounded-full gap-1.5">
+                  <Printer className="size-4" /> Cetak Sekarang
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setPrintClass(null)} className="rounded-full">
+                  Tutup / Kembali
+                </Button>
+              </div>
+            </div>
+
+            {printableStudents.length === 0 ? (
+              <div className="text-center py-12 surface-card max-w-md mx-auto p-6">
+                <p className="font-bold text-foreground">Tidak Ada Data Siswa untuk Dicetak</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tidak ditemukan siswa untuk {printClass === "SEMUA" ? "semua kelas" : `kelas "${printClass}"`}. Pastikan data siswa telah diisi dengan kelas yang sesuai.
+                </p>
+                <Button size="sm" variant="outline" onClick={() => setPrintClass(null)} className="mt-4 rounded-full">
+                  Kembali
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center">
+                {printableStudents.map((s) => (
+                  <div
+                    key={s.student_id}
+                    className="print-card flex flex-col items-center border border-border rounded-3xl p-5 bg-card shadow-sm w-full max-w-xs"
+                    style={{ pageBreakInside: "avoid", breakInside: "avoid" }}
+                  >
+                    <div className="gradient-hero w-full rounded-2xl p-4 text-primary-foreground shadow-sm">
+                      <span className="label-xs text-primary-foreground/75">KARTU IDENTITAS ECO</span>
+                      <h3 className="mt-1 text-base font-extrabold truncate">{s.full_name}</h3>
+                      <p className="text-xs opacity-90">
+                        Kelas {s.class_name || "-"} · NIS {s.nis}
+                      </p>
+                      <div className="mt-2 flex flex-col gap-0.5 border-t border-primary-foreground/20 pt-2 text-[11px] opacity-80">
+                        <p>Username: {s.nis}</p>
+                        <p>Password: S!swa@Smpn99jkt</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 rounded-2xl bg-card p-2.5 shadow-md border">
+                      <QrImage value={s.nis ?? ""} size={140} />
                     </div>
                   </div>
-                  <div className="mt-6 rounded-2xl bg-card p-3 shadow-md border">
-                    <QrImage value={s.nis ?? ""} size={150} />
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
