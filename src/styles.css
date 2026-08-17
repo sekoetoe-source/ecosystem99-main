@@ -204,7 +204,7 @@
     size: A4 portrait;
     margin: 5mm;
   }
-  .no-print, header, nav, sidebar, [role="navigation"] {
+  .no-print, header, nav, sidebar, [role="navigation"], section, table, form, input, button, select, .surface-card, main > div > section {
     display: none !important;
   }
   body, html {
@@ -215,6 +215,9 @@
     margin: 0 !important;
     padding: 0 !important;
   }
+  .print-area, .print-area *, .print-page, .print-page *, .print-card, .print-card * {
+    display: block !important;
+  }
   .print-area {
     position: static !important;
     overflow: visible !important;
@@ -222,6 +225,7 @@
     padding: 0 !important;
     margin: 0 !important;
     height: auto !important;
+    width: 100% !important;
   }
   .print-page {
     break-after: page !important;

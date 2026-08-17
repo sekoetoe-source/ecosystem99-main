@@ -737,7 +737,7 @@ function PenggunaPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${printClass ? "no-print" : ""}`}>
       <div className="flex border-b border-border">
         {[
           { id: "siswa", label: "Daftar Siswa" },
