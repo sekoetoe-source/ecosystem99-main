@@ -181,3 +181,76 @@ export function getCategoryBadgeStyle(category: EcoNewsCategory) {
       return "bg-emerald-700 text-white font-bold px-2.5 py-0.5 rounded-full border border-emerald-400 shrink-0 whitespace-nowrap";
   }
 }
+
+export type AiPromptTopic = {
+  key: string;
+  label: string;
+  category: EcoNewsCategory;
+  icon: string;
+  title: string;
+  summary: string;
+  content: string;
+  source: string;
+};
+
+export const AI_NEWS_PROMPTS: AiPromptTopic[] = [
+  {
+    key: "hidrasi-belajar",
+    label: "🥤 Hidrasi & Tumbler Belajar",
+    category: "kesehatan",
+    icon: "💧",
+    title: "🥤 AI Health Tip: Hidrasi 2 Liter Air Putih dari Tumbler Tingkatkan Fokus Belajar",
+    summary: "Asupan air putih yang cukup dari tumbler pribadi meningkatkan fokus otak & fungsi sel tubuh hingga 20%.",
+    content: "Berdasarkan rekomendasi edukasi kesehatan remaja:\n\n1. Mengonsumsi 8 gelas (2 liter) air bersih harian menjaga metabolisme dan konsentrasi konsisten selama jam sekolah.\n2. Menggunakan tumbler stainless bebas BPA mencegah mikroplastik dari wadah sekali pakai masuk ke dalam organ pencernaan.\n3. Jangan menunggu merasa haus baru minum; biasakan minum 2-3 teguk air di sela pergantian mata pelajaran.",
+    source: "AI Eco-Health Intelligence SMPN 99",
+  },
+  {
+    key: "kualitas-udara-aqi",
+    label: "🌫️ Kualitas Udara & Masker Remaja",
+    category: "aqi",
+    icon: "🌬️",
+    title: "🌫️ AI AQI Alert: Solusi Paru-Paru Sehat Remaja Saat Indeks Udara Tinggi",
+    summary: "Lindungi pernapasan dari partikel PM2.5 dengan memakai masker medis & membilas mukosa mulut dari tumbler.",
+    content: "Analisis perlindungan kualitas udara remaja sekolah:\n\n• Saat Indeks Kualitas Udara (AQI) mencapai zona kuning/oranye (>100), gunakan masker filter saat berangkat dan pulang sekolah.\n• Rajin meminum air putih hangat dari tumbler pribadi untuk mengikis debu halus yang menempel di mukosa tenggorokan.\n• Hindari berdiri di dekat area pembakaran sampah liar yang melepas dioksin berbahaya bagi paru-paru remaja yang sedang berkembang.",
+    source: "AI AQI & Environmental Guardian",
+  },
+  {
+    key: "lunchbox-nutrisi",
+    label: "🍱 Bekal Lunchbox Bebas Sterofoam",
+    category: "kesehatan",
+    icon: "🍱",
+    title: "🍱 AI Nutrition Guide: Bekal Sehat Lunchbox Bebas Kimia Sterofoam & Plastik",
+    summary: "Membawa lunchbox wadah berulang memastikan nutrisi gizi seimbang tanpa kontaminasi panas plastik.",
+    content: "Tips nutrisi dan bekal aman untuk remaja sekolah:\n\n• Wadah plastik sekali pakai atau sterofoam saat terpapar makanan panas dapat melepaskan senyawa kimia berbahaya bagi hormon pertumbuhan.\n• Bawa bekal makanan dari rumah dalam wadah lunchbox food-grade (BPA Free) yang berisi sayuran hijau, protein, dan buah-buahan segar.\n• Menggunakan lunchbox berulang hemat hingga Rp 15.000,- per hari sekaligus mengurangi akumulasi sampah TPA.",
+    source: "AI Eco-Nutrition Specialist",
+  },
+  {
+    key: "zero-waste-sekolah",
+    label: "🌱 Zero Waste & Daur Ulang Remaja",
+    category: "lingkungan",
+    icon: "♻️",
+    title: "🌱 AI Green Tip: Aksi Nyata Zero Waste Remaja SMPN 99 Kurangi Sampah Plastik",
+    summary: "Aksi sederhana membawa tempat makan & minum sendiri berdampak menyelamatkan 350+ botol plastik per siswa per tahun.",
+    content: "Fakta lingkungan & aksi dampak nyata sekolah:\n\n1. Satu siswa yang konsisten menggunakan tumbler dan lunchbox selama 1 tahun ajaran mencegah lebih dari 350 kemasan sekali pakai terbuang ke lingkungan.\n2. Kumpulkan Eco-Points harian dengan melakukan scan di Pos Scanner Petugas sekolah untuk membawa kelasmu menjadi Jawara Lingkungan.\n3. Salurkan sampah kertas dan kardus bekas ke tempat daur ulang sekolah untuk mendukung ekonomi sirkular.",
+    source: "AI Zero Waste Movement",
+  },
+  {
+    key: "postur-duduk-mata",
+    label: "🧘‍♂️ Postur Belajar & Mata Remaja",
+    category: "kesehatan",
+    icon: "👓",
+    title: "🧘‍♂️ AI Ergonomic Tip: Jaga Postur Duduk Tegak & Istirahat Mata Saat Belajar",
+    summary: "Cegah kelainan tulang belakang & mata lelah dengan aturan 20-20-20 serta duduk tegak simetris.",
+    content: "Edukasi kesehatan fisik & ergonomi remaja:\n\n• Duduklah tegak dengan punggung menempel pada sandaran kursi dan kaki menapak rata di lantai untuk mencegah gangguan skoliosis.\n• Jaga jarak mata dengan buku atau HP minimal 30 cm.\n• Terapkan aturan 20-20-20: Setiap 20 menit menatap layar HP/buku, alihkan pandangan mata ke pohon atau daun hijau di luar kelas selama 20 detik.",
+    source: "AI Adolescent Health Guide",
+  },
+];
+
+export function generateAiEcoNews(promptKey?: string): AiPromptTopic {
+  if (promptKey) {
+    const found = AI_NEWS_PROMPTS.find((p) => p.key === promptKey);
+    if (found) return found;
+  }
+  const randomIndex = Math.floor(Math.random() * AI_NEWS_PROMPTS.length);
+  return AI_NEWS_PROMPTS[randomIndex];
+}

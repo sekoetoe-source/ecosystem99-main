@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil, Filter, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil, Filter, ArrowUpDown, ChevronLeft, ChevronRight, Sparkles, Wand2, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +26,8 @@ import {
   toggleEcoNewsStatusLocal,
   addEcoNewsItemLocal,
   deleteEcoNewsItemLocal,
+  AI_NEWS_PROMPTS,
+  generateAiEcoNews,
 } from "@/lib/ecoNewsService";
 
 export const Route = createFileRoute("/admin/pengguna")({
@@ -1255,12 +1257,31 @@ function PenggunaPage() {
                 Headline berita & tips kesehatan remaja/sekolah (AQI Jakarta, bebas plastik, hidrasi, dll) yang berjalan di beranda dan dasbor.
               </p>
             </div>
-            <Button
-              onClick={() => setAddNewsOpen(true)}
-              className="gap-2 rounded-full font-bold shadow-sm"
-            >
-              <Plus className="size-4" /> Tambah Running Text Baru
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const ai = generateAiEcoNews();
+                  setNewsTitle(ai.title);
+                  setNewsCategory(ai.category);
+                  setNewsIcon(ai.icon);
+                  setNewsSummary(ai.summary);
+                  setNewsContent(ai.content);
+                  setNewsSource(ai.source);
+                  setAddNewsOpen(true);
+                  toast.success(`✨ AI News Generator dibuka! Berita "${ai.label}" telah disiapkan.`);
+                }}
+                className="gap-2 rounded-full font-bold border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 shadow-sm"
+              >
+                <Sparkles className="size-4 text-emerald-600 animate-pulse" /> ✨ Generate AI News
+              </Button>
+              <Button
+                onClick={() => setAddNewsOpen(true)}
+                className="gap-2 rounded-full font-bold shadow-sm"
+              >
+                <Plus className="size-4" /> Tambah Running Text Baru
+              </Button>
+            </div>
           </header>
 
           <div className="surface-card p-4 rounded-2xl border border-emerald-500/20">
@@ -1751,6 +1772,64 @@ function PenggunaPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* AI NEWS GENERATOR ENGINE */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-sky-500/10 to-purple-500/10 border border-emerald-500/25 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-extrabold text-xs text-emerald-800 dark:text-emerald-300">
+                  <Sparkles className="size-4 text-emerald-600 animate-pulse" />
+                  <span>✨ AI Eco-Health News Generator</span>
+                </div>
+                <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full shadow-sm">
+                  Smart AI Prompts
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                Pilih topik AI di bawah ini atau klik <strong>Generate Acak AI</strong> untuk mencari & membuat berita/tips kesehatan & lingkungan otomatis:
+              </p>
+              
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {AI_NEWS_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt.key}
+                    type="button"
+                    onClick={() => {
+                      const ai = generateAiEcoNews(prompt.key);
+                      setNewsTitle(ai.title);
+                      setNewsCategory(ai.category);
+                      setNewsIcon(ai.icon);
+                      setNewsSummary(ai.summary);
+                      setNewsContent(ai.content);
+                      setNewsSource(ai.source);
+                      toast.success(`✨ Berita AI "${ai.label}" berhasil digenerate!`);
+                    }}
+                    className="text-[10px] font-bold bg-background hover:bg-emerald-50 text-foreground dark:hover:bg-emerald-950/40 border border-border hover:border-emerald-500 px-2 py-1 rounded-lg transition-all"
+                  >
+                    {prompt.label}
+                  </button>
+                ))}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full text-xs font-bold gap-1.5 mt-1 border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl"
+                onClick={() => {
+                  const ai = generateAiEcoNews();
+                  setNewsTitle(ai.title);
+                  setNewsCategory(ai.category);
+                  setNewsIcon(ai.icon);
+                  setNewsSummary(ai.summary);
+                  setNewsContent(ai.content);
+                  setNewsSource(ai.source);
+                  toast.success(`✨ AI berhasil meng-generate berita acak!`);
+                }}
+              >
+                <Wand2 className="size-3.5 text-emerald-600" />
+                Generate Acak (AI Smart Prompt)
+              </Button>
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-bold text-muted-foreground">Judul Headline / Berita</label>
               <input
