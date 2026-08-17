@@ -79,27 +79,42 @@ function useSchoolStats() {
   return useQuery({
     queryKey: ["school-stats"],
     queryFn: async () => {
-      const [{ data: scores }, { count: studentCount }, { data: items }, { data: classes }] =
+      const [{ data: scores }, { data: students }, { data: items }, { data: classes }] =
         await Promise.all([
-          supabase.from("student_scores").select("earned_points, total_items"),
-          supabase.from("students").select("id", { count: "exact", head: true }),
+          supabase.from("student_scores").select("earned_points, total_items, class_name"),
+          supabase.from("students").select("id, class_id, classes(name)").not("class_id", "is", null),
           supabase.from("eco_items").select("code, co2_grams"),
           supabase
             .from("class_scores")
             .select("class_name, total_points, avg_points, student_count")
-            .order("avg_points", { ascending: false })
-            .limit(5),
+            .order("avg_points", { ascending: false }),
         ]);
-      const totalPoints = (scores ?? []).reduce((a, s) => a + (s.earned_points ?? 0), 0);
-      const totalItems = (scores ?? []).reduce((a, s) => a + Number(s.total_items ?? 0), 0);
+
+      const validScores = (scores ?? []).filter((s) => {
+        const c = (s.class_name ?? "").trim();
+        return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
+      });
+
+      const validStudents = (students ?? []).filter((s) => {
+        const className = (s.classes as { name: string } | null)?.name?.trim();
+        return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas");
+      });
+
+      const validClasses = (classes ?? []).filter((c) => {
+        const name = (c.class_name ?? "").trim();
+        return Boolean(name && name !== "-" && name.toLowerCase() !== "tanpa kelas");
+      });
+
+      const totalPoints = validScores.reduce((a, s) => a + (s.earned_points ?? 0), 0);
+      const totalItems = validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
       const avgCo2 =
         (items ?? []).reduce((a, i) => a + i.co2_grams, 0) / Math.max(1, (items ?? []).length);
       return {
         totalPoints,
         totalItems,
-        studentCount: studentCount ?? 0,
+        studentCount: validStudents.length,
         co2Kg: Math.round((totalItems * avgCo2) / 1000),
-        classes: classes ?? [],
+        classes: validClasses.slice(0, 5),
       };
     },
   });

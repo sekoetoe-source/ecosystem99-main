@@ -20,7 +20,10 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         .order("earned_points", { ascending: false })
         .limit(100);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).filter((s) => {
+        const c = (s.class_name ?? "").trim();
+        return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
+      });
     },
   });
 
@@ -32,7 +35,10 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         .select("class_id, class_name, student_count, total_points, avg_points")
         .order("total_points", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).filter((c) => {
+        const name = (c.class_name ?? "").trim();
+        return Boolean(name && name !== "-" && name.toLowerCase() !== "tanpa kelas");
+      });
     },
   });
 
@@ -44,7 +50,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
             id: s.student_id as string,
             rank: i + 1,
             title: s.full_name as string,
-            sub: s.class_name ?? "Tanpa kelas",
+            sub: s.class_name as string,
             points: s.earned_points ?? 0,
           }))
       : (classes.data ?? [])

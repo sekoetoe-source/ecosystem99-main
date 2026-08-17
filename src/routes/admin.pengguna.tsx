@@ -128,8 +128,9 @@ function PenggunaPage() {
         (scoresRes.data ?? []).map((s) => [s.student_id, s])
       );
 
+      let list: any[] = [];
       if (studentsRes.data && studentsRes.data.length > 0) {
-        return studentsRes.data.map((s) => {
+        list = studentsRes.data.map((s) => {
           const sc = scoresMap.get(s.id);
           return {
             student_id: s.id,
@@ -140,9 +141,14 @@ function PenggunaPage() {
             total_items: sc?.total_items ?? 0,
           };
         });
+      } else {
+        list = scoresRes.data ?? [];
       }
 
-      return scoresRes.data ?? [];
+      return list.filter((s) => {
+        const c = (s.class_name ?? "").trim();
+        return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
+      });
     },
   });
 

@@ -97,6 +97,12 @@ function LaporanPage() {
           : Promise.resolve({ data: [] as { points: number; validations: { status: string } | null }[] }),
       ]);
 
+      // Filter to only include active students who have a valid class assigned
+      const validStudents = (students ?? []).filter((s) => {
+        const className = (s.classes as { name: string } | null)?.name?.trim();
+        return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas");
+      });
+
       const approved = (items ?? []).filter(
         (i) => (i.validations as { status: string } | null)?.status === "approved",
       );
@@ -105,12 +111,13 @@ function LaporanPage() {
       );
 
       const classOf = new Map<string, string>();
-      for (const s of students ?? []) {
-        classOf.set(s.id, (s.classes as { name: string } | null)?.name ?? "Tanpa kelas");
+      for (const s of validStudents) {
+        const className = (s.classes as { name: string } | null)!.name.trim();
+        classOf.set(s.id, className);
       }
 
       const classes = new Map<string, ClassRow>();
-      for (const s of students ?? []) {
+      for (const s of validStudents) {
         const name = classOf.get(s.id)!;
         const row = classes.get(name) ?? { name, students: 0, points: 0, tumbler: 0, lunchbox: 0 };
         row.students += 1;
@@ -122,8 +129,10 @@ function LaporanPage() {
       const classTumbler = new Map<string, Set<string>>();
       const classLunchbox = new Map<string, Set<string>>();
 
-      for (const i of approved) {
-        const name = classOf.get(i.student_id) ?? "Tanpa kelas";
+      const approvedValid = approved.filter((i) => classOf.has(i.student_id));
+
+      for (const i of approvedValid) {
+        const name = classOf.get(i.student_id)!;
         const row = classes.get(name) ?? { name, students: 0, points: 0, tumbler: 0, lunchbox: 0 };
         row.points += Number(i.points ?? 0);
         classes.set(name, row);
@@ -141,14 +150,14 @@ function LaporanPage() {
         }))
         .sort((a, b) => b.points - a.points);
 
-      const totalStudents = (students ?? []).length;
-      const totalPoints = approved.reduce((a, i) => a + Number(i.points ?? 0), 0);
+      const totalStudents = validStudents.length;
+      const totalPoints = approvedValid.reduce((a, i) => a + Number(i.points ?? 0), 0);
       const prevPoints = prevApproved.reduce((a, i) => a + Number(i.points ?? 0), 0);
 
       return {
         rows,
         totalStudents,
-        totalItems: approved.length,
+        totalItems: approvedValid.length,
         totalPoints,
         tumblerRate: Math.round((tumblerUsers.size / Math.max(1, totalStudents)) * 100),
         lunchboxRate: Math.round((lunchboxUsers.size / Math.max(1, totalStudents)) * 100),
