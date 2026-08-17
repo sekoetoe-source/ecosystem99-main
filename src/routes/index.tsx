@@ -1481,45 +1481,45 @@ function Index() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-border bg-background/95 p-1.5 backdrop-blur-md shadow-2xl lg:hidden">
         <a
           href="#home"
-          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-1.5 rounded-lg active:scale-95"
         >
-          <Home className="size-5" />
-          <span className="text-[10px] font-bold">Beranda</span>
+          <Home className="size-4.5" />
+          <span className="text-[9px] font-bold">Beranda</span>
         </a>
         <a
-          href="#statistik"
-          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+          href="#panduan"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-1.5 rounded-lg active:scale-95"
         >
-          <BarChart2 className="size-5" />
-          <span className="text-[10px] font-bold">Statistik</span>
+          <BookOpen className="size-4.5 text-emerald-600 dark:text-emerald-400" />
+          <span className="text-[9px] font-bold">Panduan</span>
         </a>
         <a
           href="#leaderboard"
-          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-1.5 rounded-lg active:scale-95"
         >
-          <Trophy className="size-5" />
-          <span className="text-[10px] font-bold">Jawara</span>
+          <Trophy className="size-4.5" />
+          <span className="text-[9px] font-bold">Jawara</span>
         </a>
         <a
           href="#challenge"
-          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-1.5 rounded-lg active:scale-95"
         >
-          <Flame className="size-5 text-amber-500" />
-          <span className="text-[10px] font-bold">Challenge</span>
+          <Flame className="size-4.5 text-amber-500" />
+          <span className="text-[9px] font-bold">Challenge</span>
         </a>
         <a
           href="#kopi"
-          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-1.5 rounded-lg active:scale-95"
         >
-          <Coffee className="size-5 text-amber-600" />
-          <span className="text-[10px] font-bold">Traktir</span>
+          <Coffee className="size-4.5 text-amber-600" />
+          <span className="text-[9px] font-bold">Traktir</span>
         </a>
         <Link
           to={dashHref}
-          className="flex flex-col items-center gap-0.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all py-1.5 px-3 rounded-full shadow-md active:scale-95 font-extrabold"
+          className="flex flex-col items-center gap-0.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all py-1 px-2.5 rounded-full shadow-md active:scale-95 font-extrabold"
         >
-          <LogIn className="size-4" />
-          <span className="text-[10px]">Login</span>
+          <LogIn className="size-3.5" />
+          <span className="text-[9px]">Login</span>
         </Link>
       </nav>
     </div>
