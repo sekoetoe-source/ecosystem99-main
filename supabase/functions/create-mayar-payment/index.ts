@@ -45,7 +45,11 @@ serve(async (req) => {
         email: donorEmail,
         mobile: donorMobile,
         description: "Dukungan operasional program budaya ramah lingkungan sekolah.",
+        redirectUrl: targetRedirectUrl,
         redirectURL: targetRedirectUrl,
+        redirect_url: targetRedirectUrl,
+        successRedirectUrl: targetRedirectUrl,
+        callbackUrl: targetRedirectUrl,
         expiredIn: 900,
         expiredAt: expiredAtDate,
         items: [

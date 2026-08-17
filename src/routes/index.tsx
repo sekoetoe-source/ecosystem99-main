@@ -172,11 +172,23 @@ function Index() {
             body: { invoiceId, status: "success" }
           });
         }
-        // Clean URL query params
+        // Clean URL query params & smooth scroll to #kopi section
         window.history.replaceState({}, document.title, window.location.pathname + "#kopi");
+        setTimeout(() => {
+          const kopiElem = document.getElementById("kopi");
+          if (kopiElem) {
+            kopiElem.scrollIntoView({ behavior: "smooth" });
+          }
+        }, 200);
       } else if (status === "expired" || status === "cancelled" || status === "failed" || status === "canceled") {
         toast.error("Batas waktu pembayaran (15 menit) telah habis atau dibatalkan. Silakan klik Traktir Kopi lagi untuk membuat transaksi baru.");
         window.history.replaceState({}, document.title, window.location.pathname + "#kopi");
+        setTimeout(() => {
+          const kopiElem = document.getElementById("kopi");
+          if (kopiElem) {
+            kopiElem.scrollIntoView({ behavior: "smooth" });
+          }
+        }, 200);
       }
     }
   }, []);
@@ -221,7 +233,7 @@ function Index() {
       }
       
       const currentOrigin = window.location.origin;
-      const redirectUrl = `${currentOrigin}/?status=success#kopi`;
+      const redirectUrl = `${currentOrigin}/?status=success&redirect=kopi`;
 
       const { data, error } = await supabase.functions.invoke("create-mayar-payment", {
         body: {
