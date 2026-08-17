@@ -252,5 +252,5 @@ export function generateAiEcoNews(promptKey?: string): AiPromptTopic {
     if (found) return found;
   }
   const randomIndex = Math.floor(Math.random() * AI_NEWS_PROMPTS.length);
-  return AI_NEWS_PROMPTS[randomIndex];
+  return AI_NEWS_PROMPTS[randomIndex] ?? AI_NEWS_PROMPTS[0];
 }
