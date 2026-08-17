@@ -159,7 +159,7 @@ function useSchoolStats() {
 
         if (computedClasses.length === 0 && validClasses.length > 0) {
           computedClasses = validClasses.map((c) => ({
-            class_name: c.class_name,
+            class_name: c.class_name ?? "Kelas",
             student_count: Number(c.student_count ?? 0),
             total_points: Number(c.total_points ?? 0),
             avg_points: Number(c.avg_points ?? 0),
