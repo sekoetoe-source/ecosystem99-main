@@ -1,10 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Leaf, TrendingUp, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/routes/siswa.index";
+import { EcoNewsTicker } from "@/components/eco/EcoNewsTicker";
 import { useMe } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin/")({
@@ -118,6 +119,24 @@ function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      <section className="surface-card p-5 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/10 via-background to-background">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📢</span>
+            <div>
+              <h2 className="text-base font-extrabold text-foreground">Info Berjalan (Running Text Eco & Health AI)</h2>
+              <p className="text-xs text-muted-foreground">Live preview headline berita & tips kesehatan remaja/lingkungan Jakarta di beranda</p>
+            </div>
+          </div>
+          <Button asChild size="sm" variant="outline" className="rounded-full gap-1">
+            <Link to="/admin/pengguna">Kelola Running Text →</Link>
+          </Button>
+        </div>
+        <div className="rounded-xl overflow-hidden border border-emerald-500/20 shadow-sm">
+          <EcoNewsTicker />
+        </div>
+      </section>
 
       <section>
         <h2 className="text-lg font-bold">Antrean Persetujuan Klaim</h2>

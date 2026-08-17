@@ -4,6 +4,7 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   HeartPulse,
   Info,
   Leaf,
@@ -177,11 +178,22 @@ export function EcoNewsTicker({ compact = false, className = "" }: EcoNewsTicker
               </div>
 
               {selectedNews.source && (
-                <div className="flex items-center justify-between text-xs text-muted-foreground bg-primary/5 p-3 rounded-xl border border-primary/10">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground bg-primary/5 p-3 rounded-xl border border-primary/10">
                   <span className="flex items-center gap-1.5 font-semibold text-primary">
                     <Info className="size-4" /> Sumber Informasi & Tips:
                   </span>
-                  <span className="font-bold">{selectedNews.source}</span>
+                  {selectedNews.sourceUrl ? (
+                    <a
+                      href={selectedNews.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold text-primary hover:underline inline-flex items-center gap-1 bg-primary/10 px-2.5 py-1 rounded-lg"
+                    >
+                      {selectedNews.source} <ExternalLink className="size-3" />
+                    </a>
+                  ) : (
+                    <span className="font-bold">{selectedNews.source}</span>
+                  )}
                 </div>
               )}
 

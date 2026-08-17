@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type EcoNewsCategory = "lingkungan" | "kesehatan" | "sekolah";
+export type EcoNewsCategory = "lingkungan" | "kesehatan" | "sekolah" | "aqi";
 
 export type EcoNewsItem = {
   id: string;
@@ -9,6 +9,7 @@ export type EcoNewsItem = {
   summary: string;
   content: string;
   source?: string;
+  sourceUrl?: string;
   date?: string;
   icon?: string;
   badge?: string;
@@ -16,12 +17,25 @@ export type EcoNewsItem = {
 
 export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
   {
+    id: "news-aqi-live",
+    category: "aqi",
+    title: "🌬️ Live AQI Jakarta (106 - Buruk/Sedang): PM2.5 38µg/m³ · Disarankan Pakai Masker & Minum dari Tumbler",
+    summary: "Indeks Kualitas Udara (AQI) Jakarta real-time terpantau 106 dengan polutan utama PM2.5. Gunakan masker saat berangkat sekolah!",
+    content: "Berdasarkan data real-time AQI.in Jakarta:\n\n• Indeks Kualitas Udara (AQI): 106 (Tingkat Buruk/Sedang)\n• Polutan Utama PM2.5: 38 µg/m³ | PM10: 66 µg/m³ | Suhu: 29.1°C\n• Rekomendasi Kesehatan Remaja SMPN 99:\n  1. Kenakan masker saat berangkat/pulang sekolah atau beraktivitas luar ruangan.\n  2. Sering minum air putih dari Tumbler pribadi untuk membilas tenggorokan dan menjaga kelembapan mukosa sel pernapasan dari partikel debu halus PM2.5.\n  3. Kurangi olahraga luar ruangan yang berlebihan saat Indeks AQI di atas 100.",
+    source: "AQI.in Jakarta Live Dashboard",
+    sourceUrl: "https://www.aqi.in/id/dashboard/indonesia/jakarta/jakarta",
+    date: "Real-time Live",
+    icon: "🌫️",
+    badge: "AQI Jakarta Real-Time",
+  },
+  {
     id: "news-1",
     category: "lingkungan",
-    title: "🌿 Kualitas Udara Jakarta Hari Ini & Tips Menjaga Kesehatan Paru Remaja",
+    title: "🌿 Kualitas Udara Jakarta & Tips Menjaga Kesehatan Paru Remaja Sekolah",
     summary: "Pantau indeks AQI Jakarta dan gunakan tumbler stainless untuk mengurangi sampah botol sekali pakai.",
     content: "Polusi udara di DKI Jakarta memerlukan perhatian khusus dari remaja sekolah. Selalu bawa tumbler stainless steel pribadi ke SMPN 99 Jakarta untuk menjaga kelembapan tenggorokan, gunakan masker saat berada di luar ruangan pada pagi hari, dan kurangi penggunaan plastik sekali pakai yang pembakarannya dapat memperburuk kualitas udara.",
     source: "Dinas Lingkungan Hidup DKI Jakarta",
+    sourceUrl: "https://www.aqi.in/id/dashboard/indonesia/jakarta/jakarta",
     date: "Hari Ini",
     icon: "🌬️",
     badge: "Lingkungan Jakarta",
@@ -40,7 +54,7 @@ export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
   {
     id: "news-3",
     category: "sekolah",
-    title: "🍱 Kebiasaan Bawa Lunchbox Sekolah: Bebas Mikroplastik & Hemat Uang Jaku",
+    title: "🍱 Kebiasaan Bawa Lunchbox Sekolah: Bebas Mikroplastik & Hemat Uang Saku",
     summary: "Membawa bekal dari rumah memastikan asupan gizi seimbang dan bebas dari kemasan sterofoam berbahaya.",
     content: "Penggunaan wadah makan berulang (lunchbox) di SMP Negeri 99 Jakarta melindungi makanan dari bahaya lelehan kimia wadah plastik sekali pakai saat terpapar panas. Pastikan bekal sekolahmu mengandung protein, sayuran hijau, dan karbohidrat seimbang untuk energi optimal sepanjang hari.",
     source: "Gerakan Sekolah Sehat SMPN 99",
@@ -77,6 +91,7 @@ export const DEFAULT_ECO_NEWS: EcoNewsItem[] = [
     summary: "Setiap langkah kecilmu membawa botol & lunchbox mengurangi beban TPA Bantar Gebang.",
     content: "DKI Jakarta menghasilkan lebih dari 7.500 ton sampah harian. Dengan menjadi bagian dari program School Ecosystem SMPN 99 Jakarta, kamu telah membantu mencegah ribuan sedotan dan botol plastik berakhir di laut dan sungai Jakarta.",
     source: "DLH DKI & Eco-Movement",
+    sourceUrl: "https://www.aqi.in/id/dashboard/indonesia/jakarta/jakarta",
     date: "Fakta Lingkungan",
     icon: "🌍",
     badge: "Jakarta Eco",
@@ -87,12 +102,15 @@ export async function fetchEcoNews(): Promise<EcoNewsItem[]> {
   try {
     const { data, error } = await (supabase as any)
       .from("eco_news")
-      .select("id, category, title, summary, content, source, date, icon, badge")
+      .select("id, category, title, summary, content, source, source_url, date, icon, badge")
       .eq("is_published", true)
       .order("created_at", { ascending: false });
 
     if (!error && data && data.length > 0) {
-      return data as EcoNewsItem[];
+      return data.map((d: any) => ({
+        ...d,
+        sourceUrl: d.source_url || d.sourceUrl,
+      })) as EcoNewsItem[];
     }
   } catch (_) {
     // Fallback jika tabel supabase belum dibuat
@@ -102,6 +120,8 @@ export async function fetchEcoNews(): Promise<EcoNewsItem[]> {
 
 export function getCategoryBadgeStyle(category: EcoNewsCategory) {
   switch (category) {
+    case "aqi":
+      return "bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/40 font-black animate-pulse";
     case "lingkungan":
       return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
     case "kesehatan":
