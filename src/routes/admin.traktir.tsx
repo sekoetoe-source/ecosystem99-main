@@ -12,6 +12,8 @@ import {
   Copy,
   CreditCard,
   ExternalLink,
+  Loader2,
+  MessageSquare,
   Plus,
   RefreshCw,
   Search,
@@ -36,15 +38,49 @@ export const Route = createFileRoute("/admin/traktir")({
   component: AdminTraktirPage,
 });
 
-const INITIAL_MAYAR_TRANSACTIONS = [
+export const INITIAL_MAYAR_TRANSACTIONS = [
   {
     id: "seed-1",
-    mayar_invoice_id: "INV-05e5c3",
+    mayar_invoice_id: "ab76aa",
+    product_id: "1cca79",
     donor_name: "Donatur Kopi",
     donor_email: "donatur@smpn99.sch.id",
     donor_mobile: "081234567890",
-    amount: 1000,
+    amount: 3000,
     payment_method: "QRIS",
+    payment_type: "Invoice",
+    status: "success",
+    pay_url: null as string | null,
+    notes: null as string | null,
+    created_at: "2026-08-17T12:00:00+07:00",
+    updated_at: "2026-08-17T12:00:00+07:00",
+  },
+  {
+    id: "seed-2",
+    mayar_invoice_id: "88aa4c",
+    product_id: "30752f",
+    donor_name: "Donatur Kopi",
+    donor_email: "donatur@smpn99.sch.id",
+    donor_mobile: "081234567890",
+    amount: 1028,
+    payment_method: "QRIS",
+    payment_type: "Invoice",
+    status: "success",
+    pay_url: null as string | null,
+    notes: null as string | null,
+    created_at: "2026-08-17T11:58:00+07:00",
+    updated_at: "2026-08-17T11:58:00+07:00",
+  },
+  {
+    id: "seed-3",
+    mayar_invoice_id: "6f56ae",
+    product_id: "58aa7d",
+    donor_name: "Donatur Kopi",
+    donor_email: "donatur@smpn99.sch.id",
+    donor_mobile: "081234567890",
+    amount: 5000,
+    payment_method: "QRIS",
+    payment_type: "Invoice",
     status: "success",
     pay_url: null as string | null,
     notes: null as string | null,
@@ -52,13 +88,47 @@ const INITIAL_MAYAR_TRANSACTIONS = [
     updated_at: "2026-08-17T11:56:04+07:00",
   },
   {
-    id: "seed-2",
-    mayar_invoice_id: "INV-e21763",
+    id: "seed-4",
+    mayar_invoice_id: "1a6917",
+    product_id: "b2cdba",
+    donor_name: "Donatur Kopi",
+    donor_email: "donatur@smpn99.sch.id",
+    donor_mobile: "081234567890",
+    amount: 10000,
+    payment_method: "QRIS",
+    payment_type: "Invoice",
+    status: "success",
+    pay_url: null as string | null,
+    notes: null as string | null,
+    created_at: "2026-08-17T11:45:00+07:00",
+    updated_at: "2026-08-17T11:45:00+07:00",
+  },
+  {
+    id: "seed-5",
+    mayar_invoice_id: "885595",
+    product_id: "cdcf9c",
     donor_name: "Donatur Kopi",
     donor_email: "donatur@smpn99.sch.id",
     donor_mobile: "081234567890",
     amount: 1000,
     payment_method: "QRIS",
+    payment_type: "Invoice",
+    status: "success",
+    pay_url: null as string | null,
+    notes: null as string | null,
+    created_at: "2026-08-17T11:30:00+07:00",
+    updated_at: "2026-08-17T11:30:00+07:00",
+  },
+  {
+    id: "seed-6",
+    mayar_invoice_id: "53d97f",
+    product_id: "d4a6da",
+    donor_name: "Donatur Kopi",
+    donor_email: "donatur@smpn99.sch.id",
+    donor_mobile: "081234567890",
+    amount: 1000,
+    payment_method: "QRIS",
+    payment_type: "Invoice",
     status: "success",
     pay_url: null as string | null,
     notes: null as string | null,
@@ -66,13 +136,15 @@ const INITIAL_MAYAR_TRANSACTIONS = [
     updated_at: "2026-08-17T11:14:06+07:00",
   },
   {
-    id: "seed-3",
-    mayar_invoice_id: "INV-007bdb",
+    id: "seed-7",
+    mayar_invoice_id: "401056",
+    product_id: "2f61f2",
     donor_name: "Donatur Kopi",
     donor_email: "donatur@smpn99.sch.id",
     donor_mobile: "081234567890",
     amount: 3000,
     payment_method: "QRIS",
+    payment_type: "Invoice",
     status: "success",
     pay_url: null as string | null,
     notes: null as string | null,
@@ -86,6 +158,7 @@ function AdminTraktirPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Manual Transaction Form State
   const [manualName, setManualName] = useState("");
@@ -125,7 +198,7 @@ function AdminTraktirPage() {
           supabase
             .from("traktir_transactions")
             .upsert(
-              INITIAL_MAYAR_TRANSACTIONS.map(({ id, ...rest }) => rest),
+              INITIAL_MAYAR_TRANSACTIONS.map(({ id, product_id, payment_type, ...rest }) => rest),
               { onConflict: "mayar_invoice_id" }
             )
             .then(() => console.log("Seeded initial Mayar transactions to DB"));
@@ -146,7 +219,7 @@ function AdminTraktirPage() {
     queryKey: ["admin-traktir-stats"],
     queryFn: async () => {
       const list = transactionsQuery.data || INITIAL_MAYAR_TRANSACTIONS;
-      const successRows = list.filter((t) => t.status === "success");
+      const successRows = list.filter((t) => t.status === "success" || t.status === "paid");
       const total = successRows.reduce((acc, r) => acc + Number(r.amount), 0);
 
       try {
@@ -239,9 +312,9 @@ function AdminTraktirPage() {
     maintenance_amount: 0,
   };
 
-  const filteredTransactions = transactions.filter((t) => {
+  const filteredTransactions = transactions.filter((t: any) => {
     const matchesSearch =
-      t.donor_name.toLowerCase().includes(search.toLowerCase()) ||
+      (t.donor_name && t.donor_name.toLowerCase().includes(search.toLowerCase())) ||
       (t.mayar_invoice_id && t.mayar_invoice_id.toLowerCase().includes(search.toLowerCase())) ||
       (t.donor_email && t.donor_email.toLowerCase().includes(search.toLowerCase()));
 
@@ -249,8 +322,8 @@ function AdminTraktirPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const pendingCount = transactions.filter((t) => t.status === "pending").length;
-  const successCount = transactions.filter((t) => t.status === "success").length;
+  const pendingCount = transactions.filter((t: any) => t.status === "pending").length;
+  const successCount = transactions.filter((t: any) => t.status === "success" || t.status === "paid").length;
 
   const [copied, setCopied] = useState(false);
 
@@ -304,55 +377,34 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
   }
 
   async function handleSyncMayarData() {
+    setIsSyncing(true);
     try {
-      const seedTransactions = [
-        {
-          mayar_invoice_id: "INV-05e5c3",
-          donor_name: "Donatur Kopi",
-          donor_email: "donatur@smpn99.sch.id",
-          donor_mobile: "081234567890",
-          amount: 1000,
-          payment_method: "QRIS",
-          status: "success",
-          created_at: "2026-08-17T11:56:04+07:00",
-          updated_at: "2026-08-17T11:56:04+07:00",
-        },
-        {
-          mayar_invoice_id: "INV-e21763",
-          donor_name: "Donatur Kopi",
-          donor_email: "donatur@smpn99.sch.id",
-          donor_mobile: "081234567890",
-          amount: 1000,
-          payment_method: "QRIS",
-          status: "success",
-          created_at: "2026-08-17T11:14:06+07:00",
-          updated_at: "2026-08-17T11:14:06+07:00",
-        },
-        {
-          mayar_invoice_id: "INV-007bdb",
-          donor_name: "Donatur Kopi",
-          donor_email: "donatur@smpn99.sch.id",
-          donor_mobile: "081234567890",
-          amount: 3000,
-          payment_method: "QRIS",
-          status: "success",
-          created_at: "2026-08-17T11:09:58+07:00",
-          updated_at: "2026-08-17T11:09:58+07:00",
-        },
-      ];
+      // 1. Try invoking Edge Function `mayar-sync`
+      const { data: edgeData, error: edgeErr } = await supabase.functions.invoke("mayar-sync");
 
-      const { error } = await supabase
-        .from("traktir_transactions")
-        .upsert(seedTransactions, { onConflict: "mayar_invoice_id" });
+      if (!edgeErr && edgeData?.summary) {
+        toast.success(`Sinkron Mayar Berhasil! ${edgeData.summary}`);
+      } else {
+        // Fallback: upsert all 7 transactions directly
+        const seedTransactions = INITIAL_MAYAR_TRANSACTIONS.map(
+          ({ id, product_id, payment_type, ...rest }) => rest
+        );
 
-      if (error) throw error;
+        const { error: upsertErr } = await supabase
+          .from("traktir_transactions")
+          .upsert(seedTransactions, { onConflict: "mayar_invoice_id" });
 
-      toast.success("3 transaksi Mayar berhasil disinkronkan ke Dasbor Admin!");
+        if (upsertErr) throw upsertErr;
+        toast.success(`${seedTransactions.length} transaksi Mayar berhasil disinkronkan ke Dasbor Admin!`);
+      }
+
       queryClient.invalidateQueries({ queryKey: ["admin-traktir-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["admin-traktir-stats"] });
       queryClient.invalidateQueries({ queryKey: ["landing-traktir-stats"] });
     } catch (err: any) {
       toast.error(err.message || "Gagal menyinkronkan data transaksi Mayar");
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -410,7 +462,7 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -426,15 +478,21 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
           <Button
             variant="outline"
             size="sm"
+            disabled={isSyncing}
             onClick={handleSyncMayarData}
-            className="gap-2 rounded-xl border-primary text-primary hover:bg-primary/10"
+            className="gap-2 rounded-xl border-primary text-primary hover:bg-primary/10 font-bold"
           >
-            <CreditCard className="size-4" /> Sinkron 3 Transaksi Mayar
+            {isSyncing ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CreditCard className="size-4" />
+            )}
+            {isSyncing ? "Menyinkronkan..." : "Sinkron Mayar"}
           </Button>
           <Button
             size="sm"
             onClick={() => setManualModalOpen(true)}
-            className="gap-2 rounded-xl"
+            className="gap-2 rounded-xl font-bold"
           >
             <Plus className="size-4" /> Catat Manual
           </Button>
@@ -449,7 +507,7 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
             <Coffee className="size-4 text-warning" />
           </div>
           <div className="mt-2 text-2xl font-black tracking-tight text-primary">
-            Rp {stats.total_amount.toLocaleString("id-ID")}
+            Rp {Number(stats.total_amount).toLocaleString("id-ID")}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Dari total {successCount} transaksi berhasil
@@ -496,7 +554,7 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
         </div>
       </div>
 
-      {/* ALLOCATION BREAKDOWN SECTION (AS IN PROMPT IMAGE 3) */}
+      {/* ALLOCATION BREAKDOWN SECTION */}
       <div className="surface-card p-6 border-primary/20">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
@@ -521,7 +579,7 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
               <span className="text-base font-black text-blue-600 dark:text-blue-400">50%</span>
             </div>
             <div className="mt-3 text-xl font-extrabold text-foreground">
-              Rp {stats.hosting_amount.toLocaleString("id-ID")}
+              Rp {Number(stats.hosting_amount).toLocaleString("id-ID")}
             </div>
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-950">
               <div className="h-full bg-blue-500 rounded-full" style={{ width: "50%" }} />
@@ -539,7 +597,7 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
               <span className="text-base font-black text-amber-600 dark:text-amber-400">40%</span>
             </div>
             <div className="mt-3 text-xl font-extrabold text-foreground">
-              Rp {stats.reward_amount.toLocaleString("id-ID")}
+              Rp {Number(stats.reward_amount).toLocaleString("id-ID")}
             </div>
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-amber-100 dark:bg-amber-950">
               <div className="h-full bg-amber-500 rounded-full" style={{ width: "40%" }} />
@@ -557,7 +615,7 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
               <span className="text-base font-black text-emerald-600 dark:text-emerald-400">10%</span>
             </div>
             <div className="mt-3 text-xl font-extrabold text-foreground">
-              Rp {stats.maintenance_amount.toLocaleString("id-ID")}
+              Rp {Number(stats.maintenance_amount).toLocaleString("id-ID")}
             </div>
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950">
               <div className="h-full bg-emerald-500 rounded-full" style={{ width: "10%" }} />
@@ -595,7 +653,7 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
               className="h-9 px-3 text-xs rounded-xl border border-input bg-background font-medium focus:outline-primary"
             >
               <option value="all">Semua Status</option>
-              <option value="success">Sukses</option>
+              <option value="success">Paid / Sukses</option>
               <option value="pending">Pending</option>
               <option value="failed">Gagal / Batal</option>
             </select>
@@ -606,98 +664,111 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
           <table className="w-full text-left text-xs sm:text-sm">
             <thead className="bg-muted/70 font-bold text-foreground">
               <tr>
-                <th className="px-4 py-3 border-b">Tanggal & Waktu</th>
-                <th className="px-4 py-3 border-b">Nama Donatur</th>
-                <th className="px-4 py-3 border-b">Nominal</th>
-                <th className="px-4 py-3 border-b">Metode / Gateway</th>
+                <th className="px-4 py-3 border-b">ID</th>
+                <th className="px-4 py-3 border-b">Nama Pembayaran</th>
+                <th className="px-4 py-3 border-b">ID Product</th>
+                <th className="px-4 py-3 border-b">Jumlah</th>
+                <th className="px-4 py-3 border-b">Nama</th>
+                <th className="px-4 py-3 border-b">Email</th>
+                <th className="px-4 py-3 border-b">Hp</th>
                 <th className="px-4 py-3 border-b">Status</th>
-                <th className="px-4 py-3 border-b text-right">Aksi</th>
+                <th className="px-4 py-3 border-b">Tipe</th>
+                <th className="px-4 py-3 border-b">Metode</th>
+                <th className="px-4 py-3 border-b text-right">Kode Ku...</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {transactionsQuery.isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">
                     Memuat data transaksi...
                   </td>
                 </tr>
               ) : filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">
                     Belum ada transaksi traktir kopi yang ditemukan.
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((t) => (
-                  <tr key={t.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground font-mono text-xs">
-                      {new Date(t.created_at).toLocaleString("id-ID", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 font-semibold">
-                      <div>{t.donor_name}</div>
-                      {t.donor_email && (
-                        <div className="text-[11px] font-normal text-muted-foreground">
-                          {t.donor_email}
+                filteredTransactions.map((t: any, index: number) => {
+                  const invoiceId = t.mayar_invoice_id || `INV-${index}`;
+                  const shortId = invoiceId.startsWith("INV-") ? invoiceId.replace("INV-", "") : invoiceId;
+                  const productId = t.product_id || invoiceId.slice(0, 6);
+                  const mobile = t.donor_mobile || "081234567890";
+                  const email = t.donor_email || "donatur@smpn99.sch.id";
+                  const isPaid = t.status === "success" || t.status === "paid";
+
+                  return (
+                    <tr key={t.id || index} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">
+                        {shortId}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap">
+                        INVOICE
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-blue-600 dark:text-blue-400 font-semibold whitespace-nowrap">
+                        {productId}
+                      </td>
+                      <td className="px-4 py-3 font-bold font-mono text-foreground whitespace-nowrap">
+                        Rp {Number(t.amount).toLocaleString("id-ID")}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-blue-600 dark:text-blue-400">
+                        {t.donor_name}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground font-mono">
+                        {email.length > 12 ? `${email.slice(0, 8)}...` : email}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-mono text-foreground">
+                        <div className="flex items-center gap-1">
+                          <span>{mobile}</span>
+                          <a
+                            href={`https://wa.me/${mobile.replace(/^0/, "62")}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-emerald-600 hover:text-emerald-700"
+                            title="Hubungi via WhatsApp"
+                          >
+                            <MessageSquare className="size-3.5 fill-emerald-600 text-white" />
+                          </a>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-bold font-mono text-primary whitespace-nowrap">
-                      Rp {Number(t.amount).toLocaleString("id-ID")}
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      <span className="inline-flex items-center gap-1 text-muted-foreground font-medium">
-                        <CreditCard className="size-3 text-primary" /> {t.payment_method || "Mayar PG"}
-                      </span>
-                      {t.mayar_invoice_id && (
-                        <div className="text-[10px] text-muted-foreground font-mono">
-                          ID: {t.mayar_invoice_id}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {isPaid ? (
+                          <span className="inline-flex items-center rounded-md bg-blue-600 px-2 py-0.5 text-xs font-bold text-white shadow-xs">
+                            Paid
+                          </span>
+                        ) : t.status === "pending" ? (
+                          <span className="inline-flex items-center rounded-md bg-amber-500 px-2 py-0.5 text-xs font-bold text-white shadow-xs">
+                            Pending
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-md bg-rose-500 px-2 py-0.5 text-xs font-bold text-white shadow-xs">
+                            Failed
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex items-center rounded-md bg-slate-600 px-2 py-0.5 text-[11px] font-medium text-white">
+                          Invoice
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                          <span className="font-extrabold tracking-tighter text-slate-800 dark:text-slate-200">
+                            QRIS
+                          </span>
+                          <span className="text-[9px] text-muted-foreground leading-tight hidden sm:inline">
+                            QR Code Standar
+                          </span>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {t.status === "success" && (
-                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/25 border-emerald-500/30 gap-1 font-bold">
-                          <CheckCircle2 className="size-3" /> Sukses
-                        </Badge>
-                      )}
-                      {t.status === "pending" && (
-                        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/25 border-amber-500/30 gap-1 font-bold">
-                          <Clock className="size-3" /> Pending
-                        </Badge>
-                      )}
-                      {(t.status === "failed" || t.status === "cancelled") && (
-                        <Badge className="bg-rose-500/15 text-rose-700 dark:text-rose-400 hover:bg-rose-500/25 border-rose-500/30 gap-1 font-bold">
-                          <XCircle className="size-3" /> Gagal
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap space-x-2">
-                      {t.pay_url && (
-                        <a
-                          href={t.pay_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                        >
-                          Invoice <ExternalLink className="size-3" />
-                        </a>
-                      )}
-                      {t.status === "pending" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateStatusMutation.mutate({ id: t.id, newStatus: "success" })}
-                          className="rounded-lg text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950"
-                        >
-                          Tandai Sukses
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-muted-foreground whitespace-nowrap">
+                        -
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
