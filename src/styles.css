@@ -207,6 +207,7 @@
     background: #ffffff !important;
     color: #000000 !important;
     overflow: visible !important;
+    height: auto !important;
   }
   .print-area {
     position: static !important;
@@ -214,9 +215,21 @@
     background: #ffffff !important;
     padding: 0 !important;
     margin: 0 !important;
+    height: auto !important;
+  }
+  .print-page {
+    break-after: page !important;
+    page-break-after: always !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+    padding: 10px !important;
+    margin: 0 !important;
   }
   .print-card {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
   }
 }
