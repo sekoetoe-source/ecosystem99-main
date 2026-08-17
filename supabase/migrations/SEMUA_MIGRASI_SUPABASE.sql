@@ -271,6 +271,11 @@ CREATE TABLE IF NOT EXISTS public.traktir_transactions (
     expired_at TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '15 minutes')
 );
 
+-- Add performance indexes
+CREATE INDEX IF NOT EXISTS idx_traktir_transactions_status ON public.traktir_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_traktir_transactions_mayar_id ON public.traktir_transactions(mayar_invoice_id);
+CREATE INDEX IF NOT EXISTS idx_traktir_transactions_created ON public.traktir_transactions(created_at DESC);
+
 CREATE OR REPLACE FUNCTION public.cancel_expired_traktir_transactions()
 RETURNS INT
 LANGUAGE plpgsql
