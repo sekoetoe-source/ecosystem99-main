@@ -3,10 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Building2,
+  Check,
   CheckCircle2,
   Clock,
   Coffee,
+  Copy,
   CreditCard,
   ExternalLink,
   Plus,
@@ -46,6 +49,8 @@ function AdminTraktirPage() {
   const [manualNotes, setManualNotes] = useState("Dukungan langsung / manual");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [isTableMissing, setIsTableMissing] = useState(false);
+
   // Fetch transactions list
   const transactionsQuery = useQuery({
     queryKey: ["admin-traktir-transactions"],
@@ -55,7 +60,19 @@ function AdminTraktirPage() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        if (
+          error.message?.includes("traktir_transactions") ||
+          error.message?.includes("schema cache") ||
+          error.code === "PGRST205" ||
+          error.code === "42P01"
+        ) {
+          setIsTableMissing(true);
+          return [];
+        }
+        throw error;
+      }
+      setIsTableMissing(false);
       return data || [];
     },
   });
@@ -163,8 +180,97 @@ function AdminTraktirPage() {
   const pendingCount = transactions.filter((t) => t.status === "pending").length;
   const successCount = transactions.filter((t) => t.status === "success").length;
 
+  const [copied, setCopied] = useState(false);
+
+  const migrationSql = `-- Run this in Supabase Dashboard -> SQL Editor -> Run
+CREATE TABLE IF NOT EXISTS public.traktir_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    mayar_invoice_id TEXT UNIQUE,
+    donor_name TEXT NOT NULL DEFAULT 'Donatur Kopi',
+    donor_email TEXT,
+    donor_mobile TEXT,
+    amount NUMERIC NOT NULL CHECK (amount >= 1000),
+    payment_method TEXT DEFAULT 'Mayar PG',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'success', 'failed', 'cancelled')),
+    pay_url TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expired_at TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '15 minutes')
+);
+
+CREATE OR REPLACE FUNCTION public.cancel_expired_traktir_transactions()
+RETURNS INT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_count INT := 0;
+BEGIN
+    UPDATE public.traktir_transactions SET status = 'cancelled', updated_at = now() WHERE status = 'pending' AND expired_at <= now();
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END; $$;
+
+ALTER TABLE public.traktir_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read success traktir_transactions" ON public.traktir_transactions;
+CREATE POLICY "Public read success traktir_transactions" ON public.traktir_transactions FOR SELECT USING (status = 'success');
+DROP POLICY IF EXISTS "Admin full access traktir_transactions" ON public.traktir_transactions;
+CREATE POLICY "Admin full access traktir_transactions" ON public.traktir_transactions FOR ALL USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));
+
+CREATE OR REPLACE FUNCTION public.get_traktir_stats()
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_total_amount NUMERIC := 0; v_total_count INT := 0; v_hosting_amount NUMERIC := 0; v_reward_amount NUMERIC := 0; v_maintenance_amount NUMERIC := 0;
+BEGIN
+    SELECT COALESCE(SUM(amount), 0), COUNT(*) INTO v_total_amount, v_total_count FROM public.traktir_transactions WHERE status = 'success';
+    v_hosting_amount := ROUND(v_total_amount * 0.50, 0); v_reward_amount := ROUND(v_total_amount * 0.40, 0); v_maintenance_amount := ROUND(v_total_amount * 0.10, 0);
+    RETURN jsonb_build_object('total_amount', v_total_amount, 'total_count', v_total_count, 'hosting_amount', v_hosting_amount, 'reward_amount', v_reward_amount, 'maintenance_amount', v_maintenance_amount, 'hosting_pct', 50, 'reward_pct', 40, 'maintenance_pct', 10);
+END; $$;
+GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
+
+  function copySql() {
+    navigator.clipboard.writeText(migrationSql);
+    setCopied(true);
+    toast.success("Script SQL berhasil disalin ke clipboard!");
+    setTimeout(() => setCopied(false), 3000);
+  }
+
   return (
     <div className="space-y-8 pb-12">
+      {/* WARNING BANNER FOR MISSING TABLE */}
+      {isTableMissing && (
+        <div className="rounded-2xl border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-5 shadow-sm space-y-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="size-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <h4 className="text-base font-extrabold text-amber-800 dark:text-amber-200">
+                Tabel Database `public.traktir_transactions` Belum Dibuat
+              </h4>
+              <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                Supabase database Anda belum memiliki tabel <code>public.traktir_transactions</code>. Silakan salin script SQL di bawah dan jalankan di <strong>Supabase Dashboard -&gt; SQL Editor -&gt; Run</strong>.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button
+              size="sm"
+              onClick={copySql}
+              className="gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold"
+            >
+              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              {copied ? "Script Berhasil Disalin!" : "Salin Script SQL Migration"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                transactionsQuery.refetch();
+                statsQuery.refetch();
+              }}
+              className="gap-2 rounded-xl border-amber-400 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+            >
+              <RefreshCw className="size-4" /> Coba Lagi
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* HEADER SECTION */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
