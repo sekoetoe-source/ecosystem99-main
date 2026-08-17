@@ -85,51 +85,39 @@ const NAV = [
   { href: "#kopi", label: "Traktir Kopi" },
 ];
 
-function useSchoolStats() {
+const useSchoolStats = () => {
   return useQuery({
     queryKey: ["school-stats"],
     queryFn: async () => {
       try {
-        const [{ data: scores }, { data: students }, { data: items }, { data: classes }, { count: valItemsCount }] =
-          await Promise.all([
-            supabase.from("student_scores").select("earned_points, total_items, class_name"),
-            supabase.from("students").select("id, class_id, classes(name)").not("class_id", "is", null),
-            supabase.from("eco_items").select("code, co2_grams"),
-            supabase
-              .from("class_scores")
-              .select("class_name, total_points, avg_points, student_count")
-              .order("avg_points", { ascending: false }),
-            supabase.from("validation_items").select("id", { count: "exact", head: true }),
-          ]);
+        const [
+          { count: totalStudentsCount },
+          { data: scores },
+          { data: items },
+          { count: valItemsCount },
+        ] = await Promise.all([
+          supabase.from("students").select("id", { count: "exact", head: true }),
+          supabase.from("student_scores").select("earned_points, total_items, class_name"),
+          supabase.from("eco_items").select("code, co2_grams"),
+          supabase.from("validation_items").select("id", { count: "exact", head: true }),
+        ]);
+
+        const studentCount = totalStudentsCount ?? 0;
 
         const validScores = (scores ?? []).filter((s) => {
           const c = (s.class_name ?? "").trim();
           return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
         });
 
-        const validStudents = (students ?? []).filter((s) => {
-          const className = (s.classes as { name: string } | null)?.name?.trim();
-          return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas");
-        });
+        // Calculate total items scanned (plastic waste prevented)
+        const calcTotalItems = (valItemsCount ?? 0) > 0 
+          ? (valItemsCount ?? 0) 
+          : validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
 
-        const validClasses = (classes ?? []).filter((c) => {
-          const name = (c.class_name ?? "").trim();
-          return Boolean(name && name !== "-" && name.toLowerCase() !== "tanpa kelas");
-        });
+        // Calculate total eco points earned by all students
+        const totalPoints = validScores.reduce((a, s) => a + Number(s.earned_points ?? 0), 0);
 
-        let calcTotalItems = (valItemsCount ?? 0) > 0 ? (valItemsCount ?? 0) : validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
-        
-        // Dynamic fallback when initial data is zero so public statistics display correctly
-        const activeStudentCount = validStudents.length > 0 ? validStudents.length : 858;
-        if (calcTotalItems === 0) {
-          calcTotalItems = Math.round(activeStudentCount * 2.8);
-        }
-
-        let totalPoints = validScores.reduce((a, s) => a + (s.earned_points ?? 0), 0);
-        if (totalPoints === 0) {
-          totalPoints = Math.round(calcTotalItems * 85);
-        }
-
+        // Average CO2 grams saved per item
         const avgCo2 = (items ?? []).length > 0
           ? (items ?? []).reduce((a, i) => a + i.co2_grams, 0) / Math.max(1, (items ?? []).length)
           : 68;
@@ -150,43 +138,33 @@ function useSchoolStats() {
           });
         });
 
-        let computedClasses = Array.from(classMap.values()).map((c) => ({
+        const computedClasses = Array.from(classMap.values()).map((c) => ({
           class_name: c.class_name,
           student_count: c.student_count,
           total_points: c.total_points,
           avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
-        }));
-
-        if (computedClasses.length === 0 && validClasses.length > 0) {
-          computedClasses = validClasses.map((c) => ({
-            class_name: c.class_name ?? "Kelas",
-            student_count: Number(c.student_count ?? 0),
-            total_points: Number(c.total_points ?? 0),
-            avg_points: Number(c.avg_points ?? 0),
-          }));
-        }
-
-        computedClasses.sort((a, b) => b.avg_points - a.avg_points || b.total_points - a.total_points);
+        })).sort((a, b) => b.avg_points - a.avg_points || b.total_points - a.total_points);
 
         return {
           totalPoints,
           totalItems: calcTotalItems,
-          studentCount: activeStudentCount,
+          studentCount,
           co2Kg,
           classes: computedClasses.slice(0, 5),
         };
-      } catch (_) {
+      } catch (err) {
+        console.error("Error fetching school stats:", err);
         return {
           totalPoints: 0,
           totalItems: 0,
-          studentCount: 858,
+          studentCount: 0,
           co2Kg: 0,
           classes: [],
         };
       }
     },
   });
-}
+};
 
 function SectionHead({
   kicker,
