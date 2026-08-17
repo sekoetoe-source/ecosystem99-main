@@ -583,15 +583,15 @@ function Index() {
     queryFn: async () => {
       try {
         const { data, error } = await (supabase as any).rpc("get_traktir_stats");
-        if (!error && data && Number(data.total_amount) > 0) {
+        if (!error && data) {
           return data;
         }
         const { data: rows } = await (supabase as any)
           .from("traktir_transactions")
           .select("amount")
           .eq("status", "success");
-        const total = rows && rows.length > 0 ? rows.reduce((acc: number, r: any) => acc + Number(r.amount), 0) : 29028;
-        const count = rows && rows.length > 0 ? rows.length : 10;
+        const total = rows && rows.length > 0 ? rows.reduce((acc: number, r: any) => acc + Number(r.amount), 0) : 0;
+        const count = rows && rows.length > 0 ? rows.length : 0;
         return {
           total_amount: total,
           total_count: count,
@@ -601,22 +601,22 @@ function Index() {
         };
       } catch (err) {
         return {
-          total_amount: 29028,
-          total_count: 10,
-          hosting_amount: 14514,
-          reward_amount: 11611,
-          maintenance_amount: 2903,
+          total_amount: 0,
+          total_count: 0,
+          hosting_amount: 0,
+          reward_amount: 0,
+          maintenance_amount: 0,
         };
       }
     },
   });
 
   const traktirStats = traktirStatsQuery.data || {
-    total_amount: 29028,
-    total_count: 10,
-    hosting_amount: 14514,
-    reward_amount: 11611,
-    maintenance_amount: 2903,
+    total_amount: 0,
+    total_count: 0,
+    hosting_amount: 0,
+    reward_amount: 0,
+    maintenance_amount: 0,
   };
 
   async function handleVerifyCheckout(explicit = false) {
