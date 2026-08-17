@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  BarChart2,
   Building2,
   CheckCircle2,
   Clock,
@@ -12,8 +13,10 @@ import {
   Droplets,
   ExternalLink,
   Flame,
+  Home,
   Leaf,
   Lock,
+  LogIn,
   Menu,
   Plus,
   QrCode,
@@ -382,7 +385,7 @@ function Index() {
   const champion = data?.classes?.[0];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 lg:pb-0">
       <EcoNewsTicker />
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
@@ -1180,6 +1183,52 @@ function Index() {
           <span>Environmental behavior + engagement + measurable impact</span>
         </div>
       </footer>
+
+      {/* MOBILE BOTTOM NAVIGATION BAR (FIXED DOCK FOR MOBILE PHONES) */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-border bg-background/95 p-1.5 backdrop-blur-md shadow-2xl lg:hidden">
+        <a
+          href="#home"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+        >
+          <Home className="size-5" />
+          <span className="text-[10px] font-bold">Beranda</span>
+        </a>
+        <a
+          href="#statistik"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+        >
+          <BarChart2 className="size-5" />
+          <span className="text-[10px] font-bold">Statistik</span>
+        </a>
+        <a
+          href="#leaderboard"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+        >
+          <Trophy className="size-5" />
+          <span className="text-[10px] font-bold">Jawara</span>
+        </a>
+        <a
+          href="#challenge"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+        >
+          <Flame className="size-5 text-amber-500" />
+          <span className="text-[10px] font-bold">Challenge</span>
+        </a>
+        <a
+          href="#kopi"
+          className="flex flex-col items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors py-1 px-2 rounded-lg active:scale-95"
+        >
+          <Coffee className="size-5 text-amber-600" />
+          <span className="text-[10px] font-bold">Traktir</span>
+        </a>
+        <Link
+          to={dashHref}
+          className="flex flex-col items-center gap-0.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all py-1.5 px-3 rounded-full shadow-md active:scale-95 font-extrabold"
+        >
+          <LogIn className="size-4" />
+          <span className="text-[10px]">Login</span>
+        </Link>
+      </nav>
     </div>
   );
 }
