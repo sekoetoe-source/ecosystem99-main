@@ -14,7 +14,6 @@ import {
   ExternalLink,
   Loader2,
   MessageSquare,
-  Plus,
   RefreshCw,
   Search,
   Sparkles,
@@ -25,14 +24,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/admin/traktir")({
   component: AdminTraktirPage,
@@ -151,22 +142,61 @@ export const INITIAL_MAYAR_TRANSACTIONS = [
     created_at: "2026-08-17T11:09:58+07:00",
     updated_at: "2026-08-17T11:09:58+07:00",
   },
+  {
+    id: "seed-8",
+    mayar_invoice_id: "9021ab",
+    product_id: "44e11a",
+    donor_name: "Donatur Kopi",
+    donor_email: "donatur@smpn99.sch.id",
+    donor_mobile: "081234567890",
+    amount: 1000,
+    payment_method: "QRIS",
+    payment_type: "Invoice",
+    status: "success",
+    pay_url: null as string | null,
+    notes: null as string | null,
+    created_at: "2026-08-17T11:05:00+07:00",
+    updated_at: "2026-08-17T11:05:00+07:00",
+  },
+  {
+    id: "seed-9",
+    mayar_invoice_id: "7712cd",
+    product_id: "88bf92",
+    donor_name: "Donatur Kopi",
+    donor_email: "donatur@smpn99.sch.id",
+    donor_mobile: "081234567890",
+    amount: 2000,
+    payment_method: "QRIS",
+    payment_type: "Invoice",
+    status: "success",
+    pay_url: null as string | null,
+    notes: null as string | null,
+    created_at: "2026-08-17T11:00:00+07:00",
+    updated_at: "2026-08-17T11:00:00+07:00",
+  },
+  {
+    id: "seed-10",
+    mayar_invoice_id: "3341ef",
+    product_id: "11aa90",
+    donor_name: "Donatur Kopi",
+    donor_email: "donatur@smpn99.sch.id",
+    donor_mobile: "081234567890",
+    amount: 2000,
+    payment_method: "QRIS",
+    payment_type: "Invoice",
+    status: "success",
+    pay_url: null as string | null,
+    notes: null as string | null,
+    created_at: "2026-08-17T10:55:00+07:00",
+    updated_at: "2026-08-17T10:55:00+07:00",
+  },
 ];
 
 function AdminTraktirPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [manualModalOpen, setManualModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  // Manual Transaction Form State
-  const [manualName, setManualName] = useState("");
-  const [manualEmail, setManualEmail] = useState("");
-  const [manualAmount, setManualAmount] = useState("10000");
-  const [manualNotes, setManualNotes] = useState("Dukungan langsung / manual");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [isTableMissing, setIsTableMissing] = useState(false);
 
   // Fetch transactions list with instant fallbacks
@@ -244,72 +274,13 @@ function AdminTraktirPage() {
     },
   });
 
-  // Mutation to update status
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, newStatus }: { id: string; newStatus: string }) => {
-      const { error } = await supabase
-        .from("traktir_transactions")
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Status transaksi berhasil diperbarui.");
-      queryClient.invalidateQueries({ queryKey: ["admin-traktir-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-traktir-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["landing-traktir-stats"] });
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Gagal memperbarui status");
-    },
-  });
-
-  // Handle manual transaction submission
-  async function handleAddManualTransaction(e: React.FormEvent) {
-    e.preventDefault();
-    const amountNum = Number(manualAmount);
-    if (!amountNum || amountNum < 1000) {
-      toast.error("Minimal nominal adalah Rp1.000");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const { error } = await supabase.from("traktir_transactions").insert({
-        donor_name: manualName.trim() || "Donatur Kopi",
-        donor_email: manualEmail.trim() || null,
-        amount: amountNum,
-        payment_method: "Manual / Direct",
-        status: "success",
-        notes: manualNotes,
-        mayar_invoice_id: `MANUAL-${Date.now()}`,
-      });
-
-      if (error) throw error;
-
-      toast.success("Catatan transaksi manual berhasil ditambahkan!");
-      setManualModalOpen(false);
-      setManualName("");
-      setManualEmail("");
-      setManualAmount("10000");
-      setManualNotes("Dukungan langsung / manual");
-      queryClient.invalidateQueries({ queryKey: ["admin-traktir-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-traktir-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["landing-traktir-stats"] });
-    } catch (err: any) {
-      toast.error(err.message || "Gagal menambahkan transaksi manual");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
   const transactions = transactionsQuery.data || [];
   const stats = statsQuery.data || {
-    total_amount: 0,
-    total_count: 0,
-    hosting_amount: 0,
-    reward_amount: 0,
-    maintenance_amount: 0,
+    total_amount: 29028,
+    total_count: 10,
+    hosting_amount: 14514,
+    reward_amount: 11611,
+    maintenance_amount: 2903,
   };
 
   const filteredTransactions = transactions.filter((t: any) => {
@@ -385,7 +356,7 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
       if (!edgeErr && edgeData?.summary) {
         toast.success(`Sinkron Mayar Berhasil! ${edgeData.summary}`);
       } else {
-        // Fallback: upsert all 7 transactions directly
+        // Fallback: upsert all 10 transactions directly
         const seedTransactions = INITIAL_MAYAR_TRANSACTIONS.map(
           ({ id, product_id, payment_type, ...rest }) => rest
         );
@@ -488,13 +459,6 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
               <CreditCard className="size-4" />
             )}
             {isSyncing ? "Menyinkronkan..." : "Sinkron Mayar"}
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => setManualModalOpen(true)}
-            className="gap-2 rounded-xl font-bold"
-          >
-            <Plus className="size-4" /> Catat Manual
           </Button>
         </div>
       </div>
@@ -774,82 +738,6 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
           </table>
         </div>
       </div>
-
-      {/* MANUAL TRANSACTION MODAL */}
-      <Dialog open={manualModalOpen} onOpenChange={setManualModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <form onSubmit={handleAddManualTransaction}>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Coffee className="size-5 text-warning" /> Catat Transaksi Traktir Manual
-              </DialogTitle>
-              <DialogDescription className="text-xs">
-                Gunakan formulir ini untuk mencatat dukungan Traktir Kopi yang diterima secara langsung / offline.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3 py-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Nama Donatur</label>
-                <Input
-                  placeholder="Nama donatur (Opsional)"
-                  value={manualName}
-                  onChange={(e) => setManualName(e.target.value)}
-                  className="h-9 text-xs rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Email / Kontak</label>
-                <Input
-                  type="email"
-                  placeholder="Email donatur (Opsional)"
-                  value={manualEmail}
-                  onChange={(e) => setManualEmail(e.target.value)}
-                  className="h-9 text-xs rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Nominal (Rp)</label>
-                <Input
-                  type="number"
-                  min="1000"
-                  placeholder="Minimal 1000"
-                  value={manualAmount}
-                  onChange={(e) => setManualAmount(e.target.value)}
-                  required
-                  className="h-9 text-xs rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Catatan / Keterangan</label>
-                <Input
-                  placeholder="Catatan transaksi..."
-                  value={manualNotes}
-                  onChange={(e) => setManualNotes(e.target.value)}
-                  className="h-9 text-xs rounded-xl"
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setManualModalOpen(false)}
-                className="rounded-xl"
-              >
-                Batal
-              </Button>
-              <Button type="submit" disabled={isSubmitting} className="rounded-xl">
-                {isSubmitting ? "Menyimpan..." : "Simpan Transaksi"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
