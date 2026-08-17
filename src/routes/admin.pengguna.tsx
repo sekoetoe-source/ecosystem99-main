@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2 } from "lucide-react";
+import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,6 +71,12 @@ function PenggunaPage() {
   const [addOfficerOpen, setAddOfficerOpen] = useState(false);
   const [officerName, setOfficerName] = useState("");
   const [officerStation, setOfficerStation] = useState("Gerbang Utama");
+
+  // Edit Officer state
+  const [editingOfficer, setEditingOfficer] = useState<any | null>(null);
+  const [editOfficerName, setEditOfficerName] = useState("");
+  const [editOfficerStation, setEditOfficerStation] = useState("Gerbang Utama");
+  const [editOfficerActive, setEditOfficerActive] = useState(true);
 
   // Create User Account state
   const [addUserOpen, setAddUserOpen] = useState(false);
@@ -219,7 +225,7 @@ function PenggunaPage() {
           if (role === "student") {
             const s = studentsMap.get(p.id);
             if (s) {
-              const cls = classesMap.get(s.class_id);
+              const cls = s.class_id ? classesMap.get(s.class_id) : null;
               details = `Siswa (NIS: ${s.nis}${cls ? `, Kelas: ${cls.name}` : ""})`;
             } else {
               details = "Siswa";
@@ -398,6 +404,52 @@ function PenggunaPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menambahkan petugas"),
   });
 
+  const updateOfficerMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingOfficer) return;
+      if (!editOfficerName.trim()) throw new Error("Nama petugas wajib diisi");
+
+      const { error } = await supabase
+        .from("officers")
+        .update({
+          full_name: editOfficerName.trim(),
+          station: editOfficerStation,
+          active: editOfficerActive,
+        })
+        .eq("id", editingOfficer.id);
+
+      if (error) throw error;
+
+      // Update profil auth jika petugas terhubung ke akun
+      if (editingOfficer.profile_id) {
+        await supabase
+          .from("profiles")
+          .update({ full_name: editOfficerName.trim() })
+          .eq("id", editingOfficer.profile_id);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Data petugas berhasil diperbarui");
+      setEditingOfficer(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-officers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-users"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal memperbarui data petugas"),
+  });
+
+  const deleteOfficerMutation = useMutation({
+    mutationFn: async (officerId: string) => {
+      const { error } = await supabase.from("officers").delete().eq("id", officerId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Petugas berhasil dihapus");
+      queryClient.invalidateQueries({ queryKey: ["admin-officers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-users"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menghapus petugas"),
+  });
+
   const changeRoleMutation = useMutation({
     mutationFn: async () => {
       if (!changeRoleUser || !newRole) return;
@@ -410,7 +462,7 @@ function PenggunaPage() {
       // 2. Insert new role
       const { error: insErr } = await supabase.from("user_roles").insert({
         user_id: userId,
-        role: newRole,
+        role: newRole as any,
       });
       if (insErr) throw insErr;
 
@@ -446,10 +498,21 @@ function PenggunaPage() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase.rpc("admin_delete_user", {
+      // 1. Coba panggil RPC admin_delete_user terlebih dahulu
+      const { error: rpcErr } = await supabase.rpc("admin_delete_user", {
         _user_id: userId,
       });
-      if (error) throw error;
+      if (!rpcErr) return;
+
+      // 2. Fallback: Hapus data relasi di tabel public (user_roles, officers, profiles, unlink students)
+      await supabase.from("user_roles").delete().eq("user_id", userId);
+      await supabase.from("officers").delete().eq("profile_id", userId);
+      await supabase.from("students").update({ profile_id: null }).eq("profile_id", userId);
+      const { error: profileErr } = await supabase.from("profiles").delete().eq("id", userId);
+
+      if (profileErr) {
+        throw new Error(rpcErr.message || profileErr.message || "Gagal menghapus akun");
+      }
     },
     onSuccess: () => {
       toast.success("Akun pengguna berhasil dihapus");
@@ -465,7 +528,7 @@ function PenggunaPage() {
       ["nama", "nis", "kelas", "item", "poin"].join(","),
       ...(students.data ?? []).map((s) =>
         [
-          `"${s.full_name.replace(/"/g, '""')}"`,
+          `"${(s.full_name ?? "").replace(/"/g, '""')}"`,
           `"${s.nis}"`,
           `"${(s.class_name ?? "").replace(/"/g, '""')}"`,
           s.total_items ?? 0,
@@ -492,6 +555,7 @@ function PenggunaPage() {
         const sheetName = workbook.SheetNames[0];
         if (!sheetName) throw new Error("File Excel kosong.");
         const worksheet = workbook.Sheets[sheetName];
+        if (!worksheet) throw new Error("Sheet Excel tidak valid.");
         rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
       } else {
         const text = await file.text();
@@ -689,18 +753,77 @@ function PenggunaPage() {
             </Button>
           </header>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(officers.data ?? []).map((o) => (
-              <div key={o.id} className="surface-card p-5">
-                <p className="font-bold">{o.full_name ?? "Tanpa nama"}</p>
-                <p className="text-sm text-muted-foreground">Pos {o.station}</p>
-                <span className="label-xs mt-3 inline-block text-eco">
-                  {o.active ? "Aktif" : "Nonaktif"}
-                </span>
-              </div>
-            ))}
+          <div className="mt-4 flex max-w-sm items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-primary/20">
+            <Search className="size-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Cari nama petugas atau pos..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {(officers.data ?? [])
+              .filter((o) => {
+                const q = search.trim().toLowerCase();
+                if (!q) return true;
+                return (
+                  (o.full_name ?? "").toLowerCase().includes(q) ||
+                  (o.station ?? "").toLowerCase().includes(q)
+                );
+              })
+              .map((o) => (
+                <div key={o.id} className="surface-card p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-bold text-base">{o.full_name ?? "Tanpa nama"}</p>
+                      <span className={`label-xs px-2.5 py-0.5 rounded-full font-bold ${
+                        o.active ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {o.active ? "Aktif" : "Nonaktif"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1.5">
+                      Pos Penugasan: <span className="font-semibold text-foreground">{o.station}</span>
+                    </p>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-border flex items-center justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 rounded-full text-xs"
+                      onClick={() => {
+                        setEditingOfficer(o);
+                        setEditOfficerName(o.full_name ?? "");
+                        setEditOfficerStation(o.station ?? "Gerbang Utama");
+                        setEditOfficerActive(o.active ?? true);
+                      }}
+                    >
+                      <Pencil className="size-3.5" />
+                      Edit Petugas
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-8 gap-1.5 rounded-full text-xs"
+                      onClick={() => {
+                        if (confirm(`Apakah Anda yakin ingin menghapus petugas "${o.full_name}"?`)) {
+                          deleteOfficerMutation.mutate(o.id);
+                        }
+                      }}
+                      disabled={deleteOfficerMutation.isPending}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Hapus
+                    </Button>
+                  </div>
+                </div>
+              ))}
             {(officers.data ?? []).length === 0 && (
-              <p className="text-sm text-muted-foreground">Belum ada petugas terdaftar.</p>
+              <p className="text-sm text-muted-foreground col-span-full py-8 text-center">Belum ada petugas terdaftar.</p>
             )}
           </div>
         </section>
@@ -1227,6 +1350,61 @@ function PenggunaPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!editingOfficer} onOpenChange={(open) => !open && setEditingOfficer(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Data Petugas Pos</DialogTitle>
+            <DialogDescription>
+              Perbarui nama petugas, lokasi pos bertugas, atau status keaktifan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Nama Petugas</label>
+              <input
+                type="text"
+                value={editOfficerName}
+                onChange={(e) => setEditOfficerName(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                placeholder="Contoh: Petugas Utama"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Pos Penugasan</label>
+              <select
+                value={editOfficerStation}
+                onChange={(e) => setEditOfficerStation(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              >
+                <option value="Gerbang Utama">Gerbang Utama</option>
+                <option value="Kantin">Kantin</option>
+                <option value="Koperasi">Koperasi</option>
+                <option value="Greenhouse">Greenhouse</option>
+                <option value="Bank Sampah">Bank Sampah</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Status Petugas</label>
+              <select
+                value={editOfficerActive ? "true" : "false"}
+                onChange={(e) => setEditOfficerActive(e.target.value === "true")}
+                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+              >
+                <option value="true">Aktif</option>
+                <option value="false">Nonaktif</option>
+              </select>
+            </div>
+            <Button
+              className="w-full rounded-full mt-2"
+              onClick={() => updateOfficerMutation.mutate()}
+              disabled={updateOfficerMutation.isPending}
+            >
+              {updateOfficerMutation.isPending ? "Menyimpan..." : "Simpan Perubahan Petugas"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -1304,7 +1482,7 @@ function PenggunaPage() {
                     </div>
                   </div>
                   <div className="mt-6 rounded-2xl bg-card p-3 shadow-md border">
-                    <QrImage value={s.nis} size={150} />
+                    <QrImage value={s.nis ?? ""} size={150} />
                   </div>
                 </div>
               ))}

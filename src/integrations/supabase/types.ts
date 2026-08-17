@@ -18,18 +18,21 @@ export type Database = {
         Row: {
           created_at: string
           homeroom_teacher: string | null
+          homeroom_teacher_id: string | null
           id: string
           name: string
         }
         Insert: {
           created_at?: string
           homeroom_teacher?: string | null
+          homeroom_teacher_id?: string | null
           id?: string
           name: string
         }
         Update: {
           created_at?: string
           homeroom_teacher?: string | null
+          homeroom_teacher_id?: string | null
           id?: string
           name?: string
         }
@@ -53,8 +56,8 @@ export type Database = {
         Update: {
           active?: boolean
           co2_grams?: number
-          code?: string
-          label?: string
+          code: string
+          label: string
           points?: number
         }
         Relationships: []
@@ -100,18 +103,30 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          is_approved: boolean | null
+          requested_role: string | null
+          requested_class_id: string | null
+          requested_nis: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
           full_name?: string
           id: string
+          is_approved?: boolean | null
+          requested_role?: string | null
+          requested_class_id?: string | null
+          requested_nis?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
           full_name?: string
           id?: string
+          is_approved?: boolean | null
+          requested_role?: string | null
+          requested_class_id?: string | null
+          requested_nis?: string | null
         }
         Relationships: []
       }
@@ -438,6 +453,33 @@ export type Database = {
       }
     }
     Functions: {
+      admin_approve_user: {
+        Args: {
+          _class_id?: string | null
+          _nis?: string | null
+          _role: string
+          _station?: string | null
+          _user_id: string
+        }
+        Returns: undefined
+      }
+      admin_create_user: {
+        Args: {
+          _class_id?: string | null
+          _email: string
+          _full_name: string
+          _password: string
+          _role: string
+          _station?: string | null
+        }
+        Returns: string
+      }
+      admin_delete_user: {
+        Args: {
+          _user_id: string
+        }
+        Returns: undefined
+      }
       current_officer_id: { Args: never; Returns: string }
       current_student_id: { Args: never; Returns: string }
       has_role: {
@@ -450,7 +492,7 @@ export type Database = {
       student_streak: { Args: { _student_id: string }; Returns: number }
     }
     Enums: {
-      app_role: "student" | "officer" | "admin"
+      app_role: "student" | "officer" | "admin" | "teacher"
       redemption_status: "pending" | "fulfilled" | "cancelled"
       validation_source: "scan" | "manual"
       validation_status: "pending" | "approved" | "rejected"
@@ -581,7 +623,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["student", "officer", "admin"],
+      app_role: ["student", "officer", "admin", "teacher"],
       redemption_status: ["pending", "fulfilled", "cancelled"],
       validation_source: ["scan", "manual"],
       validation_status: ["pending", "approved", "rejected"],

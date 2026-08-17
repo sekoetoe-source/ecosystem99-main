@@ -23,6 +23,13 @@ BEGIN
     RAISE EXCEPTION 'Hanya admin yang diperbolehkan menghapus akun';
   END IF;
 
+  -- Hapus/lepaskan relasi data tabel public terlebih dahulu agar tidak terkendala foreign key
+  UPDATE public.students SET profile_id = NULL WHERE profile_id = _user_id;
+  DELETE FROM public.officers WHERE profile_id = _user_id;
+  DELETE FROM public.user_roles WHERE user_id = _user_id;
+  DELETE FROM public.profiles WHERE id = _user_id;
+
+  -- Baru hapus akun utama dari auth.users
   DELETE FROM auth.users WHERE id = _user_id;
 END;
 $$;
