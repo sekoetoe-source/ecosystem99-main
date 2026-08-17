@@ -42,13 +42,30 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
     },
   });
 
-  const rawClasses = (classes.data ?? []).length > 0 ? (classes.data ?? []) : [
-    { class_id: "cls-7b", class_name: "7B", student_count: 36, avg_points: 285, total_points: 10260 },
-    { class_id: "cls-7g", class_name: "7G", student_count: 35, avg_points: 260, total_points: 9100 },
-    { class_id: "cls-9g", class_name: "9G", student_count: 36, avg_points: 240, total_points: 8640 },
-    { class_id: "cls-8a", class_name: "8A", student_count: 36, avg_points: 225, total_points: 8100 },
-    { class_id: "cls-9f", class_name: "9F", student_count: 36, avg_points: 210, total_points: 7560 },
-  ];
+  // Aggregate real student scores by class for accurate class leaderboard
+  const classAggregatesMap = new Map<string, { class_name: string; total_points: number; student_count: number }>();
+  (students.data ?? []).forEach((s) => {
+    const cName = (s.class_name ?? "").trim();
+    if (!cName || cName === "-" || cName.toLowerCase() === "tanpa kelas") return;
+    const existing = classAggregatesMap.get(cName) || { class_name: cName, total_points: 0, student_count: 0 };
+    classAggregatesMap.set(cName, {
+      class_name: cName,
+      total_points: existing.total_points + Number(s.earned_points ?? 0),
+      student_count: existing.student_count + 1,
+    });
+  });
+
+  const realClassesFromStudents = Array.from(classAggregatesMap.values())
+    .map((c) => ({
+      class_id: `class-${c.class_name}`,
+      class_name: c.class_name,
+      student_count: c.student_count,
+      total_points: c.total_points,
+      avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
+    }))
+    .sort((a, b) => b.avg_points - a.avg_points || b.total_points - a.total_points);
+
+  const rawClasses = realClassesFromStudents.length > 0 ? realClassesFromStudents : (classes.data ?? []);
 
   const rows =
     tab === "siswa"
@@ -59,19 +76,14 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
             rank: i + 1,
             title: s.full_name as string,
             sub: s.class_name as string,
-            points: (s.earned_points ?? 0) > 0 ? (s.earned_points ?? 0) : Math.max(100, 350 - i * 15),
+            points: Number(s.earned_points ?? 0),
           }))
       : rawClasses
           .filter((c) => (c.class_name ?? "").toLowerCase().includes(q.toLowerCase()))
           .map((c, i) => {
-            const studentCount = Number(c.student_count ?? 30);
-            let avgPoints = Number(c.avg_points ?? 0);
-            let totalPoints = Number(c.total_points ?? 0);
-
-            if (avgPoints === 0 || totalPoints === 0) {
-              avgPoints = Math.max(120, 285 - i * 25);
-              totalPoints = avgPoints * studentCount;
-            }
+            const studentCount = Number(c.student_count ?? 0);
+            const avgPoints = Number(c.avg_points ?? 0);
+            const totalPoints = Number(c.total_points ?? 0);
 
             return {
               id: (c.class_id || `cls-${i}`) as string,

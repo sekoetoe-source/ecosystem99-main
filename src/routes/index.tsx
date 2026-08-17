@@ -136,52 +136,52 @@ function useSchoolStats() {
 
         const co2Kg = Math.round((calcTotalItems * avgCo2) / 1000);
 
-        const classListSource = validClasses.length > 0 ? validClasses : [
-          { class_name: "7B", student_count: 36, avg_points: 285, total_points: 10260 },
-          { class_name: "7G", student_count: 35, avg_points: 260, total_points: 9100 },
-          { class_name: "9G", student_count: 36, avg_points: 240, total_points: 8640 },
-          { class_name: "8A", student_count: 36, avg_points: 225, total_points: 8100 },
-          { class_name: "9F", student_count: 36, avg_points: 210, total_points: 7560 },
-        ];
+        // Real-time calculation of class rankings from student_scores
+        const classMap = new Map<string, { class_name: string; total_points: number; student_count: number }>();
 
-        const processedClasses = classListSource.map((c, index) => {
-          const studentCount = Number(c.student_count ?? 30);
-          let avgPoints = Number(c.avg_points ?? 0);
-          let totalPoints = Number(c.total_points ?? 0);
+        validScores.forEach((s) => {
+          const name = (s.class_name ?? "").trim();
+          if (!name || name === "-" || name.toLowerCase() === "tanpa kelas") return;
+          const current = classMap.get(name) || { class_name: name, total_points: 0, student_count: 0 };
+          classMap.set(name, {
+            class_name: name,
+            total_points: current.total_points + Number(s.earned_points ?? 0),
+            student_count: current.student_count + 1,
+          });
+        });
 
-          if (avgPoints === 0 || totalPoints === 0) {
-            avgPoints = Math.max(120, 285 - index * 25);
-            totalPoints = avgPoints * studentCount;
-          }
+        let computedClasses = Array.from(classMap.values()).map((c) => ({
+          class_name: c.class_name,
+          student_count: c.student_count,
+          total_points: c.total_points,
+          avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
+        }));
 
-          return {
-            ...c,
-            student_count: studentCount,
-            avg_points: avgPoints,
-            total_points: totalPoints,
-          };
-        }).sort((a, b) => b.avg_points - a.avg_points);
+        if (computedClasses.length === 0 && validClasses.length > 0) {
+          computedClasses = validClasses.map((c) => ({
+            class_name: c.class_name,
+            student_count: Number(c.student_count ?? 0),
+            total_points: Number(c.total_points ?? 0),
+            avg_points: Number(c.avg_points ?? 0),
+          }));
+        }
+
+        computedClasses.sort((a, b) => b.avg_points - a.avg_points || b.total_points - a.total_points);
 
         return {
           totalPoints,
           totalItems: calcTotalItems,
           studentCount: activeStudentCount,
           co2Kg,
-          classes: processedClasses.slice(0, 5),
+          classes: computedClasses.slice(0, 5),
         };
       } catch (_) {
         return {
-          totalPoints: 24350,
-          totalItems: 2402,
+          totalPoints: 0,
+          totalItems: 0,
           studentCount: 858,
-          co2Kg: 163,
-          classes: [
-            { class_name: "7B", student_count: 36, avg_points: 285, total_points: 10260 },
-            { class_name: "7G", student_count: 35, avg_points: 260, total_points: 9100 },
-            { class_name: "9G", student_count: 36, avg_points: 240, total_points: 8640 },
-            { class_name: "8A", student_count: 36, avg_points: 225, total_points: 8100 },
-            { class_name: "9F", student_count: 36, avg_points: 210, total_points: 7560 },
-          ],
+          co2Kg: 0,
+          classes: [],
         };
       }
     },
