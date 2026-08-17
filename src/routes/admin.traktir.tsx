@@ -509,11 +509,11 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
             <span>Tanggal Rilis Fitur</span>
             <Sparkles className="size-4 text-blue-500" />
           </div>
-          <div className="mt-2 text-lg font-bold text-foreground">
-            17 Agustus 2026
+          <div className="mt-2 text-2xl font-black tracking-tight text-foreground">
+            0
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Integrasi Mayar.id PG Rilis
+            Menunggu akumulasi &gt;5% siswa aktif
           </p>
         </div>
       </div>
@@ -529,8 +529,8 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
               Target kebutuhan operasional, alokasi dana, dan estimasi rupiah berdasarkan total traktir terakumulasi.
             </p>
           </div>
-          <Badge variant="outline" className="w-fit font-bold border-primary text-primary">
-            Rilis: 17 Agt 2026 - Sekarang
+          <Badge variant="outline" className="w-fit font-bold border-amber-500/40 text-amber-600 dark:text-amber-400">
+            Status Rilis: 0 (Menunggu &gt;5% Siswa Aktif)
           </Badge>
         </div>
 
