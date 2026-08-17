@@ -16,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { EcoNewsTicker } from "@/components/eco/EcoNewsTicker";
+import { DEFAULT_ECO_NEWS, getCategoryBadgeStyle, type EcoNewsItem } from "@/lib/ecoNewsService";
 
 export const Route = createFileRoute("/admin/pengguna")({
   head: () => ({
@@ -60,7 +62,7 @@ function PenggunaPage() {
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [printClass, setPrintClass] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"siswa" | "petugas" | "semua" | "persetujuan">("siswa");
+  const [activeTab, setActiveTab] = useState<"siswa" | "petugas" | "semua" | "persetujuan" | "running-text">("siswa");
 
   // Filter, Sort, & Pagination states untuk Daftar Siswa
   const [filterClass, setFilterClass] = useState<string>("ALL");
@@ -678,6 +680,7 @@ function PenggunaPage() {
           { id: "petugas", label: "Petugas Pos" },
           { id: "semua", label: "Semua Akun & Role" },
           { id: "persetujuan", label: "Persetujuan Akun Google" },
+          { id: "running-text", label: "📢 Running Text (AI Info)" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1175,6 +1178,65 @@ function PenggunaPage() {
             {(allUsers.data ?? []).filter((u) => !u.is_approved).length === 0 && (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">Tidak ada permintaan persetujuan baru.</p>
             )}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "running-text" && (
+        <section className="space-y-6">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl flex items-center gap-2">
+                📢 Info Berjalan (Running Text Lingkungan & Kesehatan)
+              </h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Headline berita & tips kesehatan remaja/sekolah (AQI Jakarta, bebas plastik, hidrasi, dll) yang berjalan di beranda dan dasbor.
+              </p>
+            </div>
+          </header>
+
+          <div className="surface-card p-4 rounded-2xl border border-emerald-500/20">
+            <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Live Ticker Preview:</h2>
+            <div className="rounded-xl overflow-hidden shadow-sm">
+              <EcoNewsTicker />
+            </div>
+          </div>
+
+          <div className="surface-card rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-border bg-muted/40 flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-sm text-foreground">Daftar Tips & Berita AI Lingkungan & Kesehatan Remaja</h3>
+                <p className="text-xs text-muted-foreground">Otomatis dirotasi secara halus di halaman depan & dasbor siswa</p>
+              </div>
+              <span className="text-xs font-bold bg-primary/10 text-primary px-3 py-1 rounded-full">
+                {DEFAULT_ECO_NEWS.length} Berita Aktif
+              </span>
+            </div>
+            <div className="divide-y divide-border">
+              {DEFAULT_ECO_NEWS.map((item) => (
+                <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-muted/20 transition-colors">
+                  <div className="flex items-start gap-3.5">
+                    <span className="text-3xl shrink-0 p-2 rounded-2xl bg-muted/60">{item.icon || "🌿"}</span>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${getCategoryBadgeStyle(item.category)}`}>
+                          {item.badge || item.category}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-medium">{item.source}</span>
+                      </div>
+                      <h4 className="font-bold text-sm sm:text-base text-foreground leading-snug">{item.title}</h4>
+                      <p className="text-xs text-muted-foreground max-w-2xl">{item.summary}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/80 dark:text-emerald-300 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Aktif di Running Text
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       )}

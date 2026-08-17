@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { Brand } from "@/components/eco/Brand";
 import { QrImage } from "@/components/eco/QrImage";
+import { EcoNewsTicker } from "@/components/eco/EcoNewsTicker";
 import { homeForRole, useMe } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import logoAsset from "@/assets/logo-smpn99.png.asset.json";
@@ -382,6 +383,7 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
+      <EcoNewsTicker />
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Brand />

@@ -4,6 +4,7 @@ import { Coffee, Flame, Gift, Sparkles, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { EcoNewsTicker } from "@/components/eco/EcoNewsTicker";
 import { useMe } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -112,6 +113,7 @@ function StudentDashboard() {
 
   return (
     <div className="space-y-6">
+      <EcoNewsTicker compact className="rounded-2xl border border-emerald-800/30 shadow-sm" />
       <div>
         <h1 className="text-2xl font-extrabold tracking-tight">Halo, {me.student.full_name}</h1>
         <p className="text-sm text-muted-foreground">
