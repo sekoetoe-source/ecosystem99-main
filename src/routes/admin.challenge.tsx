@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Leaf, Plus, Edit, Trash2 } from "lucide-react";
+import { Leaf, Plus, Edit, Trash2, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,94 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+export type AiChallengePrompt = {
+  key: string;
+  label: string;
+  pill: string;
+  name: string;
+  title: string;
+  body: string;
+  pct: number;
+};
+
+export const AI_CHALLENGE_PROMPTS: AiChallengePrompt[] = [
+  {
+    key: "5-hari-tumbler",
+    label: "🥤 Streak Tumbler 5 Hari",
+    pill: "ACTIVE",
+    name: "5 Hari Tumbler",
+    title: "Build the streak.",
+    body: "Minimal 5 kali validasi membawa tumbler pribadi ke sekolah dalam 1 minggu untuk membuka bonus +150 Eco-Points.",
+    pct: 65,
+  },
+  {
+    key: "full-reusable-class",
+    label: "🍱 Full Reusable Class",
+    pill: "ACTIVE",
+    name: "100% Reusable Class",
+    title: "One class, one goal.",
+    body: "Target 100% siswa dalam satu kelas membawa tumbler dan lunchbox tanpa sampah plastik sekali pakai selama jam istirahat.",
+    pct: 48,
+  },
+  {
+    key: "most-improved-eco",
+    label: "📈 Most Improved Class",
+    pill: "ACTIVE",
+    name: "Most Improved Eco",
+    title: "Progress matters.",
+    body: "Apresiasi khusus bagi kelas yang berhasil meningkatkan persentase partisipasi harian paling drastis dibanding minggu lalu.",
+    pct: 72,
+  },
+  {
+    key: "zero-waste-hero",
+    label: "🌱 Zero Waste Hero 7 Hari",
+    pill: "ACTIVE",
+    name: "Zero Waste Hero",
+    title: "Save our planet daily.",
+    body: "Tantangan individu siswa membawa tempat makan & minum sendiri secara konsisten tanpa jeda selama 7 hari sekolah.",
+    pct: 80,
+  },
+  {
+    key: "aqi-awareness-challenge",
+    label: "🌫️ Kualifikasi Remaja AQI Sehat",
+    pill: "COMING SOON",
+    name: "Remaja AQI Sehat",
+    title: "Breathe safe, stay hydrated.",
+    body: "Tantangan menjaga kecukupan cairan tumbler & pemakaian masker filter saat indeks kualitas udara Jakarta di atas 100.",
+    pct: 25,
+  },
+  {
+    key: "jawara-daur-ulang",
+    label: "♻️ Jawara Daur Ulang Kertas",
+    pill: "COMING SOON",
+    name: "Jawara Paper Recycle",
+    title: "Recycle for future.",
+    body: "Tantangan pengumpulan kertas buku bekas & kardus antar kelas untuk disetorkan ke bank sampah sekolah SMPN 99.",
+    pct: 10,
+  },
+];
+
+export function generateAiChallenge(key?: string): AiChallengePrompt {
+  if (key) {
+    const found = AI_CHALLENGE_PROMPTS.find((p) => p.key === key);
+    if (found) return found;
+  }
+  const randomIndex = Math.floor(Math.random() * AI_CHALLENGE_PROMPTS.length);
+  const item = AI_CHALLENGE_PROMPTS[randomIndex];
+  if (item) return item;
+  const fallback = AI_CHALLENGE_PROMPTS[0];
+  if (fallback) return fallback;
+  return {
+    key: "default",
+    label: "🥤 Streak Tumbler",
+    pill: "ACTIVE",
+    name: "5 Hari Tumbler",
+    title: "Build the streak.",
+    body: "Minimal 5 kali validasi membawa tumbler pribadi.",
+    pct: 50,
+  };
+}
 
 export const Route = createFileRoute("/admin/challenge")({
   head: () => ({
@@ -113,9 +201,28 @@ function ChallengeManagementPage() {
             Kelola tantangan ramah lingkungan yang ditampilkan di beranda siswa.
           </p>
         </div>
-        <Button size="sm" onClick={() => setIsAddOpen(true)} className="rounded-full gap-1">
-          <Plus className="size-4" /> Tambah Challenge
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const ai = generateAiChallenge();
+              setPill(ai.pill);
+              setName(ai.name);
+              setTitle(ai.title);
+              setBody(ai.body);
+              setPct(ai.pct);
+              setIsAddOpen(true);
+              toast.success(`✨ AI Challenge Generator dibuka! Tantangan "${ai.name}" disiapkan.`);
+            }}
+            className="rounded-full gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 font-bold"
+          >
+            <Sparkles className="size-4 text-emerald-600 animate-pulse" /> ✨ Generate AI Challenge
+          </Button>
+          <Button size="sm" onClick={() => setIsAddOpen(true)} className="rounded-full gap-1 font-bold">
+            <Plus className="size-4" /> Tambah Challenge
+          </Button>
+        </div>
       </header>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -169,6 +276,62 @@ function ChallengeManagementPage() {
             <DialogDescription>Tambahkan program challenge ramah lingkungan baru.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* AI CHALLENGE GENERATOR ENGINE */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-sky-500/10 to-purple-500/10 border border-emerald-500/25 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-extrabold text-xs text-emerald-800 dark:text-emerald-300">
+                  <Sparkles className="size-4 text-emerald-600 animate-pulse" />
+                  <span>✨ AI Eco-Challenge Generator</span>
+                </div>
+                <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full shadow-sm">
+                  Smart AI Prompts
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                Pilih topik tantangan di bawah ini atau klik <strong>Generate Acak AI</strong> untuk membuat program eco-challenge otomatis:
+              </p>
+              
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {AI_CHALLENGE_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt.key}
+                    type="button"
+                    onClick={() => {
+                      const ai = generateAiChallenge(prompt.key);
+                      setPill(ai.pill);
+                      setName(ai.name);
+                      setTitle(ai.title);
+                      setBody(ai.body);
+                      setPct(ai.pct);
+                      toast.success(`✨ Challenge AI "${ai.label}" berhasil digenerate!`);
+                    }}
+                    className="text-[10px] font-bold bg-background hover:bg-emerald-50 text-foreground dark:hover:bg-emerald-950/40 border border-border hover:border-emerald-500 px-2 py-1 rounded-lg transition-all"
+                  >
+                    {prompt.label}
+                  </button>
+                ))}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full text-xs font-bold gap-1.5 mt-1 border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl"
+                onClick={() => {
+                  const ai = generateAiChallenge();
+                  setPill(ai.pill);
+                  setName(ai.name);
+                  setTitle(ai.title);
+                  setBody(ai.body);
+                  setPct(ai.pct);
+                  toast.success(`✨ AI berhasil meng-generate challenge acak!`);
+                }}
+              >
+                <Wand2 className="size-3.5 text-emerald-600" />
+                Generate Acak (AI Smart Prompt)
+              </Button>
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-bold text-muted-foreground">Kategori/Status (Pill)</label>
               <select
