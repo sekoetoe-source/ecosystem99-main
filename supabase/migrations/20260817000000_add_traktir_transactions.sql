@@ -11,8 +11,29 @@ CREATE TABLE IF NOT EXISTS public.traktir_transactions (
     pay_url TEXT,
     notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expired_at TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '15 minutes')
 );
+
+-- Function to auto cancel pending transactions older than 15 minutes
+CREATE OR REPLACE FUNCTION public.cancel_expired_traktir_transactions()
+RETURNS INT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public AS $$
+DECLARE
+    v_count INT := 0;
+BEGIN
+    UPDATE public.traktir_transactions
+    SET status = 'cancelled', updated_at = now()
+    WHERE status = 'pending' AND expired_at <= now();
+
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.cancel_expired_traktir_transactions() TO anon, authenticated;
 
 -- Enable RLS
 ALTER TABLE public.traktir_transactions ENABLE ROW LEVEL SECURITY;

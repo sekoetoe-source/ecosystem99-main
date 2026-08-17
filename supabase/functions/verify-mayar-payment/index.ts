@@ -22,6 +22,11 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Automatically cancel expired transactions older than 15 minutes
+    try {
+      await supabase.rpc("cancel_expired_traktir_transactions");
+    } catch (_) {}
+
     const updateStatus = status === "success" || status === "paid" ? "success" : "failed";
 
     if (invoiceId) {

@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
+  Clock,
   Coffee,
   CreditCard,
   Droplets,
@@ -173,8 +174,8 @@ function Index() {
         }
         // Clean URL query params
         window.history.replaceState({}, document.title, window.location.pathname + "#kopi");
-      } else if (status === "failed" || status === "canceled") {
-        toast.error("Pembayaran tidak berhasil atau dibatalkan. Anda dapat mengulanginya kapan saja.");
+      } else if (status === "expired" || status === "cancelled" || status === "failed" || status === "canceled") {
+        toast.error("Batas waktu pembayaran (15 menit) telah habis atau dibatalkan. Silakan klik Traktir Kopi lagi untuk membuat transaksi baru.");
         window.history.replaceState({}, document.title, window.location.pathname + "#kopi");
       }
     }
@@ -817,6 +818,10 @@ function Index() {
               <p className="text-muted-foreground text-[11px] leading-relaxed">
                 Pembayaran diproses secara instant & aman via Mayar.id. Mendukung QRIS (GoPay, OVO, Dana, ShopeePay), Virtual Account, & Transfer Bank.
               </p>
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-xl">
+                <Clock className="size-3.5 shrink-0 text-amber-500" />
+                <span>Batas waktu pembayaran: <strong>15 menit</strong>. Lewat 15 menit otomatis dibatalkan.</span>
+              </div>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <span className="inline-flex items-center gap-1 text-[10px] bg-background px-2 py-1 rounded-md border text-muted-foreground">
                   <QrCode className="size-3 text-primary" /> QRIS Instan

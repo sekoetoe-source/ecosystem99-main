@@ -223,6 +223,7 @@ export type Database = {
           payment_method: string | null
           status: string
           updated_at: string
+          expired_at: string
         }
         Insert: {
           amount: number
@@ -237,6 +238,7 @@ export type Database = {
           payment_method?: string | null
           status?: string
           updated_at?: string
+          expired_at?: string
         }
         Update: {
           amount?: number
@@ -251,6 +253,7 @@ export type Database = {
           payment_method?: string | null
           status?: string
           updated_at?: string
+          expired_at?: string
         }
         Relationships: []
       }

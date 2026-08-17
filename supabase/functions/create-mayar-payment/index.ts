@@ -30,8 +30,10 @@ serve(async (req) => {
     const donorEmail = email || "donatur@smpn99.sch.id";
     const donorMobile = mobile || "081234567890";
     const targetRedirectUrl = redirectUrl || "https://ecosystem99.web.id/#kopi";
+    const expirationMs = 15 * 60 * 1000; // 15 minutes
+    const expiredAtDate = new Date(Date.now() + expirationMs).toISOString();
 
-    // Call Mayar Headless API to create invoice
+    // Call Mayar Headless API to create invoice with 15 minutes limit (900 seconds)
     const response = await fetch("https://api.mayar.id/hl/v1/invoice/create", {
       method: "POST",
       headers: {
@@ -44,11 +46,13 @@ serve(async (req) => {
         mobile: donorMobile,
         description: "Dukungan operasional program budaya ramah lingkungan sekolah.",
         redirectURL: targetRedirectUrl,
+        expiredIn: 900,
+        expiredAt: expiredAtDate,
         items: [
           {
             quantity: 1,
             rate: Number(amount),
-            description: "Traktir Kopi - School Ecosystem"
+            description: "Traktir Kopi - School Ecosystem (Batas Waktu 15 Min)"
           }
         ]
       }),
@@ -82,6 +86,7 @@ serve(async (req) => {
           payment_method: "Mayar PG",
           status: "pending",
           pay_url: linkUrl,
+          expired_at: expiredAtDate,
         });
       } catch (dbErr) {
         console.error("Failed to log traktir_transaction to DB:", dbErr);
