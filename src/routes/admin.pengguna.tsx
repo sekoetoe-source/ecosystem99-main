@@ -792,8 +792,8 @@ function PenggunaPage() {
                 >
                   <option value="nama-asc">Urutkan: Nama (A - Z)</option>
                   <option value="nama-desc">Urutkan: Nama (Z - A)</option>
-                  <option value="kelas-asc">Urutkan: Kelas (7A → 9G)</option>
-                  <option value="kelas-desc">Urutkan: Kelas (9G → 7A)</option>
+                  <option value="kelas-asc">Urutkan: Kelas (7A → 9H)</option>
+                  <option value="kelas-desc">Urutkan: Kelas (9H → 7A)</option>
                   <option value="nis-asc">Urutkan: NIS</option>
                   <option value="poin-desc">Urutkan: Poin Terbanyak</option>
                 </select>
