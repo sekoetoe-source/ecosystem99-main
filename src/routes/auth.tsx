@@ -13,16 +13,19 @@ import { homeForRole, useMe } from "@/lib/auth";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Masuk — School Ecosystem SMPN 99 Jakarta" },
+      { title: "Masuk — ecosystem99 (ecosystem99.web.id)" },
       {
         name: "description",
-        content: "Masuk atau daftar akun School Ecosystem untuk siswa, petugas, dan admin sekolah.",
+        content: "Masuk atau daftar akun ecosystem99 (ecosystem99.web.id) untuk siswa, petugas, dan admin SMP Negeri 99 Jakarta.",
       },
-      { property: "og:title", content: "Masuk — School Ecosystem SMPN 99 Jakarta" },
+      { property: "og:title", content: "Masuk — ecosystem99" },
       {
         property: "og:description",
-        content: "Portal autentikasi School Ecosystem SMP Negeri 99 Jakarta.",
+        content: "Portal autentikasi ecosystem99 SMP Negeri 99 Jakarta (ecosystem99.web.id).",
       },
+    ],
+    links: [
+      { rel: "canonical", href: "https://ecosystem99.web.id/auth" },
     ],
   }),
   component: AuthPage,

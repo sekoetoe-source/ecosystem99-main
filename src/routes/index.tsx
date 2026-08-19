@@ -57,20 +57,38 @@ export const Route = createFileRoute("/")({
   component: Index,
   head: () => ({
     meta: [
-      { title: "School Ecosystem SMPN 99 Jakarta | Tumbler & Lunchbox" },
+      { title: "ecosystem99 — Platform Resmi Eco-Points SMPN 99 Jakarta (ecosystem99.web.id)" },
       {
         name: "description",
         content:
-          "Platform sekolah bebas sampah: scan QR tumbler & lunchbox, kumpulkan Eco Points, pantau Eco Score kelas, dan raih Jawara Lingkungan.",
+          "ecosystem99 (ecosystem99.web.id) — Platform resmi Eco-Points & sekolah bebas sampah SMP Negeri 99 Jakarta. Scan QR tumbler & lunchbox, kumpulkan poin, dan raih reward.",
       },
-      { property: "og:title", content: "School Ecosystem SMPN 99 Jakarta" },
+      {
+        name: "keywords",
+        content:
+          "ecosystem99, ecosystem99.web.id, ecosystem 99, ecosystem99 web id, smpn 99 jakarta, smp 99 jakarta, eco points smpn 99, tumbler lunchbox smp 99",
+      },
+      { property: "og:title", content: "ecosystem99 — Platform Resmi Eco-Points SMPN 99 Jakarta" },
       {
         property: "og:description",
         content:
-          "Scan. Catat. Dapatkan poin. Naikkan Eco Score kelasmu di SMP Negeri 99 Jakarta.",
+          "Scan tumbler & kotak makan, kumpulkan Eco Points, dan naikkan Eco Score kelasmu di ecosystem99 (ecosystem99.web.id).",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://ecosystem99.web.id/" },
+      { property: "og:site_name", content: "ecosystem99" },
+      { property: "og:image", content: "https://ecosystem99.web.id/logo-smpn99.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "ecosystem99 — Platform Resmi Eco-Points SMPN 99 Jakarta" },
+      {
+        name: "twitter:description",
+        content:
+          "Platform resmi Eco-Points & sekolah bebas sampah SMP Negeri 99 Jakarta (ecosystem99.web.id).",
+      },
+      { name: "twitter:image", content: "https://ecosystem99.web.id/logo-smpn99.png" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://ecosystem99.web.id/" },
     ],
   }),
 });

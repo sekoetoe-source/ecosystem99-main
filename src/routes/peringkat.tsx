@@ -7,17 +7,20 @@ import { homeForRole, useMe } from "@/lib/auth";
 export const Route = createFileRoute("/peringkat")({
   head: () => ({
     meta: [
-      { title: "Papan Peringkat Eco — SMPN 99 Jakarta" },
+      { title: "Papan Peringkat Eco — ecosystem99 (ecosystem99.web.id)" },
       {
         name: "description",
         content:
-          "Peringkat Eco-Points siswa dan kelas SMP Negeri 99 Jakarta dari kebiasaan membawa tumbler dan kotak makan.",
+          "Papan peringkat Eco-Points siswa dan kelas SMP Negeri 99 Jakarta di ecosystem99 (ecosystem99.web.id).",
       },
-      { property: "og:title", content: "Papan Peringkat Eco — SMPN 99 Jakarta" },
+      { property: "og:title", content: "Papan Peringkat Eco — ecosystem99" },
       {
         property: "og:description",
-        content: "Lihat Jawara Lingkungan dan peringkat kelas terbaik di School Ecosystem.",
+        content: "Lihat Jawara Lingkungan dan peringkat kelas terbaik di ecosystem99 (ecosystem99.web.id).",
       },
+    ],
+    links: [
+      { rel: "canonical", href: "https://ecosystem99.web.id/peringkat" },
     ],
   }),
   component: PeringkatPage,

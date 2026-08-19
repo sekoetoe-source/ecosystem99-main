@@ -97,20 +97,37 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "School Ecosystem — SMP Negeri 99 Jakarta" },
+      { title: "ecosystem99 — Website Resmi Ecosystem 99 SMPN 99 Jakarta" },
       {
         name: "description",
-        content: "Platform Eco-Points sekolah bebas sampah: scan tumbler & kotak makan, kumpulkan poin, raih reward.",
+        content:
+          "ecosystem99 (ecosystem99.web.id) adalah platform resmi Eco-Points & sekolah bebas sampah SMP Negeri 99 Jakarta. Scan tumbler & kotak makan, kumpulkan poin, dan raih reward.",
+      },
+      {
+        name: "keywords",
+        content:
+          "ecosystem99, ecosystem99.web.id, ecosystem 99, ecosystem99 web id, smpn 99 jakarta, smp 99 jakarta, eco points smpn 99",
       },
       { name: "author", content: "SMP Negeri 99 Jakarta" },
-      { property: "og:title", content: "School Ecosystem — SMP Negeri 99 Jakarta" },
+      { name: "google-site-verification", content: "google30611e22a79a9eea" },
+      { property: "og:title", content: "ecosystem99 — Website Resmi Ecosystem 99 SMPN 99 Jakarta" },
       {
         property: "og:description",
-        content: "Platform Eco-Points sekolah bebas sampah: scan tumbler & kotak makan, kumpulkan poin, raih reward.",
+        content:
+          "ecosystem99 (ecosystem99.web.id) adalah platform resmi Eco-Points & sekolah bebas sampah SMP Negeri 99 Jakarta.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://ecosystem99.web.id/" },
+      { property: "og:site_name", content: "ecosystem99" },
+      { property: "og:image", content: "https://ecosystem99.web.id/logo-smpn99.png" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "ecosystem99 — Website Resmi Ecosystem 99 SMPN 99 Jakarta" },
+      {
+        name: "twitter:description",
+        content:
+          "Platform resmi Eco-Points & sekolah bebas sampah SMP Negeri 99 Jakarta (ecosystem99.web.id).",
+      },
+      { name: "twitter:image", content: "https://ecosystem99.web.id/logo-smpn99.png" },
     ],
     links: [
       {
@@ -124,6 +141,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap",
       },
       { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "canonical", href: "https://ecosystem99.web.id/" },
     ],
   }),
   shellComponent: RootShell,
@@ -133,10 +151,35 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "ecosystem99",
+    alternateName: [
+      "Ecosystem99",
+      "Ecosystem 99",
+      "ecosystem99.web.id",
+      "School Ecosystem SMPN 99 Jakarta",
+    ],
+    url: "https://ecosystem99.web.id/",
+    description:
+      "ecosystem99 adalah platform resmi Eco-Points & sekolah bebas sampah SMP Negeri 99 Jakarta.",
+    publisher: {
+      "@type": "Organization",
+      name: "SMP Negeri 99 Jakarta",
+      url: "https://ecosystem99.web.id/",
+      logo: "https://ecosystem99.web.id/logo-smpn99.png",
+    },
+  };
+
   return (
-    <html lang="en">
+    <html lang="id">
       <head>
         <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body>
         {children}
