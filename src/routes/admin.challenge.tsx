@@ -270,24 +270,25 @@ function ChallengeManagementPage() {
 
       {/* DIALOG TAMBAH CHALLENGE */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Buat Challenge Baru</DialogTitle>
-            <DialogDescription>Tambahkan program challenge ramah lingkungan baru.</DialogDescription>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl border border-border shadow-2xl">
+          <DialogHeader className="p-6 pb-3 border-b border-border/40 bg-muted/20 shrink-0">
+            <DialogTitle className="text-lg font-extrabold tracking-tight">Buat Challenge Baru</DialogTitle>
+            <DialogDescription className="text-xs">Tambahkan program challenge ramah lingkungan baru.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 text-left">
             {/* AI CHALLENGE GENERATOR ENGINE */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-sky-500/10 to-purple-500/10 border border-emerald-500/25 space-y-2">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-sky-500/10 to-purple-500/10 border border-emerald-500/30 space-y-2.5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-extrabold text-xs text-emerald-800 dark:text-emerald-300">
                   <Sparkles className="size-4 text-emerald-600 animate-pulse" />
                   <span>✨ AI Eco-Challenge Generator</span>
                 </div>
-                <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full shadow-sm">
+                <span className="text-[10px] bg-emerald-600 text-white font-extrabold px-2 py-0.5 rounded-full shadow-sm">
                   Smart AI Prompts
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground leading-tight">
+              <p className="text-[11px] text-muted-foreground leading-snug">
                 Pilih topik tantangan di bawah ini atau klik <strong>Generate Acak AI</strong> untuk membuat program eco-challenge otomatis:
               </p>
               
@@ -305,7 +306,7 @@ function ChallengeManagementPage() {
                       setPct(ai.pct);
                       toast.success(`✨ Challenge AI "${ai.label}" berhasil digenerate!`);
                     }}
-                    className="text-[10px] font-bold bg-background hover:bg-emerald-50 text-foreground dark:hover:bg-emerald-950/40 border border-border hover:border-emerald-500 px-2 py-1 rounded-lg transition-all"
+                    className="text-[10px] font-bold bg-background hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 border border-border hover:border-emerald-600 px-2.5 py-1 rounded-xl transition-all shadow-xs"
                   >
                     {prompt.label}
                   </button>
@@ -316,7 +317,7 @@ function ChallengeManagementPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="w-full text-xs font-bold gap-1.5 mt-1 border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl"
+                className="w-full text-xs font-extrabold gap-1.5 mt-1 border-emerald-500/40 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 rounded-xl"
                 onClick={() => {
                   const ai = generateAiChallenge();
                   setPill(ai.pill);
@@ -332,60 +333,64 @@ function ChallengeManagementPage() {
               </Button>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground">Kategori/Status (Pill)</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Kategori/Status (Pill)</label>
               <select
                 value={pill}
                 onChange={(e) => setPill(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               >
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="COMING SOON">COMING SOON</option>
                 <option value="COMPLETED">COMPLETED</option>
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground">Nama Program</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Nama Program</label>
               <input
                 type="text"
                 placeholder="Contoh: 5 Hari Tumbler"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground">Motto/Headline</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Motto/Headline</label>
               <input
                 type="text"
                 placeholder="Contoh: Build the streak."
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground">Deskripsi Tantangan</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Deskripsi Tantangan</label>
               <textarea
+                rows={3}
                 placeholder="Contoh: Bawa tumbler 5 hari berturut-turut untuk bonus poin."
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                className="w-full min-h-[80px] p-3 rounded-xl border border-input bg-background text-sm focus:outline-primary resize-y"
+                className="w-full p-3.5 rounded-xl border border-input bg-background text-sm font-normal leading-relaxed focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all resize-y min-h-[90px]"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground">Progress Default (%)</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Progress Default (%)</label>
               <input
                 type="number"
                 min="0"
                 max="100"
                 value={pct}
                 onChange={(e) => setPct(Number(e.target.value))}
-                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
+          </div>
+
+          <div className="p-4 bg-muted/20 border-t border-border/40 shrink-0">
             <Button
-              className="w-full rounded-full mt-2"
+              className="w-full h-11 rounded-xl font-extrabold text-sm shadow-md"
               onClick={() => createMutation.mutate()}
               disabled={createMutation.isPending}
             >

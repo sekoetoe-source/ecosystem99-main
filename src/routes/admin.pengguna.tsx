@@ -1763,28 +1763,30 @@ function PenggunaPage() {
       </Dialog>
 
       {/* DIALOG TAMBAH RUNNING TEXT BARU */}
+      {/* DIALOG TAMBAH RUNNING TEXT BARU */}
       <Dialog open={addNewsOpen} onOpenChange={setAddNewsOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Tambah Running Text / Headline Baru</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl border border-border shadow-2xl">
+          <DialogHeader className="p-6 pb-3 border-b border-border/40 bg-muted/20 shrink-0">
+            <DialogTitle className="text-lg font-extrabold tracking-tight">Tambah Running Text / Headline Baru</DialogTitle>
+            <DialogDescription className="text-xs">
               Tambahkan berita atau tips kesehatan & lingkungan baru untuk running text di beranda dan dasbor.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 text-left">
             {/* AI NEWS GENERATOR ENGINE */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-sky-500/10 to-purple-500/10 border border-emerald-500/25 space-y-2">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-sky-500/10 to-purple-500/10 border border-emerald-500/30 space-y-2.5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-extrabold text-xs text-emerald-800 dark:text-emerald-300">
                   <Sparkles className="size-4 text-emerald-600 animate-pulse" />
                   <span>✨ AI Eco-Health News Generator</span>
                 </div>
-                <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full shadow-sm">
+                <span className="text-[10px] bg-emerald-600 text-white font-extrabold px-2 py-0.5 rounded-full shadow-sm">
                   Smart AI Prompts
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground leading-tight">
-                Pilih topik AI di bawah ini atau klik <strong>Generate Acak AI</strong> untuk mencari & membuat berita/tips kesehatan & lingkungan otomatis:
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Pilih topik AI di bawah ini atau klik <strong>Generate Acak AI</strong> untuk membuat berita/tips kesehatan & lingkungan otomatis:
               </p>
               
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -1802,7 +1804,7 @@ function PenggunaPage() {
                       setNewsSource(ai.source);
                       toast.success(`✨ Berita AI "${ai.label}" berhasil digenerate!`);
                     }}
-                    className="text-[10px] font-bold bg-background hover:bg-emerald-50 text-foreground dark:hover:bg-emerald-950/40 border border-border hover:border-emerald-500 px-2 py-1 rounded-lg transition-all"
+                    className="text-[10px] font-bold bg-background hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 border border-border hover:border-emerald-600 px-2.5 py-1 rounded-xl transition-all shadow-xs"
                   >
                     {prompt.label}
                   </button>
@@ -1813,7 +1815,7 @@ function PenggunaPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="w-full text-xs font-bold gap-1.5 mt-1 border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl"
+                className="w-full text-xs font-extrabold gap-1.5 mt-1 border-emerald-500/40 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 rounded-xl"
                 onClick={() => {
                   const ai = generateAiEcoNews();
                   setNewsTitle(ai.title);
@@ -1830,24 +1832,24 @@ function PenggunaPage() {
               </Button>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground">Judul Headline / Berita</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Judul Headline / Berita</label>
               <input
                 type="text"
                 placeholder="Contoh: 🥤 Tips Hidrasi Remaja Saat Jam Istirahat"
                 value={newsTitle}
                 onChange={(e) => setNewsTitle(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Kategori</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground">Kategori</label>
                 <select
                   value={newsCategory}
                   onChange={(e) => setNewsCategory(e.target.value as EcoNewsCategory)}
-                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                  className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
                 >
                   <option value="lingkungan">Lingkungan</option>
                   <option value="kesehatan">Kesehatan</option>
@@ -1856,53 +1858,55 @@ function PenggunaPage() {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Ikon Emoji</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground">Ikon Emoji</label>
                 <input
                   type="text"
                   placeholder="Contoh: 🌿"
                   value={newsIcon}
                   onChange={(e) => setNewsIcon(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                  className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
                 />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground">Ringkasan Singkat (Sub-Headline Ticker)</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Ringkasan Singkat (Sub-Headline Ticker)</label>
               <input
                 type="text"
                 placeholder="Contoh: Minum air putih 2 liter per hari bantu konsentrasi belajar."
                 value={newsSummary}
                 onChange={(e) => setNewsSummary(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground">Isi Informasi Lengkap (Modal Baca Detail)</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Isi Informasi Lengkap (Modal Baca Detail)</label>
               <textarea
-                rows={3}
+                rows={4}
                 placeholder="Penjelasan rinci mengenai informasi atau tips kesehatan..."
                 value={newsContent}
                 onChange={(e) => setNewsContent(e.target.value)}
-                className="w-full p-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                className="w-full p-3.5 rounded-xl border border-input bg-background text-sm font-normal leading-relaxed focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all resize-y min-h-[110px]"
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-muted-foreground">Sumber Informasi (Opsional)</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Sumber Informasi (Opsional)</label>
               <input
                 type="text"
                 placeholder="Contoh: Tim Eco-School SMPN 99 Jakarta"
                 value={newsSource}
                 onChange={(e) => setNewsSource(e.target.value)}
-                className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
             </div>
+          </div>
 
+          <div className="p-4 bg-muted/20 border-t border-border/40 shrink-0">
             <Button
-              className="w-full rounded-full mt-2 font-bold"
+              className="w-full h-11 rounded-xl font-extrabold text-sm shadow-md"
               onClick={handleAddNews}
             >
               Simpan & Aktifkan Running Text
