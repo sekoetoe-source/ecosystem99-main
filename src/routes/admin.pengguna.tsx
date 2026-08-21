@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil, Filter, ArrowUpDown, ChevronLeft, ChevronRight, Sparkles, Wand2, Bot, X, Check } from "lucide-react";
