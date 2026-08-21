@@ -1969,7 +1969,6 @@ function PenggunaPage() {
                   <div
                     key={pageIdx}
                     className="print-page grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-4 border border-dashed border-border rounded-3xl bg-card/50 print:border-none print:bg-transparent print:p-0"
-                    style={{ breakAfter: "page", pageBreakAfter: "always" }}
                   >
                     {pageStudents.map((s) => (
                       <div
