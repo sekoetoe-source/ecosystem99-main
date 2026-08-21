@@ -70,6 +70,14 @@ export function useMe() {
     enabled: !loading,
     queryFn: async () => {
       if (!userId) return null;
+
+      const userEmail = (session?.user.email ?? "").toLowerCase().trim();
+      const isAdminEmail =
+        userEmail === "admin.smpn99@gmail.com" ||
+        userEmail === "admin@smpn99.sch.id" ||
+        userEmail.startsWith("admin.") ||
+        userEmail.startsWith("admin@");
+
       const fetchProfile = async () => {
         const { data } = await supabase
           .from("profiles")
@@ -79,12 +87,13 @@ export function useMe() {
 
         if (!data) {
           const defaultName = (session?.user?.user_metadata as any)?.["full_name"] || session?.user?.email || "Pengguna";
+          const isApprovedInitial = isAdminEmail;
           const { data: inserted } = await supabase
             .from("profiles")
-            .upsert({ id: userId, full_name: defaultName, is_approved: false }, { onConflict: "id" })
+            .upsert({ id: userId, full_name: defaultName, is_approved: isApprovedInitial }, { onConflict: "id" })
             .select("full_name, is_approved, requested_role, requested_class_id, requested_nis")
             .single();
-          return inserted ?? { full_name: defaultName, is_approved: false, requested_role: null, requested_class_id: null, requested_nis: null };
+          return inserted ?? { full_name: defaultName, is_approved: isApprovedInitial, requested_role: null, requested_class_id: null, requested_nis: null };
         }
         return data;
       };
@@ -105,8 +114,22 @@ export function useMe() {
             .maybeSingle(),
         ]);
 
-      const roles = (roleRows ?? []).map((r) => r.role as AppRole);
-      const primaryRole: AppRole = roles.includes("admin")
+      let roles = (roleRows ?? []).map((r) => r.role as AppRole);
+
+      // Auto-assign / sync admin role if designated admin email
+      if (isAdminEmail) {
+        if (!roles.includes("admin")) {
+          roles = ["admin", ...roles.filter((r) => r !== "admin")];
+          supabase.from("user_roles").upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" }).then();
+        }
+        if (!profile?.is_approved) {
+          supabase.from("profiles").update({ is_approved: true }).eq("id", userId).then();
+        }
+      }
+
+      const hasAdminRole = roles.includes("admin") || isAdminEmail;
+
+      const primaryRole: AppRole = hasAdminRole
         ? "admin"
         : roles.includes("officer")
           ? "officer"
@@ -124,11 +147,13 @@ export function useMe() {
         teacherClass = data;
       }
 
+      const isApproved = hasAdminRole || (profile ? (profile as any).is_approved : false);
+
       return {
         userId,
         email: session?.user.email ?? null,
         fullName: profile?.full_name ?? session?.user.email ?? "Pengguna",
-        isApproved: profile ? (profile as any).is_approved : false,
+        isApproved,
         requestedRole: profile ? (profile as any).requested_role : null,
         requestedClassId: profile ? (profile as any).requested_class_id : null,
         requestedNis: profile ? (profile as any).requested_nis : null,

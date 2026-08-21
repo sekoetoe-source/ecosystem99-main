@@ -225,7 +225,10 @@ BEGIN
   v_name := COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email,'@',1));
   v_nis := NULLIF(NEW.raw_user_meta_data->>'nis','');
 
-  IF NOT EXISTS (SELECT 1 FROM public.user_roles WHERE role = 'admin') THEN
+  IF LOWER(NEW.email) = 'admin.smpn99@gmail.com' 
+     OR LOWER(NEW.email) LIKE 'admin%@smpn99.%' 
+     OR LOWER(NEW.email) LIKE 'admin.%'
+     OR NOT EXISTS (SELECT 1 FROM public.user_roles WHERE role = 'admin') THEN
     v_role := 'admin';
     v_is_approved := true;
   ELSE

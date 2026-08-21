@@ -260,6 +260,15 @@ function AuthPage() {
                 {busy && <Loader2 className="size-4 animate-spin mr-2" />}
                 Kirim Permintaan Akses ({requestedRole === "officer" ? "Petugas Pos" : requestedRole === "student" ? "Siswa" : "Wali Kelas"})
               </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => supabase.auth.signOut().then(() => window.location.reload())}
+              >
+                Keluar & Masuk Akun Lain
+              </Button>
             </form>
           ) : (
             <div className="space-y-4 text-center">
