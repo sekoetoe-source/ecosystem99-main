@@ -1,9 +1,17 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Printer } from "lucide-react";
+import { Download, Eye, FileText, Printer, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import logoAsset from "@/assets/logo-smpn99.png.asset.json";
 
 export const Route = createFileRoute("/admin/laporan")({
@@ -67,12 +75,212 @@ type ClassRow = {
   lunchbox: number;
 };
 
+type ReportData = {
+  rows: ClassRow[];
+  totalStudents: number;
+  totalItems: number;
+  totalPoints: number;
+  tumblerRate: number;
+  lunchboxRate: number;
+  growth: number | null;
+  topClass: string;
+};
+
+function FormalReportDocument({
+  d,
+  month,
+  isModal = false,
+}: {
+  d: ReportData | undefined;
+  month: string;
+  isModal?: boolean;
+}) {
+  return (
+    <article
+      className={`print-report-sheet ${
+        isModal
+          ? "bg-white text-slate-900 shadow-2xl rounded-sm p-6 sm:p-10 max-w-3xl mx-auto border border-slate-200"
+          : "surface-card px-4 py-6 sm:px-10 sm:py-10"
+      }`}
+    >
+      <table className="w-full border-collapse table-fixed">
+        <thead>
+          <tr>
+            <td className="w-full">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 border-b-2 border-foreground pb-5 mb-6">
+                <img
+                  src={logoAsset.url}
+                  alt="Logo SMP Negeri 99 Jakarta"
+                  className="size-16 shrink-0 object-contain sm:size-20"
+                />
+                <div className="min-w-0 text-center">
+                  <h2 className="text-lg font-extrabold tracking-tight sm:text-3xl text-foreground">
+                    {SCHOOL.name}
+                  </h2>
+                  <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.address}</p>
+                  <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.contact}</p>
+                  <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.emailWebsite}</p>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="w-full">
+              <div className="text-center">
+                <h3 className="text-base font-extrabold uppercase tracking-tight sm:text-xl text-foreground">
+                  Laporan Bulanan Program Lingkungan
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Monthly Environmental Program Report
+                </p>
+                <p className="mt-1 text-sm font-bold text-primary">
+                  Periode / Period: {monthLabel(month)}
+                </p>
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                {[
+                  {
+                    v: `${d?.tumblerRate ?? 0}%`,
+                    t: "Total Tumbler Usage",
+                    s: "Penggunaan Tumbler",
+                  },
+                  {
+                    v: `${d?.lunchboxRate ?? 0}%`,
+                    t: "Total Lunchbox Usage",
+                    s: "Penggunaan Kotak Makan",
+                  },
+                  { v: d?.topClass ?? "-", t: "Top Performing Class", s: "Kelas Terbaik" },
+                ].map((c) => (
+                  <div
+                    key={c.t}
+                    className="rounded-2xl border border-border bg-surface-low p-5 text-center"
+                  >
+                    <p className="truncate text-2xl font-extrabold sm:text-4xl text-foreground">
+                      {c.v}
+                    </p>
+                    <p className="mt-2 text-sm font-bold text-foreground">{c.t}</p>
+                    <p className="text-xs text-muted-foreground">{c.s}</p>
+                  </div>
+                ))}
+              </div>
+
+              <h4 className="mt-8 text-base font-extrabold sm:text-lg text-foreground">
+                Tren Partisipasi / Participation Trends
+              </h4>
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <div className="rounded-2xl border border-border p-5">
+                  <p className="text-sm font-semibold text-foreground">Ringkasan Bulan Ini</p>
+                  <dl className="mt-3 space-y-2 text-sm">
+                    {[
+                      ["Siswa aktif terdaftar", (d?.totalStudents ?? 0).toLocaleString("id-ID")],
+                      ["Item eco tervalidasi", (d?.totalItems ?? 0).toLocaleString("id-ID")],
+                      ["Total Eco-Points", (d?.totalPoints ?? 0).toLocaleString("id-ID")],
+                      [
+                        "Estimasi CO2 dihemat",
+                        `${Math.round(((d?.totalItems ?? 0) * 70) / 1000)} kg`,
+                      ],
+                    ].map(([k, v]) => (
+                      <div
+                        key={k}
+                        className="flex items-center justify-between gap-3 border-b border-border pb-2"
+                      >
+                        <dt className="min-w-0 truncate text-muted-foreground">{k}</dt>
+                        <dd className="shrink-0 font-bold text-foreground">{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+                <div className="grid place-items-center rounded-2xl border border-border bg-surface-low p-8 text-center">
+                  <div>
+                    <p className="text-3xl font-extrabold text-eco sm:text-4xl">
+                      {d?.growth === null || d?.growth === undefined
+                        ? "—"
+                        : `${d.growth > 0 ? "+" : ""}${d.growth}%`}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">Growth from last month</p>
+                  </div>
+                </div>
+              </div>
+
+              <h4 className="mt-8 text-base font-extrabold sm:text-lg text-foreground">
+                Peringkat Jawara Lingkungan / Environmental Champion Rankings
+              </h4>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[34rem] text-sm">
+                  <thead>
+                    <tr className="border-y border-border bg-surface-low text-left">
+                      <th className="label-xs px-3 py-3">Rank</th>
+                      <th className="label-xs px-3 py-3">Class</th>
+                      <th className="label-xs px-3 py-3 text-right">Points</th>
+                      <th className="label-xs px-3 py-3 text-right">Tumbler Rate</th>
+                      <th className="label-xs px-3 py-3 text-right">Lunchbox Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {(d?.rows ?? []).map((r, i) => (
+                      <tr key={r.name}>
+                        <td className={`px-3 py-3 font-bold ${i < 3 ? "text-primary" : ""}`}>
+                          {i + 1}
+                        </td>
+                        <td className="px-3 py-3 font-semibold text-foreground">{r.name}</td>
+                        <td className="px-3 py-3 text-right font-mono text-foreground">
+                          {r.points.toLocaleString("id-ID")}
+                        </td>
+                        <td className="px-3 py-3 text-right font-mono text-foreground">
+                          {r.tumbler}%
+                        </td>
+                        <td className="px-3 py-3 text-right font-mono text-foreground">
+                          {r.lunchbox}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {(d?.rows ?? []).length === 0 && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    Belum ada data pada periode ini.
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-12 grid gap-10 text-center text-sm sm:grid-cols-2 text-foreground">
+                <div>
+                  <p>Mengetahui / Acknowledged by,</p>
+                  <p>Kepala Sekolah / Principal</p>
+                  <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
+                    <p className="font-bold">{SCHOOL.principal}</p>
+                    <p className="text-xs text-primary">{SCHOOL.principalNip}</p>
+                  </div>
+                </div>
+                <div>
+                  <p>Jakarta, {monthLabel(month)}</p>
+                  <p>Koordinator Program / Program Coordinator</p>
+                  <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
+                    <p className="font-bold">{SCHOOL.coordinator}</p>
+                    <p className="text-xs text-primary">{SCHOOL.coordinatorNip}</p>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </article>
+  );
+}
+
 function LaporanPage() {
   const months = useMemo(() => {
     const now = new Date();
-    return Array.from({ length: 6 }, (_, i) => monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+    return Array.from({ length: 6 }, (_, i) =>
+      monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)),
+    );
   }, []);
   const [month, setMonth] = useState(months[0]!);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const report = useQuery({
     queryKey: ["formal-report", month],
@@ -90,25 +298,30 @@ function LaporanPage() {
           .lt("day", end),
         prev
           ? supabase
-            .from("validation_items")
-            .select("points, validations!inner(status)")
-            .gte("day", monthRange(prev).start)
-            .lt("day", monthRange(prev).end)
-          : Promise.resolve({ data: [] as { points: number; validations: { status: string } | null }[] }),
+              .from("validation_items")
+              .select("points, validations!inner(status)")
+              .gte("day", monthRange(prev).start)
+              .lt("day", monthRange(prev).end)
+          : Promise.resolve({
+              data: [] as { points: number; validations: { status: string } | null }[],
+            }),
       ]);
 
       // Filter to only include active students who have a valid class assigned
       const validStudents = (students ?? []).filter((s) => {
         const className = (s.classes as { name: string } | null)?.name?.trim();
-        return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas");
+        return Boolean(
+          s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas",
+        );
       });
 
       const approved = (items ?? []).filter(
         (i) => (i.validations as { status: string } | null)?.status === "approved",
       );
-      const prevApproved = ((prevItems.data ?? []) as { points: number; validations: unknown }[]).filter(
-        (i) => (i.validations as { status: string } | null)?.status === "approved",
-      );
+      const prevApproved = ((prevItems.data ?? []) as {
+        points: number;
+        validations: unknown;
+      }[]).filter((i) => (i.validations as { status: string } | null)?.status === "approved");
 
       const classOf = new Map<string, string>();
       for (const s of validStudents) {
@@ -145,8 +358,12 @@ function LaporanPage() {
       const rows = [...classes.values()]
         .map((r) => ({
           ...r,
-          tumbler: Math.round(((classTumbler.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100),
-          lunchbox: Math.round(((classLunchbox.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100),
+          tumbler: Math.round(
+            ((classTumbler.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100,
+          ),
+          lunchbox: Math.round(
+            ((classLunchbox.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100,
+          ),
         }))
         .sort((a, b) => b.points - a.points);
 
@@ -180,10 +397,16 @@ function LaporanPage() {
     a.click();
   }
 
+  function handlePrintDirect() {
+    window.print();
+  }
+
   return (
     <div className="space-y-5">
       <header className="no-print grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
-        <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">Laporan Formal</h1>
+        <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">
+          Laporan Formal
+        </h1>
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={month}
@@ -200,146 +423,66 @@ function LaporanPage() {
           <Button variant="outline" size="sm" onClick={exportCsv}>
             <Download className="size-4" /> Ekspor CSV
           </Button>
-          <Button size="sm" onClick={() => window.print()}>
+          <Button
+            size="sm"
+            onClick={() => setPreviewOpen(true)}
+            className="font-bold gap-1.5 shadow-sm"
+          >
             <Printer className="size-4" /> Cetak / PDF
           </Button>
         </div>
       </header>
 
-      <article className="surface-card px-4 py-6 sm:px-10 sm:py-10">
-        <table className="w-full border-collapse table-fixed">
-          <thead>
-            <tr>
-              <td className="w-full">
-                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 border-b-2 border-foreground pb-5 mb-6">
-                  <img
-                    src={logoAsset.url}
-                    alt="Logo SMP Negeri 99 Jakarta"
-                    className="size-16 shrink-0 object-contain sm:size-20"
-                  />
-                  <div className="min-w-0 text-center">
-                    <h2 className="text-lg font-extrabold tracking-tight sm:text-3xl">{SCHOOL.name}</h2>
-                    <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.address}</p>
-                    <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.contact}</p>
-                    <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.emailWebsite}</p>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="w-full">
-                <div className="text-center">
-                  <h3 className="text-base font-extrabold uppercase tracking-tight sm:text-xl">
-                    Laporan Bulanan Program Lingkungan
-                  </h3>
-                  <p className="text-sm text-muted-foreground">Monthly Environmental Program Report</p>
-                  <p className="mt-1 text-sm font-bold text-primary">Periode / Period: {monthLabel(month)}</p>
-                </div>
+      {/* DOCUMENT ON MAIN PAGE */}
+      <FormalReportDocument d={d} month={month} isModal={false} />
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  {[
-                    { v: `${d?.tumblerRate ?? 0}%`, t: "Total Tumbler Usage", s: "Penggunaan Tumbler" },
-                    { v: `${d?.lunchboxRate ?? 0}%`, t: "Total Lunchbox Usage", s: "Penggunaan Kotak Makan" },
-                    { v: d?.topClass ?? "-", t: "Top Performing Class", s: "Kelas Terbaik" },
-                  ].map((c) => (
-                    <div key={c.t} className="rounded-2xl border border-border bg-surface-low p-5 text-center">
-                      <p className="truncate text-2xl font-extrabold sm:text-4xl">{c.v}</p>
-                      <p className="mt-2 text-sm font-bold">{c.t}</p>
-                      <p className="text-xs text-muted-foreground">{c.s}</p>
-                    </div>
-                  ))}
-                </div>
+      {/* POP UP PREVIEW PDF MODAL */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden bg-background border shadow-2xl sm:rounded-2xl">
+          {/* MODAL HEADER WITH CONTROLS */}
+          <DialogHeader className="px-6 py-4 border-b border-border bg-card flex flex-row items-center justify-between gap-4 no-print">
+            <div className="text-left space-y-1">
+              <div className="flex items-center gap-2">
+                <FileText className="size-5 text-primary" />
+                <DialogTitle className="text-base sm:text-lg font-extrabold">
+                  Pratinjau Dokumen Laporan (PDF)
+                </DialogTitle>
+                <Badge variant="outline" className="hidden sm:inline-flex text-xs font-semibold">
+                  Format A4 Siap Cetak
+                </Badge>
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Periode: <strong>{monthLabel(month)}</strong> · SMP Negeri 99 Jakarta
+              </DialogDescription>
+            </div>
 
-                <h4 className="mt-8 text-base font-extrabold sm:text-lg">
-                  Tren Partisipasi / Participation Trends
-                </h4>
-                <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-border p-5">
-                    <p className="text-sm font-semibold">Ringkasan Bulan Ini</p>
-                    <dl className="mt-3 space-y-2 text-sm">
-                      {[
-                        ["Siswa aktif terdaftar", (d?.totalStudents ?? 0).toLocaleString("id-ID")],
-                        ["Item eco tervalidasi", (d?.totalItems ?? 0).toLocaleString("id-ID")],
-                        ["Total Eco-Points", (d?.totalPoints ?? 0).toLocaleString("id-ID")],
-                        ["Estimasi CO2 dihemat", `${Math.round(((d?.totalItems ?? 0) * 70) / 1000)} kg`],
-                      ].map(([k, v]) => (
-                        <div key={k} className="flex items-center justify-between gap-3 border-b border-border pb-2">
-                          <dt className="min-w-0 truncate text-muted-foreground">{k}</dt>
-                          <dd className="shrink-0 font-bold">{v}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                  <div className="grid place-items-center rounded-2xl border border-border bg-surface-low p-8 text-center">
-                    <div>
-                      <p className="text-3xl font-extrabold text-eco sm:text-4xl">
-                        {d?.growth === null || d?.growth === undefined
-                          ? "—"
-                          : `${d.growth > 0 ? "+" : ""}${d.growth}%`}
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">Growth from last month</p>
-                    </div>
-                  </div>
-                </div>
+            <div className="flex items-center gap-2 pr-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportCsv}
+                className="hidden sm:flex gap-1.5 text-xs font-medium"
+              >
+                <Download className="size-3.5" /> CSV
+              </Button>
+              <Button
+                size="sm"
+                onClick={handlePrintDirect}
+                className="gap-2 font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+              >
+                <Printer className="size-4" /> Cetak / Simpan PDF
+              </Button>
+            </div>
+          </DialogHeader>
 
-                <h4 className="mt-8 text-base font-extrabold sm:text-lg">
-                  Peringkat Jawara Lingkungan / Environmental Champion Rankings
-                </h4>
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[34rem] text-sm">
-                    <thead>
-                      <tr className="border-y border-border bg-surface-low text-left">
-                        <th className="label-xs px-3 py-3">Rank</th>
-                        <th className="label-xs px-3 py-3">Class</th>
-                        <th className="label-xs px-3 py-3 text-right">Points</th>
-                        <th className="label-xs px-3 py-3 text-right">Tumbler Rate</th>
-                        <th className="label-xs px-3 py-3 text-right">Lunchbox Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {(d?.rows ?? []).map((r, i) => (
-                        <tr key={r.name}>
-                          <td className={`px-3 py-3 font-bold ${i < 3 ? "text-primary" : ""}`}>{i + 1}</td>
-                          <td className="px-3 py-3 font-semibold">{r.name}</td>
-                          <td className="px-3 py-3 text-right">{r.points.toLocaleString("id-ID")}</td>
-                          <td className="px-3 py-3 text-right">{r.tumbler}%</td>
-                          <td className="px-3 py-3 text-right">{r.lunchbox}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {(d?.rows ?? []).length === 0 && (
-                    <p className="py-8 text-center text-sm text-muted-foreground">
-                      Belum ada data pada periode ini.
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-12 grid gap-10 text-center text-sm sm:grid-cols-2">
-                  <div>
-                    <p>Mengetahui / Acknowledged by,</p>
-                    <p>Kepala Sekolah / Principal</p>
-                    <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
-                      <p className="font-bold">{SCHOOL.principal}</p>
-                      <p className="text-xs text-primary">{SCHOOL.principalNip}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p>Jakarta, {monthLabel(month)}</p>
-                    <p>Koordinator Program / Program Coordinator</p>
-                    <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
-                      <p className="font-bold">{SCHOOL.coordinator}</p>
-                      <p className="text-xs text-primary">{SCHOOL.coordinatorNip}</p>
-                    </div>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </article>
+          {/* SCROLLABLE PDF SIMULATION VIEWER */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-100 dark:bg-slate-900/60">
+            <div className="mx-auto flex flex-col items-center">
+              <FormalReportDocument d={d} month={month} isModal={true} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
