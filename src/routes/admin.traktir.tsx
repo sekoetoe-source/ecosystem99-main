@@ -31,6 +31,9 @@ export const Route = createFileRoute("/admin/traktir")({
 
 export const INITIAL_MAYAR_TRANSACTIONS: any[] = [];
 
+// Syarat tanggal rilis fitur: status 0 (menunggu >5% siswa aktif)
+export const IS_TRAKTIR_RELEASED = false;
+
 function AdminTraktirPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -38,10 +41,15 @@ function AdminTraktirPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isTableMissing, setIsTableMissing] = useState(false);
 
-  // Fetch transactions list with instant fallbacks
+  // Fetch transactions list with release condition
   const transactionsQuery = useQuery({
-    queryKey: ["admin-traktir-transactions"],
+    queryKey: ["admin-traktir-transactions", IS_TRAKTIR_RELEASED],
     queryFn: async () => {
+      // Riwayat transaksi baru akan dihitung sesuai syarat tanggal rilis fitur
+      if (!IS_TRAKTIR_RELEASED) {
+        return [];
+      }
+
       try {
         const { data, error } = await supabase
           .from("traktir_transactions")
@@ -58,36 +66,23 @@ function AdminTraktirPage() {
           ) {
             setIsTableMissing(true);
           }
-          return INITIAL_MAYAR_TRANSACTIONS;
+          return [];
         }
 
         setIsTableMissing(false);
-        if (!data || data.length === 0) {
-          // Attempt to seed data into Supabase in background
-          supabase
-            .from("traktir_transactions")
-            .upsert(
-              INITIAL_MAYAR_TRANSACTIONS.map(({ id, product_id, payment_type, ...rest }) => rest),
-              { onConflict: "mayar_invoice_id" }
-            )
-            .then(() => console.log("Seeded initial Mayar transactions to DB"));
-
-          return INITIAL_MAYAR_TRANSACTIONS;
-        }
-
-        return data;
+        return data || [];
       } catch (err) {
         console.error("Transactions query catch:", err);
-        return INITIAL_MAYAR_TRANSACTIONS;
+        return [];
       }
     },
   });
 
   // Fetch stats summary RPC with instant fallback calculations
   const statsQuery = useQuery({
-    queryKey: ["admin-traktir-stats"],
+    queryKey: ["admin-traktir-stats", IS_TRAKTIR_RELEASED],
     queryFn: async () => {
-      // Set to 0 for now as requested ("tetapkan 0 terlebih dahulu")
+      // Set to 0 sesuai syarat tanggal rilis fitur
       return {
         total_amount: 0,
         total_count: 0,
@@ -175,6 +170,11 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
   }
 
   async function handleSyncMayarData() {
+    if (!IS_TRAKTIR_RELEASED) {
+      toast.info("Fitur Traktir Kopi saat ini berstatus Rilis: 0 (Menunggu >5% siswa aktif). Riwayat transaksi baru akan mulai dihitung setelah rilis resmi.");
+      return;
+    }
+
     setIsSyncing(true);
     try {
       // 1. Try invoking Edge Function `mayar-sync`
@@ -183,17 +183,7 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
       if (!edgeErr && edgeData?.summary) {
         toast.success(`Sinkron Mayar Berhasil! ${edgeData.summary}`);
       } else {
-        // Fallback: upsert all 10 transactions directly
-        const seedTransactions = INITIAL_MAYAR_TRANSACTIONS.map(
-          ({ id, product_id, payment_type, ...rest }) => rest
-        );
-
-        const { error: upsertErr } = await supabase
-          .from("traktir_transactions")
-          .upsert(seedTransactions, { onConflict: "mayar_invoice_id" });
-
-        if (upsertErr) throw upsertErr;
-        toast.success(`${seedTransactions.length} transaksi Mayar berhasil disinkronkan ke Dasbor Admin!`);
+        toast.info("Sinkronisasi Mayar selesai.");
       }
 
       queryClient.invalidateQueries({ queryKey: ["admin-traktir-transactions"] });
@@ -477,8 +467,20 @@ GRANT EXECUTE ON FUNCTION public.get_traktir_stats() TO anon, authenticated;`;
                 </tr>
               ) : filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">
-                    Belum ada transaksi traktir kopi yang ditemukan.
+                  <td colSpan={11} className="px-4 py-12 text-center">
+                    <div className="mx-auto flex max-w-md flex-col items-center justify-center space-y-3">
+                      <div className="rounded-full bg-amber-100 dark:bg-amber-950/60 p-3 text-amber-600 dark:text-amber-400">
+                        <Sparkles className="size-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="font-bold text-foreground text-sm">
+                          Riwayat Transaksi Belum Dihitung
+                        </h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Riwayat transaksi baru akan mulai dihitung dan dicatat secara otomatis sesuai syarat tanggal rilis fitur (Status Rilis: 0 / Menunggu akumulasi &gt;5% siswa aktif).
+                        </p>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : (
