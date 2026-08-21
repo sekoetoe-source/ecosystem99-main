@@ -33,13 +33,13 @@ export function QrImage({ value, size = 220 }: { value: string; size?: number })
 
   return (
     <div
-      className="flex items-center justify-center p-0.5"
+      className="flex items-center justify-center p-0.5 mx-auto text-center"
       style={{ width: size, height: size }}
     >
       {svg ? (
         <div
           dangerouslySetInnerHTML={{ __html: svg }}
-          className="size-full flex items-center justify-center [&>svg]:size-full [&>svg]:block"
+          className="size-full flex items-center justify-center mx-auto text-center [&>svg]:size-full [&>svg]:block [&>svg]:mx-auto"
         />
       ) : (
         <div className="size-full animate-pulse rounded-md bg-muted" />

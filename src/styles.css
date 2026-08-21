@@ -235,9 +235,6 @@
   }
 
   /* ID Cards Print Area */
-  .print-area, .print-area *, .print-page, .print-page *, .print-card, .print-card * {
-    display: block !important;
-  }
   .print-area {
     position: static !important;
     overflow: visible !important;
@@ -246,6 +243,7 @@
     margin: 0 !important;
     height: auto !important;
     width: 100% !important;
+    display: block !important;
   }
   .print-page {
     break-after: page !important;
@@ -269,7 +267,16 @@
     max-height: 67mm !important;
     padding: 4px !important;
     box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    text-align: center !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+  .print-card svg, .print-card img {
+    margin: 0 auto !important;
+    display: block !important;
   }
 }

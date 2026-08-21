@@ -1984,7 +1984,7 @@ function PenggunaPage() {
                             Kelas {s.class_name || "-"} · NIS {s.nis}
                           </p>
                         </div>
-                        <div className="my-1 rounded-lg bg-card p-1 shadow-sm border border-border flex justify-center">
+                        <div className="my-1 rounded-lg bg-card p-1 shadow-sm border border-border flex items-center justify-center mx-auto text-center w-full max-w-[120px]">
                           <QrImage value={s.nis ?? ""} size={75} />
                         </div>
                         <div className="w-full text-[8px] text-muted-foreground border-t border-border/60 pt-0.5 flex justify-between px-1 font-mono">
