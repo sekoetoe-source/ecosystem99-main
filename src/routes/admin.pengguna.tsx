@@ -757,6 +757,7 @@ function PenggunaPage() {
 
       const timer = setTimeout(() => {
         window.print();
+        setPrintClass(null);
       }, 150);
 
       return () => {
