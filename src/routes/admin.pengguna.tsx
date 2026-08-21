@@ -736,6 +736,15 @@ function PenggunaPage() {
     }
   }
 
+  useEffect(() => {
+    if (printClass) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [printClass]);
+
   return (
     <>
       <div className={`space-y-6 ${printClass ? "hidden no-print" : ""}`}>
