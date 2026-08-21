@@ -1915,6 +1915,7 @@ function PenggunaPage() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
 
       {printClass && (() => {
         const printableStudents = (students.data ?? []).filter((s) => {
@@ -1998,6 +1999,6 @@ function PenggunaPage() {
           </div>
         );
       })()}
-    </div>
+    </>
   );
 }
