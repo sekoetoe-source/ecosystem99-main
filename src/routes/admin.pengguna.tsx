@@ -649,14 +649,27 @@ function PenggunaPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menghapus akun"),
   });
 
+  function sanitizeCsvValue(val: string): string {
+    let str = (val ?? "").toString().trim();
+    if (/^[=+@\-\t\r]/.test(str)) {
+      str = "'" + str;
+    }
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+
+  function sanitizeImportValue(val: string): string {
+    const str = (val ?? "").toString().trim();
+    return str.replace(/^[=+@\-\t\r]+/, "");
+  }
+
   function exportCsv() {
     const csv = [
       ["nama", "nis", "kelas", "item", "poin"].join(","),
       ...(students.data ?? []).map((s) =>
         [
-          `"${(s.full_name ?? "").replace(/"/g, '""')}"`,
-          `"${s.nis}"`,
-          `"${(s.class_name ?? "").replace(/"/g, '""')}"`,
+          sanitizeCsvValue(s.full_name ?? ""),
+          sanitizeCsvValue(s.nis ?? ""),
+          sanitizeCsvValue(s.class_name ?? ""),
           s.total_items ?? 0,
           s.earned_points ?? 0,
         ].join(","),
@@ -702,10 +715,10 @@ function PenggunaPage() {
       const payload: { nis: string; full_name: string; class_id: string | null }[] = [];
       for (const cols of rows.slice(1)) {
         if (!cols || cols.length === 0) continue;
-        const nis = String(cols[idxNis] ?? "").trim();
-        const full_name = String(cols[idxName] ?? "").trim();
+        const nis = sanitizeImportValue(String(cols[idxNis] ?? ""));
+        const full_name = sanitizeImportValue(String(cols[idxName] ?? ""));
         if (!nis || !full_name) continue;
-        const className = idxClass >= 0 ? String(cols[idxClass] ?? "").trim() : "";
+        const className = idxClass >= 0 ? sanitizeImportValue(String(cols[idxClass] ?? "")) : "";
         let class_id: string | null = null;
         if (className) {
           const key = className.toLowerCase();
@@ -748,7 +761,7 @@ function PenggunaPage() {
   return (
     <>
       <div className={`space-y-6 ${printClass ? "hidden no-print" : ""}`}>
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border overflow-x-auto whitespace-nowrap no-scrollbar">
         {[
           { id: "siswa", label: "Daftar Siswa" },
           { id: "petugas", label: "Petugas Pos" },
