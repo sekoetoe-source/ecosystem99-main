@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil, Filter, ArrowUpDown, ChevronLeft, ChevronRight, Sparkles, Wand2, Bot } from "lucide-react";
+import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil, Filter, ArrowUpDown, ChevronLeft, ChevronRight, Sparkles, Wand2, Bot, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -1942,23 +1942,15 @@ function PenggunaPage() {
 
         return (
           <div className="print-area fixed inset-0 z-50 overflow-y-auto bg-background p-6 sm:p-8">
-            <div className="no-print mb-6 flex flex-wrap justify-between items-center border-b pb-4 gap-4 bg-card p-4 rounded-2xl shadow-sm">
-              <div>
-                <h2 className="text-xl font-extrabold">
-                  Cetak Massal QR {printClass === "SEMUA" ? "Semua Kelas" : `Kelas ${printClass}`} ({printableStudents.length} Siswa — {pages.length} Halaman A4)
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Format Tag Tumbler/Lunchbox A4 (12 kartu per lembar: 3x4). Gunakan tombol cetak atau menu Ctrl + P.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => window.print()} className="rounded-full gap-1.5 font-bold">
-                  <Printer className="size-4" /> Cetak Sekarang
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setPrintClass(null)} className="rounded-full">
-                  Tutup / Kembali
-                </Button>
-              </div>
+            <div className="no-print fixed top-4 right-4 z-50 flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPrintClass(null)}
+                className="rounded-full bg-background/90 backdrop-blur shadow-md font-bold text-xs gap-1"
+              >
+                <X className="size-3.5" /> Tutup Cetak
+              </Button>
             </div>
 
             {printableStudents.length === 0 ? (
