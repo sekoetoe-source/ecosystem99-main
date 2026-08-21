@@ -751,10 +751,18 @@ function PenggunaPage() {
 
   useEffect(() => {
     if (printClass) {
+      const originalTitle = document.title;
+      const targetTitle = printClass === "SEMUA" ? "QR Massal" : `QR Kelas ${printClass}`;
+      document.title = targetTitle;
+
       const timer = setTimeout(() => {
         window.print();
       }, 150);
-      return () => clearTimeout(timer);
+
+      return () => {
+        clearTimeout(timer);
+        document.title = originalTitle;
+      };
     }
   }, [printClass]);
 
