@@ -202,7 +202,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm;
+    margin: 5mm;
   }
   .no-print, header, nav, sidebar, [role="navigation"], form, input, button, select, .no-print-area {
     display: none !important;
@@ -214,6 +214,8 @@
     height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* Print Report Document */
@@ -263,9 +265,11 @@
     page-break-inside: avoid !important;
     box-shadow: none !important;
     border: 1px solid #cbd5e1 !important;
-    height: 68mm !important;
-    max-height: 68mm !important;
+    height: 67mm !important;
+    max-height: 67mm !important;
     padding: 4px !important;
     box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
