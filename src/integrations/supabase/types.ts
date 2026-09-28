@@ -392,11 +392,13 @@ export type Database = {
       validations: {
         Row: {
           created_at: string
+          day: string
           id: string
           note: string | null
           officer_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          session: string
           source: Database["public"]["Enums"]["validation_source"]
           station: string | null
           status: Database["public"]["Enums"]["validation_status"]
@@ -404,11 +406,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          day?: string
           id?: string
           note?: string | null
           officer_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          session?: string
           source?: Database["public"]["Enums"]["validation_source"]
           station?: string | null
           status?: Database["public"]["Enums"]["validation_status"]
@@ -416,11 +420,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          day?: string
           id?: string
           note?: string | null
           officer_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          session?: string
           source?: Database["public"]["Enums"]["validation_source"]
           station?: string | null
           status?: Database["public"]["Enums"]["validation_status"]

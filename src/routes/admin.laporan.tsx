@@ -349,10 +349,20 @@ function LaporanPage() {
         const row = classes.get(name) ?? { name, students: 0, points: 0, tumbler: 0, lunchbox: 0 };
         row.points += Number(i.points ?? 0);
         classes.set(name, row);
-        const bucket = i.item_code === "tumbler" ? classTumbler : classLunchbox;
-        if (!bucket.has(name)) bucket.set(name, new Set());
-        bucket.get(name)!.add(i.student_id);
-        (i.item_code === "tumbler" ? tumblerUsers : lunchboxUsers).add(i.student_id);
+
+        if (i.item_code === "break_combo") {
+          if (!classTumbler.has(name)) classTumbler.set(name, new Set());
+          if (!classLunchbox.has(name)) classLunchbox.set(name, new Set());
+          classTumbler.get(name)!.add(i.student_id);
+          classLunchbox.get(name)!.add(i.student_id);
+          tumblerUsers.add(i.student_id);
+          lunchboxUsers.add(i.student_id);
+        } else {
+          const bucket = i.item_code === "tumbler" ? classTumbler : classLunchbox;
+          if (!bucket.has(name)) bucket.set(name, new Set());
+          bucket.get(name)!.add(i.student_id);
+          (i.item_code === "tumbler" ? tumblerUsers : lunchboxUsers).add(i.student_id);
+        }
       }
 
       const rows = [...classes.values()]

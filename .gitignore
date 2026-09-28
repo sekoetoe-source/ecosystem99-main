@@ -20,6 +20,9 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Supabase CLI temp
+supabase/.temp/cli-latest
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
