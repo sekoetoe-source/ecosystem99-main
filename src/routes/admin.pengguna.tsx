@@ -82,10 +82,10 @@ function PenggunaPage() {
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Sorting state untuk Semua Akun & Role
-  const [userSortField, setUserSortField] = useState<"name" | null>(null);
+  const [userSortField, setUserSortField] = useState<"name" | "role" | null>(null);
   const [userSortOrder, setUserSortOrder] = useState<"asc" | "desc">("asc");
 
-  const handleSortAllUsers = (field: "name") => {
+  const handleSortAllUsers = (field: "name" | "role") => {
     if (userSortField === field) {
       setUserSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
@@ -435,6 +435,17 @@ function PenggunaPage() {
       const nameB = b.full_name ?? "";
       const comp = nameA.localeCompare(nameB, "id", { sensitivity: "base" });
       return userSortOrder === "asc" ? comp : -comp;
+    }
+    if (userSortField === "role") {
+      const roleA = a.role ?? "";
+      const roleB = b.role ?? "";
+      const comp = roleA.localeCompare(roleB, "id", { sensitivity: "base" });
+      if (comp !== 0) {
+        return userSortOrder === "asc" ? comp : -comp;
+      }
+      const nameA = a.full_name ?? "";
+      const nameB = b.full_name ?? "";
+      return nameA.localeCompare(nameB, "id", { sensitivity: "base" });
     }
     return 0;
   });
@@ -1159,7 +1170,26 @@ function PenggunaPage() {
                       )}
                     </button>
                   </th>
-                  <th className="px-4 py-3 font-semibold">Role</th>
+                  <th className="px-4 py-3 font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => handleSortAllUsers("role")}
+                      className="inline-flex items-center gap-1.5 font-semibold text-foreground hover:text-primary transition-colors cursor-pointer group select-none rounded-md px-1.5 py-1 -mx-1.5 hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      title={`Urutkan berdasarkan Role (${userSortField === "role" ? (userSortOrder === "asc" ? "Z ke A" : "A ke Z") : "A ke Z"})`}
+                      aria-label={`Urutkan Role: saat ini ${userSortField === "role" ? (userSortOrder === "asc" ? "A ke Z" : "Z ke A") : "tidak terurut"}`}
+                    >
+                      <span>Role</span>
+                      {userSortField === "role" ? (
+                        userSortOrder === "asc" ? (
+                          <ArrowUp className="size-3.5 text-primary transition-transform" />
+                        ) : (
+                          <ArrowDown className="size-3.5 text-primary transition-transform" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="size-3.5 text-muted-foreground/60 transition-colors group-hover:text-foreground" />
+                      )}
+                    </button>
+                  </th>
                   <th className="px-4 py-3 font-semibold">Keterangan Tambahan</th>
                   <th className="px-4 py-3 text-center font-semibold">Aksi</th>
                 </tr>
