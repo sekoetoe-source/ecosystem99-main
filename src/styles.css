@@ -199,6 +199,14 @@
   text-transform: uppercase;
 }
 
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @media print {
   @page {
     size: A4 portrait;

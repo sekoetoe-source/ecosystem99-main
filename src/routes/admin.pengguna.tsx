@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil, Filter, ArrowUpDown, ChevronLeft, ChevronRight, Sparkles, Wand2, Bot, X, Check } from "lucide-react";
+import { Download, Upload, QrCode, Printer, Search, Plus, UserCheck, Trash2, Pencil, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Sparkles, Wand2, Bot, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -80,6 +80,19 @@ function PenggunaPage() {
   const [sortBy, setSortBy] = useState<string>("nama-asc");
   const [pageSize, setPageSize] = useState<number | "all">(50);
   const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Sorting state untuk Semua Akun & Role
+  const [userSortField, setUserSortField] = useState<"name" | null>(null);
+  const [userSortOrder, setUserSortOrder] = useState<"asc" | "desc">("asc");
+
+  const handleSortAllUsers = (field: "name") => {
+    if (userSortField === field) {
+      setUserSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setUserSortField(field);
+      setUserSortOrder("asc");
+    }
+  };
 
   // Modal form states
   const [addStudentOpen, setAddStudentOpen] = useState(false);
@@ -414,6 +427,16 @@ function PenggunaPage() {
       (u.role ?? "").toLowerCase().includes(q) ||
       (u.details ?? "").toLowerCase().includes(q)
     );
+  });
+
+  const sortedAllUsers = [...filteredAllUsers].sort((a, b) => {
+    if (userSortField === "name") {
+      const nameA = a.full_name ?? "";
+      const nameB = b.full_name ?? "";
+      const comp = nameA.localeCompare(nameB, "id", { sensitivity: "base" });
+      return userSortOrder === "asc" ? comp : -comp;
+    }
+    return 0;
   });
 
   const createUserMutation = useMutation({
@@ -759,7 +782,7 @@ function PenggunaPage() {
   return (
     <>
       <div className={`space-y-6 ${printClass ? "hidden no-print" : ""}`}>
-      <div className="flex border-b border-border overflow-x-auto whitespace-nowrap no-scrollbar">
+      <div className="flex border-b border-border overflow-x-auto overflow-y-hidden whitespace-nowrap no-scrollbar">
         {[
           { id: "siswa", label: "Daftar Siswa" },
           { id: "petugas", label: "Petugas Pos" },
@@ -773,7 +796,7 @@ function PenggunaPage() {
               setActiveTab(tab.id as any);
               setSearch("");
             }}
-            className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 -mb-[2px] ${
+            className={`px-4 py-2 text-sm font-semibold transition-colors border-b-2 -mb-px ${
               activeTab === tab.id
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -1116,14 +1139,33 @@ function PenggunaPage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/60 text-left">
                 <tr>
-                  <th className="px-4 py-3 font-semibold">Nama Pengguna</th>
+                  <th className="px-4 py-3 font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => handleSortAllUsers("name")}
+                      className="inline-flex items-center gap-1.5 font-semibold text-foreground hover:text-primary transition-colors cursor-pointer group select-none rounded-md px-1.5 py-1 -mx-1.5 hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      title={`Urutkan berdasarkan Nama Pengguna (${userSortField === "name" ? (userSortOrder === "asc" ? "Z ke A" : "A ke Z") : "A ke Z"})`}
+                      aria-label={`Urutkan Nama Pengguna: saat ini ${userSortField === "name" ? (userSortOrder === "asc" ? "A ke Z" : "Z ke A") : "tidak terurut"}`}
+                    >
+                      <span>Nama Pengguna</span>
+                      {userSortField === "name" ? (
+                        userSortOrder === "asc" ? (
+                          <ArrowUp className="size-3.5 text-primary transition-transform" />
+                        ) : (
+                          <ArrowDown className="size-3.5 text-primary transition-transform" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="size-3.5 text-muted-foreground/60 transition-colors group-hover:text-foreground" />
+                      )}
+                    </button>
+                  </th>
                   <th className="px-4 py-3 font-semibold">Role</th>
                   <th className="px-4 py-3 font-semibold">Keterangan Tambahan</th>
                   <th className="px-4 py-3 text-center font-semibold">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredAllUsers.map((u) => (
+                {sortedAllUsers.map((u) => (
                   <tr key={u.id}>
                     <td className="px-4 py-3 font-medium">{u.full_name}</td>
                     <td className="px-4 py-3">

@@ -110,7 +110,6 @@ function AdminDashboard() {
           { label: "Partisipasi hari ini", value: `${participation}%`, icon: TrendingUp },
           { label: "Siswa terdaftar", value: kpi.data?.studentCount ?? 0, icon: Users },
           { label: "Poin hari ini", value: (kpi.data?.pointsToday ?? 0).toLocaleString("id-ID"), icon: Leaf },
-          { label: "Menunggu persetujuan", value: kpi.data?.pendingCount ?? 0, icon: Check },
         ].map((k) => (
           <div key={k.label} className="surface-card p-5">
             <k.icon className="size-5 text-primary" />
@@ -118,6 +117,22 @@ function AdminDashboard() {
             <p className="label-xs text-muted-foreground">{k.label}</p>
           </div>
         ))}
+
+        <Link
+          to="/admin/pengguna"
+          className="surface-card p-5 block text-foreground no-underline cursor-pointer transition-colors hover:border-primary/50 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label="Menunggu persetujuan: lihat daftar pengguna di Manajemen Pengguna"
+          onKeyDown={(e) => {
+            if (e.key === " " || e.key === "Spacebar") {
+              e.preventDefault();
+              e.currentTarget.click();
+            }
+          }}
+        >
+          <Check className="size-5 text-primary" />
+          <p className="mt-3 text-3xl font-extrabold">{kpi.data?.pendingCount ?? 0}</p>
+          <p className="label-xs text-muted-foreground">Menunggu persetujuan</p>
+        </Link>
       </div>
 
       <section className="surface-card p-5 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/10 via-background to-background">
