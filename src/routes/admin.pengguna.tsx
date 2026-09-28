@@ -264,11 +264,76 @@ function PenggunaPage() {
   const officers = useQuery({
     queryKey: ["admin-officers"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("officers")
-        .select("id, station, active, full_name")
-        .order("station");
-      return data ?? [];
+      const [officersRes, rolesRes, profilesRes] = await Promise.all([
+        supabase.from("officers").select("id, profile_id, station, active, full_name").order("station"),
+        supabase.from("user_roles").select("user_id, role"),
+        supabase.from("profiles").select("id, full_name, is_approved"),
+      ]);
+
+      const officerRoles = new Set(
+        (rolesRes.data ?? [])
+          .filter((r) => r.role === "officer")
+          .map((r) => r.user_id)
+      );
+
+      const adminRoles = new Set(
+        (rolesRes.data ?? [])
+          .filter((r) => r.role === "admin")
+          .map((r) => r.user_id)
+      );
+
+      const profilesMap = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));
+      const officersList: Array<{
+        id: string;
+        profile_id: string | null;
+        station: string;
+        active: boolean;
+        full_name: string;
+      }> = [];
+
+      const seenProfileIds = new Set<string>();
+
+      (officersRes.data ?? []).forEach((o) => {
+        // Eksklusif: role = admin tidak boleh muncul sebagai Petugas Pos
+        if (o.profile_id && adminRoles.has(o.profile_id)) {
+          return;
+        }
+        if (o.profile_id) {
+          seenProfileIds.add(o.profile_id);
+          const p = profilesMap.get(o.profile_id);
+          officersList.push({
+            id: o.id,
+            profile_id: o.profile_id,
+            station: o.station ?? "Gerbang Utama",
+            active: o.active ?? true,
+            full_name: o.full_name || p?.full_name || "Petugas",
+          });
+        } else {
+          officersList.push({
+            id: o.id,
+            profile_id: null,
+            station: o.station ?? "Gerbang Utama",
+            active: o.active ?? true,
+            full_name: o.full_name ?? "Petugas",
+          });
+        }
+      });
+
+      // Tampilkan pengguna dengan role = officer yang belum terdaftar di tabel officers
+      officerRoles.forEach((userId) => {
+        if (!seenProfileIds.has(userId) && !adminRoles.has(userId)) {
+          const p = profilesMap.get(userId);
+          officersList.push({
+            id: `usr-${userId}`,
+            profile_id: userId,
+            station: "Gerbang Utama",
+            active: true,
+            full_name: p?.full_name || "Petugas",
+          });
+        }
+      });
+
+      return officersList.sort((a, b) => a.station.localeCompare(b.station) || a.full_name.localeCompare(b.full_name));
     },
   });
 
@@ -308,6 +373,20 @@ function PenggunaPage() {
         _station: approveRole === "officer" ? approveStation : null,
       });
       if (error) throw error;
+
+      if (approveRole === "officer") {
+        await supabase.from("officers").upsert(
+          {
+            profile_id: approveUser.id,
+            full_name: approveUser.full_name,
+            station: approveStation || "Gerbang Utama",
+            active: true,
+          },
+          { onConflict: "profile_id" }
+        );
+      } else {
+        await supabase.from("officers").delete().eq("profile_id", approveUser.id);
+      }
     },
     onSuccess: () => {
       toast.success("Pengguna berhasil disetujui!");
@@ -629,6 +708,20 @@ function PenggunaPage() {
         _station: newRole === "officer" ? newStation : null,
       });
       if (error) throw error;
+
+      if (newRole === "officer") {
+        await supabase.from("officers").upsert(
+          {
+            profile_id: changeRoleUser.id,
+            full_name: changeRoleUser.full_name,
+            station: newStation || "Gerbang Utama",
+            active: true,
+          },
+          { onConflict: "profile_id" }
+        );
+      } else {
+        await supabase.from("officers").delete().eq("profile_id", changeRoleUser.id);
+      }
     },
     onSuccess: () => {
       toast.success("Role pengguna berhasil diubah");

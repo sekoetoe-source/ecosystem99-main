@@ -813,7 +813,7 @@ function Index() {
               </div>
             </div>
             <div className="surface-card absolute right-0 top-8 hidden px-4 py-3 text-xs font-bold sm:block">
-              +10 Eco Points
+              +150 Eco Points
               <span className="label-xs block text-muted-foreground">Tumbler + Lunchbox</span>
             </div>
             <div className="surface-card absolute bottom-24 left-0 hidden px-4 py-3 text-xs font-bold sm:block">
@@ -944,8 +944,8 @@ function Index() {
           <div className="gradient-eco rounded-3xl p-8 text-eco-foreground">
             <h3 className="text-2xl font-extrabold">Eco Points</h3>
             <p className="mt-2 text-sm opacity-80">Setiap perilaku tervalidasi punya nilai jelas.</p>
-            <p className="mt-6 text-6xl font-extrabold tracking-tight">+10</p>
-            <p className="text-xs opacity-80">Tumbler + Lunchbox</p>
+            <p className="mt-6 text-6xl font-extrabold tracking-tight">+150</p>
+            <p className="text-xs opacity-80">Tumbler + Lunchbox (Masuk Sekolah)</p>
             <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-eco-foreground/20">
               <span className="block h-full w-[74%] rounded-full bg-eco-foreground" />
             </div>

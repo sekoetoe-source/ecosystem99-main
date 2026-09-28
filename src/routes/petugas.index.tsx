@@ -94,10 +94,24 @@ function ScannerPage() {
   // Active session domain state (Default: entry)
   const [session, setSession] = useState<ScanSession>("entry");
 
-  // Selected items state:
-  // For ENTRY: string[] contains 'tumbler', 'lunchbox', or both
-  // For BREAK: string[] contains 'tumbler', 'lunchbox', or both (combo)
-  const [selectedItems, setSelectedItems] = useState<string[]>(["tumbler"]);
+  // ENTRY SESSION: independent checkboxes (can pick either or both)
+  const [entryTumbler, setEntryTumbler] = useState(true);
+  const [entryLunchbox, setEntryLunchbox] = useState(false);
+
+  // BREAK SESSION: mutually exclusive radio selection (tumbler | lunchbox | break_combo)
+  type BreakItemChoice = "tumbler" | "lunchbox" | "break_combo";
+  const [breakOption, setBreakOption] = useState<BreakItemChoice>("break_combo");
+
+  // Helper to resolve selected items for active session
+  const getItemsForSession = (activeSess: ScanSession): string[] => {
+    if (activeSess === "break") {
+      return [breakOption]; // Strictly one item: "tumbler", "lunchbox", or "break_combo"
+    }
+    const items: string[] = [];
+    if (entryTumbler) items.push("tumbler");
+    if (entryLunchbox) items.push("lunchbox");
+    return items;
+  };
 
   // Recent scan feedback banner state
   const [feedback, setFeedback] = useState<ScanFeedback | null>(null);
@@ -121,13 +135,27 @@ function ScannerPage() {
   });
 
   const submit = useMutation({
-    mutationFn: async ({ code, source }: { code: string; source: "scan" | "manual" }) => {
+    mutationFn: async ({
+      code,
+      source,
+      session: sessionParam,
+    }: {
+      code: string;
+      source: "scan" | "manual";
+      session?: ScanSession;
+    }) => {
+      const activeSession = sessionParam ?? session;
       const cleanCode = code.trim();
       if (!cleanCode) throw new Error("NIS siswa tidak boleh kosong");
 
+      const itemsToValidate = getItemsForSession(activeSession);
+      if (itemsToValidate.length === 0) {
+        throw new Error("Pilih minimal satu item yang dibawa siswa");
+      }
+
       const { allocations, totalPoints, summaryLabel } = calculateSessionPoints(
-        session,
-        selectedItems
+        activeSession,
+        itemsToValidate
       );
       if (allocations.length === 0) {
         throw new Error("Pilih minimal satu item yang dibawa siswa");
@@ -152,14 +180,14 @@ function ScannerPage() {
         .from("validations")
         .select("id, created_at, session, station")
         .eq("student_id", student.id)
-        .eq("session", session)
+        .eq("session", activeSession)
         .eq("day", today)
         .neq("status", "rejected")
         .maybeSingle();
 
       if (existingValidation) {
         const timeStr = formatJakartaTime(existingValidation.created_at);
-        const sessionName = SCAN_SESSIONS[session].shortLabel;
+        const sessionName = SCAN_SESSIONS[activeSession].shortLabel;
         const msg = timeStr
           ? `${student.full_name} sudah tercatat pada sesi ${sessionName} hari ini pukul ${timeStr}.`
           : `${student.full_name} sudah tercatat pada sesi ${sessionName} hari ini.`;
@@ -167,14 +195,14 @@ function ScannerPage() {
         return {
           kind: "duplicate" as const,
           student,
-          session,
+          session: activeSession,
           timeStr,
           message: msg,
         };
       }
 
       // 3. Insert validation row
-      const stationName = me?.officer?.station || SCAN_SESSIONS[session].defaultStation;
+      const stationName = me?.officer?.station || SCAN_SESSIONS[activeSession].defaultStation;
       const { data: validation, error: vError } = await supabase
         .from("validations")
         .insert({
@@ -182,7 +210,7 @@ function ScannerPage() {
           officer_id: me?.officer?.id ?? null,
           status: "approved",
           source,
-          session,
+          session: activeSession,
           day: today,
           station: stationName,
           reviewed_at: new Date().toISOString(),
@@ -193,11 +221,11 @@ function ScannerPage() {
       if (vError) {
         // Catch DB unique index duplicate if race condition occurred
         if (vError.code === "23505") {
-          const sessionName = SCAN_SESSIONS[session].shortLabel;
+          const sessionName = SCAN_SESSIONS[activeSession].shortLabel;
           return {
             kind: "duplicate" as const,
             student,
-            session,
+            session: activeSession,
             timeStr: "",
             message: `${student.full_name} sudah tercatat pada sesi ${sessionName} hari ini.`,
           };
@@ -219,11 +247,11 @@ function ScannerPage() {
         // Rollback validation if item insertion fails
         await supabase.from("validations").delete().eq("id", validation.id);
         if (iError.code === "23505") {
-          const sessionName = SCAN_SESSIONS[session].shortLabel;
+          const sessionName = SCAN_SESSIONS[activeSession].shortLabel;
           return {
             kind: "duplicate" as const,
             student,
-            session,
+            session: activeSession,
             timeStr: "",
             message: `${student.full_name} sudah tercatat pada sesi ${sessionName} hari ini.`,
           };
@@ -234,7 +262,7 @@ function ScannerPage() {
       return {
         kind: "success" as const,
         student,
-        session,
+        session: activeSession,
         summaryLabel,
         totalPointsAdded: totalPoints,
       };
@@ -306,7 +334,7 @@ function ScannerPage() {
     unlockAudio();
     playScanDetectedSound();
 
-    submit.mutate({ code: codeText, source });
+    submit.mutate({ code: codeText, source, session });
   };
 
   const currentSessionMeta = SCAN_SESSIONS[session];
@@ -314,7 +342,8 @@ function ScannerPage() {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="space-y-4">
-        <div className="surface-card p-6">
+        <div className="surface-card p-5 sm:p-6 space-y-4">
+          {/* 1. POS HEADER */}
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
@@ -323,7 +352,7 @@ function ScannerPage() {
                   {currentSessionMeta.badge}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                 Validasi Eco-Points multi-sesi dengan audio feedback kasir.
               </p>
             </div>
@@ -333,190 +362,29 @@ function ScannerPage() {
                 unlockAudio();
                 setCamera(!camera);
               }}
-              className="gap-2"
+              className="gap-2 shrink-0"
             >
               {camera ? <CameraOff className="size-4" /> : <Camera className="size-4" />}
               {camera ? "Tutup" : "Kamera"}
             </Button>
           </div>
 
-          {/* 1. SESSION SELECTOR / INDIKATOR SESI AKTIF */}
-          <div className="mt-5 space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
-                SESSION AKTIF
-              </Label>
-              <span className="text-xs text-primary font-medium">
-                {currentSessionMeta.label}
-              </span>
+          {/* 2. KAMERA SCANNER (LANGSUNG DI BAWAH HEADER SAAT AKTIF) */}
+          {camera && (
+            <div className="rounded-2xl overflow-hidden border border-border">
+              <CameraScanner
+                active={camera}
+                isLocked={isProcessing || submit.isPending}
+                onResult={(text) => handleTriggerScan(text, "scan")}
+              />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {(["entry", "break"] as ScanSession[]).map((sessKey) => {
-                const meta = SCAN_SESSIONS[sessKey];
-                const active = session === sessKey;
-                return (
-                  <button
-                    key={sessKey}
-                    type="button"
-                    onClick={() => {
-                      unlockAudio();
-                      setSession(sessKey);
-                      // Default items per session
-                      if (sessKey === "entry") {
-                        setSelectedItems(["tumbler"]);
-                      } else {
-                        setSelectedItems(["break_combo"]); // default combo for break
-                      }
-                    }}
-                    className={cn(
-                      "flex flex-col text-left p-3.5 rounded-2xl border transition-all cursor-pointer",
-                      active
-                        ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary"
-                        : "border-border hover:bg-muted/50 text-muted-foreground"
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-base font-extrabold flex items-center gap-1.5 text-foreground">
-                        <span>{meta.icon}</span> {meta.shortLabel}
-                      </span>
-                      {active && (
-                        <span className="inline-block size-2 rounded-full bg-primary animate-pulse" />
-                      )}
-                    </div>
-                    <span className="text-[11px] mt-1 text-muted-foreground line-clamp-1">
-                      {meta.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          )}
 
-          {/* 2. ITEM SELECTION ACCORDING TO SESSION */}
-          <div className="mt-5 space-y-2">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
-              Item yang dibawa ({currentSessionMeta.shortLabel})
-            </Label>
-
-            {session === "entry" ? (
-              // ENTRY SESSION: Tumbler, Lunchbox, or Both
-              <div className="grid gap-2 sm:grid-cols-2">
-                {[
-                  { code: "tumbler", label: "Tumbler", points: 100, icon: Coffee },
-                  { code: "lunchbox", label: "Kotak Makan", points: 50, icon: UtensilsCrossed },
-                ].map((item) => {
-                  const checked = selectedItems.includes(item.code);
-                  return (
-                    <label
-                      key={item.code}
-                      onClick={() => unlockAudio()}
-                      className={cn(
-                        "flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-all",
-                        checked
-                          ? "border-emerald-600 bg-emerald-500/10 shadow-sm"
-                          : "border-border hover:bg-muted/40"
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-primary rounded"
-                        checked={checked}
-                        onChange={(e) => {
-                          const isCheck = e.target.checked;
-                          setSelectedItems((prev) =>
-                            isCheck ? [...prev, item.code] : prev.filter((c) => c !== item.code)
-                          );
-                        }}
-                      />
-                      <item.icon className={cn("size-5", checked ? "text-emerald-500" : "text-muted-foreground")} />
-                      <div className="flex-1">
-                        <span className="block font-semibold text-sm">{item.label}</span>
-                        <span className="text-xs text-muted-foreground">+{item.points} poin</span>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            ) : (
-              // BREAK SESSION: 3 Explicit Choices: Tumbler only (100), Lunchbox only (50), Combo (250)
-              <div className="grid gap-2 sm:grid-cols-3">
-                {[
-                  {
-                    id: "tumbler-only",
-                    label: "Tumbler Saja",
-                    points: 100,
-                    icon: Coffee,
-                    items: ["tumbler"],
-                  },
-                  {
-                    id: "lunchbox-only",
-                    label: "Lunchbox Saja",
-                    points: 50,
-                    icon: UtensilsCrossed,
-                    items: ["lunchbox"],
-                  },
-                  {
-                    id: "combo",
-                    label: "Combo Tumbler + Lunchbox",
-                    points: 250,
-                    icon: Sparkles,
-                    items: ["break_combo"],
-                    isCombo: true,
-                  },
-                ].map((opt) => {
-                  const isSelected =
-                    opt.items.length === selectedItems.length &&
-                    opt.items.every((it) => selectedItems.includes(it));
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => {
-                        unlockAudio();
-                        setSelectedItems(opt.items);
-                      }}
-                      className={cn(
-                        "flex flex-col text-left p-3.5 rounded-2xl border transition-all cursor-pointer relative",
-                        isSelected
-                          ? opt.isCombo
-                            ? "border-amber-500 bg-amber-500/10 shadow-sm ring-1 ring-amber-500"
-                            : "border-emerald-600 bg-emerald-500/10 shadow-sm ring-1 ring-emerald-600"
-                          : "border-border hover:bg-muted/40"
-                      )}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <opt.icon
-                          className={cn(
-                            "size-4",
-                            isSelected
-                              ? opt.isCombo
-                                ? "text-amber-500"
-                                : "text-emerald-500"
-                              : "text-muted-foreground"
-                          )}
-                        />
-                        <span className="text-xs font-bold">{opt.label}</span>
-                      </div>
-                      <span
-                        className={cn(
-                          "mt-2 text-sm font-extrabold",
-                          opt.isCombo ? "text-amber-500" : "text-primary"
-                        )}
-                      >
-                        +{opt.points} poin
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* 3. VISUAL STATUS BANNER (SUCCESS / DUPLICATE / ERROR FEEDBACK) */}
+          {/* 3. VISUAL STATUS BANNER (FEEDBACK SCAN) */}
           {feedback && (
             <div
               className={cn(
-                "mt-5 p-4 rounded-2xl border transition-all animate-in fade-in duration-200",
+                "p-3.5 rounded-xl border transition-all animate-in fade-in duration-200",
                 feedback.status === "success" &&
                   "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300",
                 feedback.status === "duplicate" &&
@@ -566,20 +434,274 @@ function ScannerPage() {
             </div>
           )}
 
-          {/* 4. CAMERA SCANNER WITH DEBOUNCE PROTECTION */}
-          {camera && (
-            <div className="mt-5">
-              <CameraScanner
-                active={camera}
-                isLocked={isProcessing || submit.isPending}
-                onResult={(text) => handleTriggerScan(text, "scan")}
-              />
+          {/* 4. PILIH SESI (SESSION SWITCHER RESPONSIVE & WAJIB TERLIHAT) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
+                Pilih Sesi
+              </Label>
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs font-bold px-2 py-0.5",
+                  session === "entry"
+                    ? "border-emerald-500/40 text-emerald-600 bg-emerald-500/10"
+                    : "border-amber-500/40 text-amber-600 bg-amber-500/10"
+                )}
+              >
+                Aktif: {session === "entry" ? "Sesi 1 — Masuk" : "Sesi 2 — Istirahat"}
+              </Badge>
             </div>
-          )}
 
-          {/* 5. MANUAL NIS INPUT FORM */}
+            {/* Dua pilihan berdampingan yang pasti terlihat di mobile & desktop */}
+            <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Pilih Sesi Pemeriksaan">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={session === "entry"}
+                onClick={() => {
+                  unlockAudio();
+                  setSession("entry");
+                }}
+                className={cn(
+                  "flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 p-3 rounded-xl border-2 text-center transition-all cursor-pointer",
+                  session === "entry"
+                    ? "border-primary bg-primary text-primary-foreground font-black shadow-md ring-2 ring-primary/20"
+                    : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40"
+                )}
+              >
+                <span className="text-lg leading-none shrink-0">🌅</span>
+                <div className="leading-tight text-center sm:text-left">
+                  <span className="block font-black text-xs sm:text-sm">Sesi 1</span>
+                  <span className="block text-[10px] sm:text-xs font-semibold opacity-90">Masuk Sekolah</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                role="tab"
+                aria-selected={session === "break"}
+                onClick={() => {
+                  unlockAudio();
+                  setSession("break");
+                }}
+                className={cn(
+                  "flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 p-3 rounded-xl border-2 text-center transition-all cursor-pointer",
+                  session === "break"
+                    ? "border-primary bg-primary text-primary-foreground font-black shadow-md ring-2 ring-primary/20"
+                    : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40"
+                )}
+              >
+                <span className="text-lg leading-none shrink-0">🍱</span>
+                <div className="leading-tight text-center sm:text-left">
+                  <span className="block font-black text-xs sm:text-sm">Sesi 2</span>
+                  <span className="block text-[10px] sm:text-xs font-semibold opacity-90">Istirahat / Kantin</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* 5. ITEM YANG DIBAWA SESUAI SESI */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
+                Item yang dibawa
+              </Label>
+              <span
+                className={cn(
+                  "text-xs font-extrabold px-2 py-0.5 rounded-full border",
+                  session === "entry"
+                    ? entryTumbler && entryLunchbox
+                      ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                      : entryTumbler || entryLunchbox
+                      ? "bg-primary/10 text-primary border-primary/20"
+                      : "bg-destructive/10 text-destructive border-destructive/20"
+                    : breakOption === "break_combo"
+                    ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                    : "bg-primary/10 text-primary border-primary/20"
+                )}
+              >
+                {session === "entry"
+                  ? entryTumbler && entryLunchbox
+                    ? "Total: +150 poin (Keduanya)"
+                    : entryTumbler
+                    ? "Total: +100 poin (Tumbler)"
+                    : entryLunchbox
+                    ? "Total: +50 poin (Kotak Makan)"
+                    : "Pilih minimal 1 item"
+                  : breakOption === "break_combo"
+                  ? "Total: +250 poin (Combo)"
+                  : breakOption === "tumbler"
+                  ? "Total: +100 poin (Tumbler saja)"
+                  : "Total: +50 poin (Kotak Makan saja)"}
+              </span>
+            </div>
+
+            {session === "entry" ? (
+              // SESI 1: Checkbox Independen (Tumbler +100, Kotak Makan +50, Keduanya +150)
+              <div className="space-y-2">
+                <div className="grid gap-2 grid-cols-2">
+                  <label
+                    onClick={() => unlockAudio()}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-xl border-2 p-3 transition-all cursor-pointer",
+                      entryTumbler
+                        ? "border-emerald-600 bg-emerald-500/10 shadow-xs ring-2 ring-emerald-500/20"
+                        : "border-border bg-card hover:bg-muted/40"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={entryTumbler}
+                      onChange={(e) => setEntryTumbler(e.target.checked)}
+                      className="size-4.5 text-emerald-600 accent-emerald-600 rounded cursor-pointer shrink-0"
+                    />
+                    <Coffee
+                      className={cn(
+                        "size-4 sm:size-5 shrink-0",
+                        entryTumbler ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                      )}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="block font-bold text-xs sm:text-sm truncate">Tumbler</span>
+                      <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                        +100 poin
+                      </span>
+                    </div>
+                  </label>
+
+                  <label
+                    onClick={() => unlockAudio()}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-xl border-2 p-3 transition-all cursor-pointer",
+                      entryLunchbox
+                        ? "border-emerald-600 bg-emerald-500/10 shadow-xs ring-2 ring-emerald-500/20"
+                        : "border-border bg-card hover:bg-muted/40"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={entryLunchbox}
+                      onChange={(e) => setEntryLunchbox(e.target.checked)}
+                      className="size-4.5 text-emerald-600 accent-emerald-600 rounded cursor-pointer shrink-0"
+                    />
+                    <UtensilsCrossed
+                      className={cn(
+                        "size-4 sm:size-5 shrink-0",
+                        entryLunchbox ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                      )}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="block font-bold text-xs sm:text-sm truncate">Kotak Makan</span>
+                      <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                        +50 poin
+                      </span>
+                    </div>
+                  </label>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  * Checkbox independen: Tumbler (+100), Kotak Makan (+50). Boleh dipilih salah satu atau keduanya (total +150 poin).
+                </p>
+              </div>
+            ) : (
+              // SESI 2: Radio Eksklusif (1. Tumbler saja, 2. Kotak Makan saja, 3. Combo)
+              <div className="space-y-2">
+                <div className="grid gap-2 grid-cols-1 sm:grid-cols-3" role="radiogroup">
+                  {[
+                    {
+                      value: "tumbler" as const,
+                      label: "Tumbler saja",
+                      points: 100,
+                      icon: Coffee,
+                      isCombo: false,
+                    },
+                    {
+                      value: "lunchbox" as const,
+                      label: "Kotak Makan saja",
+                      points: 50,
+                      icon: UtensilsCrossed,
+                      isCombo: false,
+                    },
+                    {
+                      value: "break_combo" as const,
+                      label: "Combo Tumbler + Lunchbox",
+                      points: 250,
+                      icon: Sparkles,
+                      isCombo: true,
+                    },
+                  ].map((opt) => {
+                    const isSelected = breakOption === opt.value;
+                    return (
+                      <label
+                        key={opt.value}
+                        onClick={() => unlockAudio()}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-xl border-2 p-3 transition-all cursor-pointer",
+                          isSelected
+                            ? opt.isCombo
+                              ? "border-amber-500 bg-amber-500/10 shadow-xs ring-2 ring-amber-500/30"
+                              : "border-primary bg-primary/10 shadow-xs ring-2 ring-primary/20"
+                            : "border-border bg-card hover:bg-muted/40"
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          name="break-exclusive-choice"
+                          value={opt.value}
+                          checked={isSelected}
+                          onChange={() => setBreakOption(opt.value)}
+                          className="size-4.5 text-primary accent-primary cursor-pointer shrink-0"
+                        />
+                        <opt.icon
+                          className={cn(
+                            "size-4 sm:size-5 shrink-0",
+                            isSelected
+                              ? opt.isCombo
+                                ? "text-amber-500"
+                                : "text-primary"
+                              : "text-muted-foreground"
+                          )}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="block font-bold text-xs sm:text-sm truncate">
+                              {opt.label}
+                            </span>
+                            {opt.isCombo && (
+                              <span className="text-[9px] font-black uppercase px-1 py-0.2 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+                                COMBO
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={cn(
+                              "text-[11px] font-extrabold",
+                              opt.isCombo
+                                ? "text-amber-600 dark:text-amber-400"
+                                : isSelected
+                                ? "text-primary"
+                                : "text-muted-foreground"
+                            )}
+                          >
+                            +{opt.points} poin
+                          </span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  * Pilihan saling eksklusif (radio): hanya satu opsi yang aktif. Combo bernilai utuh +250 poin.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* 6. INPUT NIS MANUAL + VALIDASI */}
           <form
-            className="mt-5 flex gap-2"
+            className="pt-1 flex gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               unlockAudio();
