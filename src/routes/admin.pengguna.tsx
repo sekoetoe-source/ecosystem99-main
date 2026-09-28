@@ -109,6 +109,7 @@ function PenggunaPage() {
   const [changeRoleUser, setChangeRoleUser] = useState<any | null>(null);
   const [newRole, setNewRole] = useState("");
   const [newClassId, setNewClassId] = useState("");
+  const [newNis, setNewNis] = useState("");
   const [newStation, setNewStation] = useState("Gerbang Utama");
 
   // Running Text Management State
@@ -269,9 +270,9 @@ function PenggunaPage() {
     },
   });
 
-  // State untuk persetujuan akun Google
+  // State untuk persetujuan akun baru
   const [approveUser, setApproveUser] = useState<any | null>(null);
-  const [approveRole, setApproveRole] = useState("student");
+  const [approveRole, setApproveRole] = useState("");
   const [approveClassId, setApproveClassId] = useState("");
   const [approveNis, setApproveNis] = useState("");
   const [approveStation, setApproveStation] = useState("Gerbang Utama");
@@ -279,10 +280,17 @@ function PenggunaPage() {
   const approveUserMutation = useMutation({
     mutationFn: async () => {
       if (!approveUser) return;
+      if (!approveRole) {
+        throw new Error("Pilih role pengguna terlebih dahulu");
+      }
+      if (approveRole === "teacher" && !approveClassId) {
+        throw new Error("Wali Kelas wajib memilih kelas yang diampu");
+      }
+      const isClassRole = approveRole === "student" || approveRole === "teacher";
       const { error } = await supabase.rpc("admin_approve_user", {
         _user_id: approveUser.id,
         _role: approveRole,
-        _class_id: approveRole === "student" && approveClassId ? approveClassId : null,
+        _class_id: isClassRole && approveClassId ? approveClassId : null,
         _nis: approveRole === "student" && approveNis ? approveNis : null,
         _station: approveRole === "officer" ? approveStation : null,
       });
@@ -291,13 +299,14 @@ function PenggunaPage() {
     onSuccess: () => {
       toast.success("Pengguna berhasil disetujui!");
       setApproveUser(null);
-      setApproveRole("student");
+      setApproveRole("");
       setApproveClassId("");
       setApproveNis("");
       setApproveStation("Gerbang Utama");
       queryClient.invalidateQueries({ queryKey: ["admin-all-users"] });
       queryClient.invalidateQueries({ queryKey: ["admin-students"] });
       queryClient.invalidateQueries({ queryKey: ["admin-officers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-kpi"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal menyetujui akun"),
   });
@@ -305,23 +314,11 @@ function PenggunaPage() {
   const allUsers = useQuery({
     queryKey: ["admin-all-users"],
     queryFn: async () => {
-      let profilesData: any[] | null = null;
-      const primaryRes = await supabase
+      const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
         .select("id, full_name, is_approved, requested_role, requested_class_id, requested_nis, user_roles(role)");
 
-      if (primaryRes.error) {
-        // Fallback jika kolom approval belum dibuat di database Supabase Cloud
-        const fallbackRes = await supabase
-          .from("profiles")
-          .select("id, full_name, user_roles(role)");
-        profilesData = (fallbackRes.data ?? []).map(p => ({
-          ...p,
-          is_approved: Array.isArray(p.user_roles) && p.user_roles.length > 0,
-        }));
-      } else {
-        profilesData = primaryRes.data;
-      }
+      if (profilesError) throw profilesError;
 
       const [studentsRes, officersRes, classesRes] = await Promise.all([
         supabase.from("students").select("profile_id, nis, class_id"),
@@ -335,53 +332,70 @@ function PenggunaPage() {
       const teacherClassMap = new Map((classesRes.data ?? []).filter(c => c.homeroom_teacher_id).map(c => [c.homeroom_teacher_id, c]));
 
       return (profilesData ?? []).map((p) => {
-        const roles = (p.user_roles as any[] | null ?? []).map(r => r.role);
-        const role = roles.includes("admin") 
-          ? "admin" 
-          : roles.includes("officer") 
-            ? "officer" 
-            : roles.includes("teacher") 
-              ? "teacher" 
-              : "student";
-        
         const isApproved = p.is_approved === true;
+        const roles = (p.user_roles as any[] | null ?? []).map(r => r.role);
+
+        let activeRole: string | null = null;
+        if (isApproved && roles.length > 0) {
+          activeRole = roles.includes("admin")
+            ? "admin"
+            : roles.includes("officer")
+              ? "officer"
+              : roles.includes("teacher")
+                ? "teacher"
+                : roles.includes("student")
+                  ? "student"
+                  : null;
+        }
 
         let details = "";
+        let classId: string | null = null;
+        const s = studentsMap.get(p.id);
+        const existingNis = s?.nis || p.requested_nis || null;
+        const existingClassId = s?.class_id || (teacherClassMap.get(p.id)?.id) || p.requested_class_id || null;
+
         if (isApproved) {
-          if (role === "student") {
-            const s = studentsMap.get(p.id);
+          if (activeRole === "student") {
             if (s) {
+              classId = s.class_id;
               const cls = s.class_id ? classesMap.get(s.class_id) : null;
               details = `Siswa (NIS: ${s.nis}${cls ? `, Kelas: ${cls.name}` : ""})`;
             } else {
               details = "Siswa";
             }
-          } else if (role === "officer") {
+          } else if (activeRole === "officer") {
             const o = officersMap.get(p.id);
             details = `Petugas (Pos: ${o?.station ?? "-"})`;
-          } else if (role === "teacher") {
+          } else if (activeRole === "teacher") {
             const cls = teacherClassMap.get(p.id);
+            if (cls) classId = cls.id;
             details = `Wali Kelas${cls ? ` (${cls.name})` : ""}`;
-          } else if (role === "admin") {
+          } else if (activeRole === "admin") {
             details = "Administrator";
+          } else {
+            details = "Pengguna Terdaftar";
           }
         } else {
           const reqClass = p.requested_class_id ? classesMap.get(p.requested_class_id) : null;
           details = `MENUNGGU PERSETUJUAN - Ingin Jadi: ${
-            p.requested_role === "student" 
-              ? `Siswa (NIS: ${p.requested_nis ?? "-"}, Kelas: ${reqClass?.name ?? "-"})` 
-              : p.requested_role === "officer" 
-                ? "Petugas Pos" 
-                : p.requested_role === "teacher"
-                  ? "Wali Kelas"
-                  : "Belum Mengisi"
+            p.requested_role === "admin"
+              ? "Administrator"
+              : p.requested_role === "student"
+                ? `Siswa (NIS: ${p.requested_nis ?? "-"}, Kelas: ${reqClass?.name ?? "-"})`
+                : p.requested_role === "officer"
+                  ? "Petugas Pos"
+                  : p.requested_role === "teacher"
+                    ? "Wali Kelas"
+                    : "BELUM MEMILIH"
           }`;
         }
 
         return {
           id: p.id,
           full_name: p.full_name,
-          role,
+          role: activeRole,
+          class_id: classId || existingClassId,
+          nis: existingNis,
           is_approved: isApproved,
           requested_role: p.requested_role,
           requested_class_id: p.requested_class_id,
@@ -411,21 +425,21 @@ function PenggunaPage() {
         finalEmail = `${finalEmail}@smpn99.sch.id`;
       }
 
-      // 1. Coba panggil RPC database admin_create_user jika sudah ada di Supabase
+      // 1. Coba panggil RPC database canonical admin_create_user
       const rpcRes = await supabase.rpc("admin_create_user", {
         _email: finalEmail,
         _password: addPassword,
         _full_name: addFullName,
         _role: addRole,
-        _class_id: addClassId || null,
-        _station: addStation,
+        _class_id: (addRole === "student" || addRole === "teacher") && addClassId ? addClassId : null,
+        _station: addRole === "officer" ? addStation : null,
       });
 
       if (!rpcRes.error) {
         return rpcRes.data;
       }
 
-      // 2. Fallback: Buat akun via Client Auth terisolasi (tanpa mempengaruhi sesi Admin)
+      // 2. Fallback jika admin_create_user belum tersedia: Buat auth terisolasi lalu approve via canonical RPC admin_approve_user
       const SUPABASE_URL = (import.meta as any).env['VITE_SUPABASE_URL'] || (process as any).env['SUPABASE_URL'];
       const SUPABASE_PUBLISHABLE_KEY = (import.meta as any).env['VITE_SUPABASE_PUBLISHABLE_KEY'] || (process as any).env['SUPABASE_PUBLISHABLE_KEY'];
       
@@ -442,34 +456,23 @@ function PenggunaPage() {
       });
 
       if (signUpErr) {
-        throw new Error(signUpErr.message);
+        throw new Error(rpcRes.error.message || signUpErr.message);
       }
 
       const newUserId = signUpData.user?.id;
       if (!newUserId) throw new Error("Gagal mendaftarkan pengguna baru");
 
-      // Set profil diapprove & update nama
-      await supabase.from("profiles").update({ is_approved: true, full_name: addFullName }).eq("id", newUserId);
+      // Approve akun baru secara kanonikal via RPC admin_approve_user
+      const { error: approveErr } = await supabase.rpc("admin_approve_user", {
+        _user_id: newUserId,
+        _role: addRole,
+        _class_id: (addRole === "student" || addRole === "teacher") && addClassId ? addClassId : null,
+        _nis: null,
+        _station: addRole === "officer" ? addStation : null,
+      });
 
-      // Set user role
-      await supabase.from("user_roles").delete().eq("user_id", newUserId);
-      await supabase.from("user_roles").insert({ user_id: newUserId, role: addRole as any });
-
-      // Set entifikasi khusus role
-      if (addRole === "student") {
-        const generatedNis = 'S' + Date.now().toString().slice(-6);
-        await supabase.from("students").insert({
-          profile_id: newUserId,
-          full_name: addFullName,
-          nis: generatedNis,
-          class_id: addClassId || null,
-        });
-      } else if (addRole === "officer") {
-        await supabase.from("officers").insert({
-          profile_id: newUserId,
-          full_name: addFullName,
-          station: addStation || "Gerbang Utama",
-        });
+      if (approveErr) {
+        throw approveErr;
       }
 
       return newUserId;
@@ -579,45 +582,31 @@ function PenggunaPage() {
   const changeRoleMutation = useMutation({
     mutationFn: async () => {
       if (!changeRoleUser || !newRole) return;
-      const userId = changeRoleUser.id;
-
-      // 1. Delete existing roles
-      const { error: delErr } = await supabase.from("user_roles").delete().eq("user_id", userId);
-      if (delErr) throw delErr;
-
-      // 2. Insert new role
-      const { error: insErr } = await supabase.from("user_roles").insert({
-        user_id: userId,
-        role: newRole as any,
-      });
-      if (insErr) throw insErr;
-
-      // 3. Handle specifics
-      if (newRole === "officer") {
-        await supabase.from("officers").upsert({
-          profile_id: userId,
-          full_name: changeRoleUser.full_name,
-          station: newStation,
-        }, { onConflict: "profile_id" });
-      } else if (newRole === "teacher" && newClassId) {
-        // remove previous homeroom teacher from this teacher
-        await supabase.from("classes").update({ homeroom_teacher_id: null }).eq("homeroom_teacher_id", userId);
-        // assign teacher to new class
-        const { error: classErr } = await supabase.from("classes").update({
-          homeroom_teacher_id: userId
-        }).eq("id", newClassId);
-        if (classErr) throw classErr;
+      if (newRole === "teacher" && !newClassId) {
+        throw new Error("Wali Kelas wajib memilih kelas yang diampu");
       }
+      const isClassRole = newRole === "student" || newRole === "teacher";
+      const targetNis = newRole === "student" ? (newNis.trim() || changeRoleUser.nis || null) : null;
+      const { error } = await supabase.rpc("admin_approve_user", {
+        _user_id: changeRoleUser.id,
+        _role: newRole,
+        _class_id: isClassRole && newClassId ? newClassId : null,
+        _nis: targetNis,
+        _station: newRole === "officer" ? newStation : null,
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success("Role pengguna berhasil diubah");
       setChangeRoleUser(null);
       setNewRole("");
       setNewClassId("");
+      setNewNis("");
       setNewStation("Gerbang Utama");
       queryClient.invalidateQueries({ queryKey: ["admin-all-users"] });
       queryClient.invalidateQueries({ queryKey: ["admin-students"] });
       queryClient.invalidateQueries({ queryKey: ["admin-officers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-kpi"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal mengubah role"),
   });
@@ -775,7 +764,7 @@ function PenggunaPage() {
           { id: "siswa", label: "Daftar Siswa" },
           { id: "petugas", label: "Petugas Pos" },
           { id: "semua", label: "Semua Akun & Role" },
-          { id: "persetujuan", label: "Persetujuan Akun Google" },
+          { id: "persetujuan", label: "Persetujuan Akun" },
           { id: "running-text", label: "📢 Running Text (AI Info)" },
         ].map((tab) => (
           <button
@@ -1138,23 +1127,31 @@ function PenggunaPage() {
                   <tr key={u.id}>
                     <td className="px-4 py-3 font-medium">{u.full_name}</td>
                     <td className="px-4 py-3">
-                      <span className={`label-xs rounded-full px-2.5 py-1 font-bold ${
-                        u.role === "admin" 
-                          ? "bg-red-100 text-red-700" 
-                          : u.role === "officer" 
-                            ? "bg-blue-100 text-blue-700" 
-                            : u.role === "teacher" 
-                              ? "bg-purple-100 text-purple-700" 
-                              : "bg-green-100 text-green-700"
-                      }`}>
-                        {u.role === "admin" 
-                          ? "ADMIN" 
-                          : u.role === "officer" 
-                            ? "PETUGAS" 
-                            : u.role === "teacher" 
-                              ? "WALI KELAS" 
-                              : "SISWA"}
-                      </span>
+                      {!u.is_approved ? (
+                        <span className="label-xs rounded-full px-2.5 py-1 font-bold bg-amber-100 text-amber-700">
+                          MENUNGGU PERSETUJUAN
+                        </span>
+                      ) : u.role === "admin" ? (
+                        <span className="label-xs rounded-full px-2.5 py-1 font-bold bg-red-100 text-red-700">
+                          ADMIN
+                        </span>
+                      ) : u.role === "officer" ? (
+                        <span className="label-xs rounded-full px-2.5 py-1 font-bold bg-blue-100 text-blue-700">
+                          PETUGAS
+                        </span>
+                      ) : u.role === "teacher" ? (
+                        <span className="label-xs rounded-full px-2.5 py-1 font-bold bg-purple-100 text-purple-700">
+                          WALI KELAS
+                        </span>
+                      ) : u.role === "student" ? (
+                        <span className="label-xs rounded-full px-2.5 py-1 font-bold bg-green-100 text-green-700">
+                          SISWA
+                        </span>
+                      ) : (
+                        <span className="label-xs rounded-full px-2.5 py-1 font-bold bg-muted text-muted-foreground">
+                          TANPA ROLE
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{u.details}</td>
                     <td className="px-4 py-3 text-center">
@@ -1165,7 +1162,10 @@ function PenggunaPage() {
                           className="h-8 gap-1.5 rounded-full"
                           onClick={() => {
                             setChangeRoleUser(u);
-                            setNewRole(u.role);
+                            setNewRole(u.role || "student");
+                            setNewClassId(u.class_id || "");
+                            setNewNis(u.nis || "");
+                            setNewStation("Gerbang Utama");
                           }}
                         >
                           <UserCheck className="size-3.5" />
@@ -1201,9 +1201,9 @@ function PenggunaPage() {
       {activeTab === "persetujuan" && (
         <section>
           <header>
-            <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">Persetujuan Akun Google</h2>
+            <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">Persetujuan Akun Baru</h2>
             <p className="text-xs text-muted-foreground">
-              Daftar pengguna baru yang masuk lewat Google (OAuth) dan menunggu persetujuan Admin untuk mendapatkan hak akses.
+              Daftar pengguna baru yang menunggu persetujuan Admin untuk mendapatkan hak akses ke sistem.
             </p>
           </header>
 
@@ -1225,13 +1225,15 @@ function PenggunaPage() {
                       <td className="px-4 py-3 font-medium">{u.full_name}</td>
                       <td className="px-4 py-3">
                         <span className="label-xs rounded-full px-2.5 py-1 font-bold bg-amber-100 text-amber-700">
-                          {u.requested_role === "student"
-                            ? "SISWA"
-                            : u.requested_role === "officer"
-                              ? "PETUGAS POS"
-                              : u.requested_role === "teacher"
-                                ? "WALI KELAS"
-                                : "BELUM PILIH (GOOGLE)"}
+                          {u.requested_role === "admin"
+                            ? "ADMIN"
+                            : u.requested_role === "student"
+                              ? "SISWA"
+                              : u.requested_role === "officer"
+                                ? "PETUGAS POS"
+                                : u.requested_role === "teacher"
+                                  ? "WALI KELAS"
+                                  : "BELUM MEMILIH"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{u.details}</td>
@@ -1243,7 +1245,7 @@ function PenggunaPage() {
                             className="h-8 gap-1.5 rounded-full"
                             onClick={() => {
                               setApproveUser(u);
-                              setApproveRole(u.requested_role || "officer");
+                              setApproveRole(u.requested_role || "");
                               setApproveClassId(u.requested_class_id || "");
                               setApproveNis(u.requested_nis || "");
                             }}
@@ -1396,7 +1398,7 @@ function PenggunaPage() {
         </section>
       )}
 
-      {/* DIALOG TINJAU & SETUJUI PENGGUNA GOOGLE */}
+      {/* DIALOG TINJAU & SETUJUI PENGGUNA */}
       <Dialog open={!!approveUser} onOpenChange={(open) => !open && setApproveUser(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1413,9 +1415,11 @@ function PenggunaPage() {
                 onChange={(e) => setApproveRole(e.target.value)}
                 className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
               >
+                <option value="">-- Pilih Role --</option>
                 <option value="student">Siswa</option>
                 <option value="officer">Petugas Pos</option>
                 <option value="teacher">Wali Kelas</option>
+                <option value="admin">Administrator (Admin)</option>
               </select>
             </div>
 
@@ -1425,10 +1429,9 @@ function PenggunaPage() {
                   <label className="text-xs font-bold text-muted-foreground">NIS (Nomor Induk Siswa)</label>
                   <input
                     type="text"
-                    required
                     value={approveNis}
                     onChange={(e) => setApproveNis(e.target.value)}
-                    placeholder="Contoh: 21455"
+                    placeholder="Contoh: 21455 (opsional)"
                     className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
                   />
                 </div>
@@ -1450,6 +1453,24 @@ function PenggunaPage() {
               </>
             )}
 
+            {approveRole === "teacher" && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground">Kelas yang Diampu (Wajib)</label>
+                <select
+                  value={approveClassId}
+                  onChange={(e) => setApproveClassId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                >
+                  <option value="">-- Pilih Kelas --</option>
+                  {(classes.data ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      Kelas {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {approveRole === "officer" && (
               <div className="space-y-1">
                 <label className="text-xs font-bold text-muted-foreground">Lokasi Pos Bertugas</label>
@@ -1469,7 +1490,11 @@ function PenggunaPage() {
             <Button
               className="w-full rounded-full mt-2"
               onClick={() => approveUserMutation.mutate()}
-              disabled={approveUserMutation.isPending}
+              disabled={
+                approveUserMutation.isPending ||
+                !approveRole ||
+                (approveRole === "teacher" && !approveClassId)
+              }
             >
               Setujui & Aktifkan Akun
             </Button>
@@ -1694,9 +1719,24 @@ function PenggunaPage() {
               </select>
             </div>
 
-            {newRole === "teacher" && (
+            {newRole === "student" && (
               <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Kelas yang Diampu</label>
+                <label className="text-xs font-bold text-muted-foreground">NIS (Nomor Induk Siswa)</label>
+                <input
+                  type="text"
+                  value={newNis}
+                  onChange={(e) => setNewNis(e.target.value)}
+                  placeholder="Contoh: 21455 (opsional, gunakan existing jika ada)"
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
+                />
+              </div>
+            )}
+
+            {(newRole === "teacher" || newRole === "student") && (
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-muted-foreground">
+                  {newRole === "teacher" ? "Kelas yang Diampu (Wajib)" : "Pilih Kelas (Opsional)"}
+                </label>
                 <select
                   value={newClassId}
                   onChange={(e) => setNewClassId(e.target.value)}
@@ -1731,7 +1771,7 @@ function PenggunaPage() {
             <Button
               className="w-full rounded-full mt-2"
               onClick={() => changeRoleMutation.mutate()}
-              disabled={changeRoleMutation.isPending}
+              disabled={changeRoleMutation.isPending || !newRole || (newRole === "teacher" && !newClassId)}
             >
               Simpan Perubahan Role
             </Button>

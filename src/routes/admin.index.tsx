@@ -34,14 +34,14 @@ function AdminDashboard() {
   const kpi = useQuery({
     queryKey: ["admin-kpi"],
     queryFn: async () => {
-      const [studentsRes, todayItems, scoresRes, pending] = await Promise.all([
+      const [studentsRes, todayItems, scoresRes, pendingAccountsRes] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").not("class_id", "is", null),
         supabase
           .from("validation_items")
           .select("student_id, points, validations!inner(status)")
           .eq("day", todayJakarta()),
         supabase.from("student_scores").select("earned_points, total_items, class_name"),
-        supabase.from("validations").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_approved", false),
       ]);
 
       const validStudents = (studentsRes.data ?? []).filter((s) => {
@@ -63,7 +63,7 @@ function AdminDashboard() {
         studentCount: validStudents.length,
         participants,
         pointsToday: approvedToday.reduce((a, i) => a + i.points, 0),
-        pendingCount: pending.count ?? 0,
+        pendingCount: pendingAccountsRes.count ?? 0,
         co2Kg: Math.round((totalItems * 70) / 1000),
       };
     },
