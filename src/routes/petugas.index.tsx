@@ -201,13 +201,26 @@ function ScannerPage() {
         };
       }
 
-      // 3. Insert validation row
+      // 3. Resolve the single operational period before inserting validation
+      const { data: activePeriod, error: periodError } = await supabase
+        .from("periods")
+        .select("id, start_date, end_date")
+        .eq("status", "ACTIVE")
+        .maybeSingle();
+      if (periodError) throw periodError;
+      if (!activePeriod) throw new Error("Tidak ada periode operasional aktif");
+      if (today < activePeriod.start_date || today > activePeriod.end_date) {
+        throw new Error("Tanggal hari ini berada di luar periode operasional aktif");
+      }
+
+      // 4. Insert validation row
       const stationName = me?.officer?.station || SCAN_SESSIONS[activeSession].defaultStation;
       const { data: validation, error: vError } = await supabase
         .from("validations")
         .insert({
           student_id: student.id,
           officer_id: me?.officer?.id ?? null,
+          period_id: activePeriod.id,
           status: "approved",
           source,
           session: activeSession,

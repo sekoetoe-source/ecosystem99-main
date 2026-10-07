@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Leaf, TrendingUp, Users, X } from "lucide-react";
+import { Check, Leaf, TrendingUp, Users, X, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,39 @@ function todayJakarta() {
 function AdminDashboard() {
   const { me } = useMe();
   const queryClient = useQueryClient();
+
+  const activePeriod = useQuery({
+    queryKey: ["active-period"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("periods")
+        .select("id, name, start_date, end_date, status")
+        .eq("status", "ACTIVE")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const resetPoint = useMutation({
+    mutationFn: async () => {
+      const confirmed = window.confirm(
+        "Reset point akan mengakhiri periode saat ini dan memulai periode baru dari 0 point.\n\nRiwayat validation dan Audit Trail tidak akan dihapus.\n\nLanjutkan?",
+      );
+      if (!confirmed) return null;
+      const { data, error } = await supabase.rpc("reset_point");
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (!data) return;
+      toast.success(`Reset point berhasil. Periode ${data.target_period_name} telah dimulai dari 0 point.`);
+      queryClient.invalidateQueries({ queryKey: ["active-period"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-kpi"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-queue"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal mereset point"),
+  });
 
   const kpi = useQuery({
     queryKey: ["admin-kpi"],
@@ -136,6 +169,25 @@ function AdminDashboard() {
           <p className="label-xs text-muted-foreground">Akun menunggu</p>
         </Link>
       </div>
+
+      <section className="surface-card p-5 rounded-2xl">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold">Periode Point</h2>
+            <p className="text-sm text-muted-foreground">
+              {activePeriod.data ? `${activePeriod.data.name} · ${activePeriod.data.start_date} – ${activePeriod.data.end_date}` : "Memuat periode aktif..."}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Status: ACTIVE · Periode baru dimulai dari 0 point</p>
+          </div>
+          <Button
+            variant="outline"
+            disabled={!activePeriod.data || resetPoint.isPending}
+            onClick={() => resetPoint.mutate()}
+          >
+            <RotateCcw className="size-4" /> Reset Point
+          </Button>
+        </div>
+      </section>
 
       <section className="surface-card p-5 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/10 via-background to-background">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
