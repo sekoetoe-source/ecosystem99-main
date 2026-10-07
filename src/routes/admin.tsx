@@ -4,6 +4,7 @@ import {
   Coffee,
   FileBarChart,
   LayoutDashboard,
+  LogOut,
   Menu,
   Trophy,
   Users,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Guard } from "@/components/eco/Guard";
+import { signOut } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({
@@ -100,6 +102,17 @@ function AdminLayout() {
             <p className="text-xs text-muted-foreground mt-1">Administrator</p>
           </div>
           <SidebarContent />
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut();
+              window.location.assign("/auth");
+            }}
+            className="mx-4 mb-6 mt-auto flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <LogOut className="size-4 flex-shrink-0" />
+            <span>Keluar</span>
+          </button>
         </aside>
 
         {/* Mobile Drawer */}
@@ -128,6 +141,17 @@ function AdminLayout() {
             </button>
           </div>
           <SidebarContent />
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut();
+              window.location.assign("/auth");
+            }}
+            className="mx-4 mb-6 mt-auto flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <LogOut className="size-4 flex-shrink-0" />
+            <span>Keluar</span>
+          </button>
         </div>
 
         {/* Main Content */}
