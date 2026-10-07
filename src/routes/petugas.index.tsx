@@ -201,11 +201,15 @@ function ScannerPage() {
         };
       }
 
-      // 3. Resolve the single operational period before inserting validation
+      // 3. Resolve the operational period for the Jakarta business date.
+      // Status alone is insufficient after a period rollover: a stale ACTIVE row
+      // must not shadow the period whose configured dates contain today.
       const { data: activePeriod, error: periodError } = await supabase
         .from("periods")
         .select("id, start_date, end_date")
         .eq("status", "ACTIVE")
+        .lte("start_date", today)
+        .gte("end_date", today)
         .maybeSingle();
       if (periodError) throw periodError;
       if (!activePeriod) throw new Error("Tidak ada periode operasional aktif");

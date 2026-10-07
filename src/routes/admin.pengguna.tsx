@@ -1563,6 +1563,23 @@ function PenggunaPage() {
         </section>
       )}
 
+      {/* DIALOG QR SISWA */}
+      <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogHeader>
+            <DialogTitle>QR Code Siswa</DialogTitle>
+            <DialogDescription>{selectedStudent?.full_name} · NIS {selectedStudent?.nis}</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-inner">
+            <QrImage value={String(selectedStudent?.nis ?? "")} size={280} />
+          </div>
+          <p className="font-mono text-sm font-bold text-foreground">{selectedStudent?.nis}</p>
+          <Button className="w-full rounded-full" onClick={() => selectedStudent && downloadQrCode(selectedStudent)}>
+            <Download className="size-4" /> Unduh QR Code
+          </Button>
+        </DialogContent>
+      </Dialog>
+
       {/* DIALOG TINJAU & SETUJUI PENGGUNA */}
       <Dialog open={!!approveUser} onOpenChange={(open) => !open && setApproveUser(null)}>
         <DialogContent className="max-w-md">
