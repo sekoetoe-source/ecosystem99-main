@@ -55,8 +55,10 @@ function AdminDashboard() {
       return data;
     },
     onSuccess: (data) => {
-      if (!data) return;
-      toast.success(`Reset point berhasil. Periode ${data.target_period_name} telah dimulai dari 0 point.`);
+      if (!data || typeof data !== "object" || Array.isArray(data)) return;
+      const targetPeriodName = data["target_period_name"];
+      if (typeof targetPeriodName !== "string") return;
+      toast.success(`Reset point berhasil. Periode ${targetPeriodName} telah dimulai dari 0 point.`);
       queryClient.invalidateQueries({ queryKey: ["active-period"] });
       queryClient.invalidateQueries({ queryKey: ["admin-kpi"] });
       queryClient.invalidateQueries({ queryKey: ["admin-queue"] });

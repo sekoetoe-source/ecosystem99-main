@@ -29,6 +29,16 @@ export const Route = createFileRoute("/admin/leaderboard")({
 
 type Tab = "siswa" | "kelas" | "jawara";
 
+type JawaraStudent = { id: string; full_name: string | null; nis: string | null; classes: { name: string } | null };
+type JawaraValidation = {
+  points: number | null;
+  validations: { day: string; students: JawaraStudent | null } | null;
+};
+type WeeklyData = {
+  global: Record<string, { name: string; nis: string; points: number }>;
+  byClass: Record<string, Record<string, { name: string; points: number }>>;
+};
+
 // Helper: Get ISO week number
 function getWeekNumber(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -77,17 +87,11 @@ function JawaraTab({ periodId, periodName }: { periodId: string; periodName?: st
 
   // Process weekly data
   const weeklyChampions = (() => {
-    if (!validationData.data || validationData.data.length === 0) return { weeks: [], byWeek: {} as Record<number, any> };
+    if (!validationData.data || validationData.data.length === 0) return { weeks: [], byWeek: {} as Record<number, WeeklyData> };
 
-    const weekMap: Record<
-      number,
-      {
-        global: Record<string, { name: string; nis: string; points: number }>;
-        byClass: Record<string, Record<string, { name: string; points: number }>>;
-      }
-    > = {};
+    const weekMap: Record<number, WeeklyData> = {};
 
-    validationData.data.forEach((item: any) => {
+    (validationData.data as JawaraValidation[]).forEach((item) => {
       const validation = item.validations;
       if (!validation) return;
 
@@ -111,7 +115,7 @@ function JawaraTab({ periodId, periodName }: { periodId: string; periodName?: st
           points: 0,
         };
       }
-      weekMap[week].global[studentId].points += item.points;
+      weekMap[week].global[studentId].points += item.points ?? 0;
 
       // Per-class ranking
       if (!weekMap[week].byClass[className]) {
@@ -123,7 +127,7 @@ function JawaraTab({ periodId, periodName }: { periodId: string; periodName?: st
           points: 0,
         };
       }
-      weekMap[week].byClass[className][studentId].points += item.points;
+      weekMap[week].byClass[className][studentId].points += item.points ?? 0;
     });
 
     const weeks = Object.keys(weekMap)
@@ -224,7 +228,7 @@ function JawaraTab({ periodId, periodName }: { periodId: string; periodName?: st
             Jawara per Kelas — Minggu {activeWeek}
           </h3>
           {Object.entries(currentWeekData.byClass).map(([className, classData]) => {
-            const classRanking = Object.entries(classData)
+            const classRanking = Object.entries(classData as Record<string, { name: string; points: number }>)
               .map(([id, data]) => ({ id, ...data }))
               .sort((a, b) => b.points - a.points);
 
@@ -337,7 +341,9 @@ function AdminLeaderboardPage() {
   });
 
   // Get unique classes for filter
-  const classOptions = Array.from(new Set((studentScores.data ?? []).map((s) => s.class_name).filter(Boolean)));
+  const classOptions = Array.from(
+    new Set((studentScores.data ?? []).map((s) => s.class_name).filter((c): c is string => Boolean(c))),
+  );
 
   // Filter student data
   const filteredStudents = (studentScores.data ?? [])
@@ -501,7 +507,7 @@ function AdminLeaderboardPage() {
                     <p className="text-sm text-muted-foreground">{row.class}</p>
                   </div>
                   <div className="col-span-2 text-right">
-                    <p className="font-bold text-lg text-green-600">{row.points.toLocaleString("id-ID")}</p>
+                    <p className="font-bold text-lg text-green-600">{(row.points ?? 0).toLocaleString("id-ID")}</p>
                   </div>
                 </div>
               ))}
@@ -537,10 +543,10 @@ function AdminLeaderboardPage() {
                     <p className="text-sm text-muted-foreground">{row.studentCount} siswa</p>
                   </div>
                   <div className="col-span-3">
-                    <p className="font-bold text-lg text-green-600">{row.totalPoints.toLocaleString("id-ID")}</p>
+                    <p className="font-bold text-lg text-green-600">{(row.totalPoints ?? 0).toLocaleString("id-ID")}</p>
                   </div>
                   <div className="col-span-2 text-right">
-                    <p className="text-sm font-semibold text-muted-foreground">{row.avgPoints.toLocaleString("id-ID")}</p>
+                    <p className="text-sm font-semibold text-muted-foreground">{(row.avgPoints ?? 0).toLocaleString("id-ID")}</p>
                   </div>
                 </div>
               ))}
@@ -552,7 +558,7 @@ function AdminLeaderboardPage() {
       )}
 
       {tab === "jawara" && (
-        <JawaraTab periodId={effectivePeriodId} periodName={currentPeriod?.name} />
+        <JawaraTab periodId={effectivePeriodId} {...(currentPeriod?.name ? { periodName: currentPeriod.name } : {})} />
       )}
     </div>
   );
