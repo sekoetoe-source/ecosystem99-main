@@ -17,7 +17,7 @@ export const Route = createFileRoute("/admin/")({
         content: "Pantau partisipasi, setujui klaim validasi, dan kelola ekosistem hijau sekolah.",
       },
       { property: "og:title", content: "Dasbor Admin — School Ecosystem" },
-      { property: "og:description", content: "KPI partisipasi dan antrean persetujuan validasi." },
+      { property: "og:description", content: "KPI partisipasi dan antrean validasi klaim eco-point." },
     ],
   }),
   component: AdminDashboard,
@@ -71,6 +71,8 @@ function AdminDashboard() {
 
   const queue = useQuery({
     queryKey: ["admin-queue"],
+    staleTime: 0,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data } = await supabase
         .from("validations")
@@ -131,7 +133,7 @@ function AdminDashboard() {
         >
           <Check className="size-5 text-primary" />
           <p className="mt-3 text-3xl font-extrabold">{kpi.data?.pendingCount ?? 0}</p>
-          <p className="label-xs text-muted-foreground">Menunggu persetujuan</p>
+          <p className="label-xs text-muted-foreground">Akun menunggu</p>
         </Link>
       </div>
 
@@ -154,7 +156,7 @@ function AdminDashboard() {
       </section>
 
       <section>
-        <h2 className="text-lg font-bold">Antrean Persetujuan Klaim</h2>
+        <h2 className="text-lg font-bold">Antrean Validasi Klaim</h2>
         <div className="surface-card mt-3 divide-y divide-border">
           {(queue.data ?? []).map((v) => (
             <div key={v.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
@@ -188,7 +190,7 @@ function AdminDashboard() {
           ))}
           {(queue.data ?? []).length === 0 && (
             <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-              Tidak ada klaim menunggu persetujuan.
+              Tidak ada klaim menunggu validasi.
             </p>
           )}
         </div>

@@ -133,7 +133,7 @@ function TeacherDashboard() {
 
       {/* ANTREAN PERSETUJUAN KLAIM KELAS */}
       <section>
-        <h2 className="text-lg font-bold">Antrean Persetujuan Klaim Kelas {classInfo.name}</h2>
+        <h2 className="text-lg font-bold">Antrean Validasi Klaim Kelas {classInfo.name}</h2>
         <div className="surface-card mt-3 divide-y divide-border">
           {(queue.data ?? []).map((v) => (
             <div key={v.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
@@ -168,7 +168,7 @@ function TeacherDashboard() {
           ))}
           {(queue.data ?? []).length === 0 && (
             <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-              Tidak ada klaim menunggu persetujuan dari kelas ini.
+              Tidak ada klaim menunggu validasi dari kelas ini.
             </p>
           )}
         </div>
