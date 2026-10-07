@@ -12,11 +12,11 @@ const ADMIN_MENU = [
   { section: "AKTIVITAS", items: [
     { to: "/admin/pengguna", label: "Pengguna", icon: Users },
     { to: "/peringkat", label: "Leaderboard", icon: TrendingUp },
-    { to: "/admin/jawara", label: "Jawara", icon: Trophy, disabled: true },
+    { to: "/admin/jawara", label: "Jawara", icon: Trophy },
     { to: "/admin/challenge", label: "Challenge", icon: BookOpen },
   ] },
   { section: "OPERASIONAL", items: [
-    { to: "/admin/periode", label: "Periode", icon: Calendar, disabled: true },
+    { to: "/admin/periode", label: "Periode", icon: Calendar },
     { to: "/admin/laporan", label: "Laporan", icon: FileBarChart },
   ] },
   { section: "LAINNYA", items: [{ to: "/admin/traktir", label: "Traktir Kopi", icon: Coffee }] },

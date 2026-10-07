@@ -53,8 +53,7 @@ function formatWeek(startDate: string, endDate: string): string {
   return `${startDate} – ${endDate}`;
 }
 
-// Jawara Tab Component
-function JawaraTab({ periodId, periodName }: { periodId: string; periodName?: string }) {
+export function JawaraTab({ periodId, periodName }: { periodId: string; periodName?: string }) {
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
 
   // Fetch validation items for the period
