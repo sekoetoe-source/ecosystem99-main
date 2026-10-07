@@ -63,7 +63,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
       total_points: c.total_points,
       avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
     }))
-    .sort((a, b) => b.avg_points - a.avg_points || b.total_points - a.total_points);
+    .sort((a, b) => b.total_points - a.total_points || b.avg_points - a.avg_points);
 
   const rawClasses = realClassesFromStudents.length > 0 ? realClassesFromStudents : (classes.data ?? []);
 
