@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Calendar, Filter, Search, Trophy } from "lucide-react";
+import { Calendar, Filter, Search, Trophy, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,239 @@ export const Route = createFileRoute("/admin/leaderboard")({
 });
 
 type Tab = "siswa" | "kelas" | "jawara";
+
+// Helper: Get ISO week number
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+// Helper: Format week display
+function formatWeek(startDate: string, endDate: string): string {
+  return `${startDate} – ${endDate}`;
+}
+
+// Jawara Tab Component
+function JawaraTab({ periodId, periodName }: { periodId: string; periodName?: string }) {
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+
+  // Fetch validation items for the period
+  const validationData = useQuery({
+    queryKey: ["jawara-data", periodId],
+    queryFn: async () => {
+      if (!periodId) return [];
+      const { data: period } = await supabase
+        .from("periods")
+        .select("start_date, end_date")
+        .eq("id", periodId)
+        .maybeSingle();
+
+      if (!period) return [];
+
+      const { data, error } = await supabase
+        .from("validation_items")
+        .select(
+          "points, validations!inner(student_id, day, status, students(id, full_name, nis, class_id, classes(name)))"
+        )
+        .eq("validations.status", "approved")
+        .gte("validations.day", period.start_date)
+        .lte("validations.day", period.end_date);
+
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!periodId,
+  });
+
+  // Process weekly data
+  const weeklyChampions = (() => {
+    if (!validationData.data || validationData.data.length === 0) return { weeks: [], byWeek: {} as Record<number, any> };
+
+    const weekMap: Record<
+      number,
+      {
+        global: Record<string, { name: string; nis: string; points: number }>;
+        byClass: Record<string, Record<string, { name: string; points: number }>>;
+      }
+    > = {};
+
+    validationData.data.forEach((item: any) => {
+      const validation = item.validations;
+      if (!validation) return;
+
+      const date = new Date(validation.day);
+      const week = getWeekNumber(date);
+      const student = validation.students;
+      const className = student?.classes?.name || "-";
+
+      if (!weekMap[week]) {
+        weekMap[week] = { global: {}, byClass: {} };
+      }
+
+      const studentId = student?.id;
+      if (!studentId) return;
+
+      // Global ranking
+      if (!weekMap[week].global[studentId]) {
+        weekMap[week].global[studentId] = {
+          name: student?.full_name || "-",
+          nis: student?.nis || "-",
+          points: 0,
+        };
+      }
+      weekMap[week].global[studentId].points += item.points;
+
+      // Per-class ranking
+      if (!weekMap[week].byClass[className]) {
+        weekMap[week].byClass[className] = {};
+      }
+      if (!weekMap[week].byClass[className][studentId]) {
+        weekMap[week].byClass[className][studentId] = {
+          name: student?.full_name || "-",
+          points: 0,
+        };
+      }
+      weekMap[week].byClass[className][studentId].points += item.points;
+    });
+
+    const weeks = Object.keys(weekMap)
+      .map(Number)
+      .sort((a, b) => b - a);
+
+    return { weeks, byWeek: weekMap };
+  })();
+
+  const weeks = weeklyChampions.weeks;
+  const byWeek = weeklyChampions.byWeek;
+  const activeWeek = selectedWeek !== null ? selectedWeek : weeks[0];
+
+  if (weeks.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-white p-12 text-center">
+        <Trophy className="size-16 mx-auto mb-4 text-gray-300" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">Belum ada data Jawara</h3>
+        <p className="text-sm text-muted-foreground">Data akan muncul setelah ada validasi yang disetujui dalam periode ini.</p>
+      </div>
+    );
+  }
+
+  const currentWeekData = activeWeek ? byWeek[activeWeek] : null;
+  const globalRanking = currentWeekData
+    ? Object.entries(currentWeekData.global)
+        .map(([id, data]) => ({ id, ...data }))
+        .sort((a, b) => b.points - a.points)
+    : [];
+
+  return (
+    <div className="space-y-6">
+      {/* Week Selector */}
+      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+        <label className="text-sm font-medium text-foreground mb-3 block">Pilih Minggu</label>
+        <Select value={activeWeek?.toString() || ""} onValueChange={(v) => setSelectedWeek(Number(v))}>
+          <SelectTrigger className="w-full sm:w-64">
+            <Calendar className="size-4 mr-2" />
+            <SelectValue placeholder="Pilih minggu" />
+          </SelectTrigger>
+          <SelectContent>
+            {weeks.map((week) => (
+              <SelectItem key={week} value={week.toString()}>
+                Minggu {week}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Global Jawara */}
+      <div>
+        <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+          <Star className="size-5 text-yellow-500" />
+          Jawara Global — Minggu {activeWeek}
+        </h3>
+        <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
+          {globalRanking.length > 0 ? (
+            <div className="divide-y divide-border">
+              {globalRanking.map((entry, idx) => (
+                <div
+                  key={entry.id}
+                  className={cn(
+                    "grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors",
+                    idx === 0 ? "bg-yellow-50" : "hover:bg-gray-50"
+                  )}
+                >
+                  <div className="col-span-1">
+                    {idx === 0 ? (
+                      <Trophy className="size-6 text-yellow-600" />
+                    ) : (
+                      <span className="font-bold text-lg text-muted-foreground">#{idx + 1}</span>
+                    )}
+                  </div>
+                  <div className="col-span-5">
+                    <p className="font-semibold text-foreground">{entry.name}</p>
+                    <p className="text-xs text-muted-foreground">{entry.nis}</p>
+                  </div>
+                  <div className="col-span-6 text-right">
+                    <p className={cn("text-2xl font-extrabold", idx === 0 ? "text-yellow-600" : "text-green-600")}>
+                      {entry.points.toLocaleString("id-ID")}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Tidak ada data untuk minggu ini.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Jawara per Kelas */}
+      {currentWeekData && Object.keys(currentWeekData.byClass).length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Trophy className="size-5 text-blue-600" />
+            Jawara per Kelas — Minggu {activeWeek}
+          </h3>
+          {Object.entries(currentWeekData.byClass).map(([className, classData]) => {
+            const classRanking = Object.entries(classData)
+              .map(([id, data]) => ({ id, ...data }))
+              .sort((a, b) => b.points - a.points);
+
+            return (
+              <div key={className} className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
+                <div className="px-6 py-4 bg-blue-50 border-b border-border">
+                  <h4 className="font-semibold text-foreground">{className}</h4>
+                </div>
+                <div className="divide-y divide-border">
+                  {classRanking.map((entry, idx) => (
+                    <div
+                      key={entry.id}
+                      className={cn("grid grid-cols-12 gap-4 px-6 py-3 items-center transition-colors", idx === 0 ? "bg-blue-50" : "hover:bg-gray-50")}
+                    >
+                      <div className="col-span-1">
+                        <span className="font-bold text-sm text-muted-foreground">#{idx + 1}</span>
+                      </div>
+                      <div className="col-span-7">
+                        <p className="font-semibold text-foreground text-sm">{entry.name}</p>
+                      </div>
+                      <div className="col-span-4 text-right">
+                        <p className={cn("font-bold", idx === 0 ? "text-blue-600" : "text-green-600")}>
+                          {entry.points.toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AdminLeaderboardPage() {
   const [tab, setTab] = useState<Tab>("siswa");
@@ -319,11 +552,7 @@ function AdminLeaderboardPage() {
       )}
 
       {tab === "jawara" && (
-        <div className="rounded-2xl border border-border bg-white p-12 text-center">
-          <Trophy className="size-16 mx-auto mb-4 text-gray-300" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Jawara Lingkungan</h3>
-          <p className="text-sm text-muted-foreground">Fitur Jawara sedang dalam tahap pengembangan.</p>
-        </div>
+        <JawaraTab periodId={effectivePeriodId} periodName={currentPeriod?.name} />
       )}
     </div>
   );
