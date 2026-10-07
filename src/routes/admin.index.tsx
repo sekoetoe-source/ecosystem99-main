@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Leaf, TrendingUp, Users, X, RotateCcw } from "lucide-react";
+import { Check, Leaf, TrendingUp, Users, X, RotateCcw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ function AdminDashboard() {
   const resetPoint = useMutation({
     mutationFn: async () => {
       const confirmed = window.confirm(
-        "Reset point akan mengakhiri periode saat ini dan memulai periode baru dari 0 point.\n\nRiwayat validation dan Audit Trail tidak akan dihapus.\n\nLanjutkan?",
+        `Reset point periode ${activePeriod.data?.name}?\n\nPeriode aktif akan ditutup dan periode baru dimulai dari 0 point.\n\nRiwayat validation dan Audit Trail tidak akan dihapus.\n\nLanjutkan?`,
       );
       if (!confirmed) return null;
       const { data, error } = await supabase.rpc("reset_point");
@@ -104,149 +104,165 @@ function AdminDashboard() {
 
   const queue = useQuery({
     queryKey: ["admin-queue"],
-    staleTime: 0,
-    refetchOnWindowFocus: true,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("validations")
-        .select("id, status, created_at, station, source, students(full_name, nis), validation_items(item_code, points)")
+        .select("id, status, source, station, day, students(full_name, nis), validation_items(item_code, points)")
         .eq("status", "pending")
-        .order("created_at", { ascending: false });
+        .order("day", { ascending: false })
+        .limit(10);
+      if (error) throw error;
       return data ?? [];
     },
   });
 
   const review = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
-      const { error } = await supabase
-        .from("validations")
-        .update({ status, reviewed_by: me?.userId ?? null, reviewed_at: new Date().toISOString() })
-        .eq("id", id);
+      const { error } = await supabase.from("validations").update({ status }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Status validasi diperbarui");
       queryClient.invalidateQueries({ queryKey: ["admin-queue"] });
       queryClient.invalidateQueries({ queryKey: ["admin-kpi"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal memperbarui"),
   });
 
-  const participation = kpi.data
-    ? Math.round((kpi.data.participants / Math.max(1, kpi.data.studentCount)) * 100)
-    : 0;
+  const participation = kpi.data?.studentCount ? Math.round((kpi.data.participants / kpi.data.studentCount) * 100) : 0;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-extrabold tracking-tight">Ikhtisar Ekosistem</h1>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Dasbor Admin</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Pantau operasional ekosistem dan validasi klaim point</p>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Partisipasi hari ini", value: `${participation}%`, icon: TrendingUp },
-          { label: "Siswa terdaftar", value: kpi.data?.studentCount ?? 0, icon: Users },
-          { label: "Poin hari ini", value: (kpi.data?.pointsToday ?? 0).toLocaleString("id-ID"), icon: Leaf },
+          { label: "Partisipasi hari ini", value: `${participation}%`, icon: TrendingUp, color: "text-blue-600" },
+          { label: "Siswa terdaftar", value: kpi.data?.studentCount ?? 0, icon: Users, color: "text-emerald-600" },
+          { label: "Poin hari ini", value: (kpi.data?.pointsToday ?? 0).toLocaleString("id-ID"), icon: Leaf, color: "text-green-600" },
+          { label: "Akun menunggu", value: kpi.data?.pendingCount ?? 0, icon: AlertCircle, color: "text-orange-600" },
         ].map((k) => (
-          <div key={k.label} className="surface-card p-5">
-            <k.icon className="size-5 text-primary" />
-            <p className="mt-3 text-3xl font-extrabold">{k.value}</p>
-            <p className="label-xs text-muted-foreground">{k.label}</p>
+          <div key={k.label} className="rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+            <k.icon className={`size-6 ${k.color}`} />
+            <p className="mt-4 text-3xl font-extrabold text-foreground">{k.value}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{k.label}</p>
           </div>
         ))}
-
-        <Link
-          to="/admin/pengguna"
-          className="surface-card p-5 block text-foreground no-underline cursor-pointer transition-colors hover:border-primary/50 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-label="Menunggu persetujuan: lihat daftar pengguna di Manajemen Pengguna"
-          onKeyDown={(e) => {
-            if (e.key === " " || e.key === "Spacebar") {
-              e.preventDefault();
-              e.currentTarget.click();
-            }
-          }}
-        >
-          <Check className="size-5 text-primary" />
-          <p className="mt-3 text-3xl font-extrabold">{kpi.data?.pendingCount ?? 0}</p>
-          <p className="label-xs text-muted-foreground">Akun menunggu</p>
-        </Link>
       </div>
 
-      <section className="surface-card p-5 rounded-2xl">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold">Periode Point</h2>
-            <p className="text-sm text-muted-foreground">
-              {activePeriod.data ? `${activePeriod.data.name} · ${activePeriod.data.start_date} – ${activePeriod.data.end_date}` : "Memuat periode aktif..."}
+      <div className="rounded-2xl border border-border bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4">
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-foreground">Periode Aktif</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {activePeriod.data
+                ? `${activePeriod.data.name} · ${activePeriod.data.start_date} – ${activePeriod.data.end_date}`
+                : "Memuat periode aktif..."}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">Status: ACTIVE · Periode baru dimulai dari 0 point</p>
+            <p className="mt-2 text-xs font-medium text-blue-700">Status: ACTIVE • Poin periode dimulai dari 0</p>
           </div>
           <Button
-            variant="outline"
-            disabled={!activePeriod.data || resetPoint.isPending}
             onClick={() => resetPoint.mutate()}
+            disabled={!activePeriod.data || resetPoint.isPending}
+            size="lg"
+            className="gap-2 self-start"
           >
-            <RotateCcw className="size-4" /> Reset Point
+            <RotateCcw className="size-4" />
+            {resetPoint.isPending ? "Memproses..." : "Reset Point"}
           </Button>
         </div>
-      </section>
+      </div>
 
-      <section className="surface-card p-5 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/10 via-background to-background">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">📢</span>
-            <div>
-              <h2 className="text-base font-extrabold text-foreground">Info Berjalan (Running Text Eco & Health AI)</h2>
-              <p className="text-xs text-muted-foreground">Live preview headline berita & tips kesehatan remaja/lingkungan Jakarta di beranda</p>
-            </div>
+      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+        <div className="flex items-start gap-3 mb-4">
+          <span className="text-2xl">📢</span>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-foreground">Berita & Tips</h2>
+            <p className="text-sm text-muted-foreground">Running text eco & health dari AI</p>
           </div>
-          <Button asChild size="sm" variant="outline" className="rounded-full gap-1">
-            <Link to="/admin/pengguna">Kelola Running Text →</Link>
-          </Button>
         </div>
-        <div className="rounded-xl overflow-hidden border border-emerald-500/20 shadow-sm">
+        <div className="rounded-xl overflow-hidden border border-border bg-gradient-to-r from-emerald-50 to-blue-50">
           <EcoNewsTicker />
         </div>
-      </section>
+      </div>
 
-      <section>
-        <h2 className="text-lg font-bold">Antrean Validasi Klaim</h2>
-        <div className="surface-card mt-3 divide-y divide-border">
-          {(queue.data ?? []).map((v) => (
-            <div key={v.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold">
-                  {(v.students as { full_name: string; nis: string } | null)?.full_name ?? "-"}{" "}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    NIS {(v.students as { nis: string } | null)?.nis}
-                  </span>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {(v.validation_items ?? []).map((i) => i.item_code).join(" + ")} ·{" "}
-                  {(v.validation_items ?? []).reduce((a, i) => a + i.points, 0)} poin ·{" "}
-                  {v.source === "manual" ? "Input manual" : "Scan"} · {v.station ?? "-"}
-                </p>
-              </div>
-              <StatusBadge status={v.status} />
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => review.mutate({ id: v.id, status: "approved" })}>
-                  <Check className="size-4" /> Setujui
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => review.mutate({ id: v.id, status: "rejected" })}
-                >
-                  <X className="size-4" /> Tolak
-                </Button>
-              </div>
+      <div>
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-foreground">Antrean Validasi Klaim</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{queue.data?.length ?? 0} klaim menunggu validasi</p>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
+          {(queue.data ?? []).length > 0 ? (
+            <div className="divide-y divide-border">
+              {queue.data?.map((v) => (
+                <div key={v.id} className="flex flex-col gap-4 p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-foreground">
+                        {(v.students as { full_name: string; nis: string } | null)?.full_name ?? "-"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        NIS {(v.students as { nis: string } | null)?.nis}
+                      </p>
+                    </div>
+                    <StatusBadge status={v.status} />
+                  </div>
+
+                  <p className="text-sm text-muted-foreground">
+                    {(v.validation_items ?? []).map((i) => i.item_code).join(" + ")} •{" "}
+                    <span className="font-semibold">{(v.validation_items ?? []).reduce((a, i) => a + i.points, 0)} poin</span> • {v.source === "manual" ? "Input manual" : "Scan"}{" "}
+                    • {v.station ?? "-"}
+                  </p>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      size="sm"
+                      onClick={() => review.mutate({ id: v.id, status: "approved" })}
+                      disabled={review.isPending}
+                    >
+                      <Check className="size-4" /> Setujui
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => review.mutate({ id: v.id, status: "rejected" })}
+                      disabled={review.isPending}
+                    >
+                      <X className="size-4" /> Tolak
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-          {(queue.data ?? []).length === 0 && (
-            <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-              Tidak ada klaim menunggu validasi.
-            </p>
+          ) : (
+            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Tidak ada klaim menunggu validasi.</p>
           )}
         </div>
-      </section>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-bold text-foreground mb-4">Akses Cepat</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { to: "/admin/pengguna", label: "Kelola Pengguna", icon: "👥" },
+            { to: "/peringkat", label: "Lihat Leaderboard", icon: "🏆" },
+            { to: "/admin/laporan", label: "Laporan Lengkap", icon: "📊" },
+          ].map((link) => (
+            <Link
+              key={link.to}
+              to={link.to}
+              className="group rounded-xl border border-border bg-white p-4 no-underline transition-all hover:border-blue-300 hover:shadow-md hover:bg-blue-50"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{link.icon}</span>
+                <span className="font-medium text-foreground group-hover:text-blue-700">{link.label}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

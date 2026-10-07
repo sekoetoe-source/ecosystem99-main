@@ -19,6 +19,7 @@ import { Route as TeacherRouteImport } from './routes/teacher'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminChallengeRouteImport } from './routes/admin.challenge'
 import { Route as AdminLaporanRouteImport } from './routes/admin.laporan'
+import { Route as AdminLeaderboardRouteImport } from './routes/admin.leaderboard'
 import { Route as AdminPenggunaRouteImport } from './routes/admin.pengguna'
 import { Route as AdminTraktirRouteImport } from './routes/admin.traktir'
 import { Route as PetugasIndexRouteImport } from './routes/petugas.index'
@@ -76,6 +77,11 @@ const AdminLaporanRoute = AdminLaporanRouteImport.update({
   path: '/laporan',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminLeaderboardRoute = AdminLeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminPenggunaRoute = AdminPenggunaRouteImport.update({
   id: '/pengguna',
   path: '/pengguna',
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/teacher': typeof TeacherRouteWithChildren
   '/admin/challenge': typeof AdminChallengeRoute
   '/admin/laporan': typeof AdminLaporanRoute
+  '/admin/leaderboard': typeof AdminLeaderboardRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/traktir': typeof AdminTraktirRoute
   '/siswa/profil': typeof SiswaProfilRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/peringkat': typeof PeringkatRoute
   '/admin/challenge': typeof AdminChallengeRoute
   '/admin/laporan': typeof AdminLaporanRoute
+  '/admin/leaderboard': typeof AdminLeaderboardRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/traktir': typeof AdminTraktirRoute
   '/siswa/profil': typeof SiswaProfilRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/teacher': typeof TeacherRouteWithChildren
   '/admin/challenge': typeof AdminChallengeRoute
   '/admin/laporan': typeof AdminLaporanRoute
+  '/admin/leaderboard': typeof AdminLeaderboardRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/traktir': typeof AdminTraktirRoute
   '/siswa/profil': typeof SiswaProfilRoute
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/teacher'
     | '/admin/challenge'
     | '/admin/laporan'
+    | '/admin/leaderboard'
     | '/admin/pengguna'
     | '/admin/traktir'
     | '/siswa/profil'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/peringkat'
     | '/admin/challenge'
     | '/admin/laporan'
+    | '/admin/leaderboard'
     | '/admin/pengguna'
     | '/admin/traktir'
     | '/siswa/profil'
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
     | '/teacher'
     | '/admin/challenge'
     | '/admin/laporan'
+    | '/admin/leaderboard'
     | '/admin/pengguna'
     | '/admin/traktir'
     | '/siswa/profil'
@@ -293,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLaporanRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/leaderboard': {
+      id: '/admin/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/admin/leaderboard'
+      preLoaderRoute: typeof AdminLeaderboardRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/pengguna': {
       id: '/admin/pengguna'
       path: '/pengguna'
@@ -341,6 +360,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminChallengeRoute: typeof AdminChallengeRoute
   AdminLaporanRoute: typeof AdminLaporanRoute
+  AdminLeaderboardRoute: typeof AdminLeaderboardRoute
   AdminPenggunaRoute: typeof AdminPenggunaRoute
   AdminTraktirRoute: typeof AdminTraktirRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -349,6 +369,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminChallengeRoute: AdminChallengeRoute,
   AdminLaporanRoute: AdminLaporanRoute,
+  AdminLeaderboardRoute: AdminLeaderboardRoute,
   AdminPenggunaRoute: AdminPenggunaRoute,
   AdminTraktirRoute: AdminTraktirRoute,
   AdminIndexRoute: AdminIndexRoute,
