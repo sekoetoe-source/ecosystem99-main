@@ -104,87 +104,39 @@ const NAV = [
 ];
 
 const useSchoolStats = () => {
+  const activePeriod = useQuery({
+    queryKey: ["active-period"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("periods").select("id").eq("status", "ACTIVE").maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
   return useQuery({
-    queryKey: ["school-stats"],
+    queryKey: ["school-stats", activePeriod.data?.id],
+    enabled: !!activePeriod.data?.id,
     queryFn: async () => {
       try {
-        const [
-          { count: totalStudentsCount },
-          { data: scores },
-          { data: items },
-          { count: valItemsCount },
-        ] = await Promise.all([
+        const periodId = activePeriod.data!.id;
+        const [{ count: totalStudentsCount }, { data: scores }, { data: items }, { count: valItemsCount }] = await Promise.all([
           supabase.from("students").select("id", { count: "exact", head: true }),
-          supabase.from("student_scores").select("earned_points, total_items, class_name"),
+          supabase.from("period_student_scores").select("earned_points, total_items, class_name").eq("period_id", periodId),
           supabase.from("eco_items").select("code, co2_grams"),
-          supabase.from("validation_items").select("id", { count: "exact", head: true }),
+          supabase.from("validation_items").select("id", { count: "exact", head: true }).eq("period_id", periodId),
         ]);
-
-        const validScores = (scores ?? []).filter((s) => {
-          const c = (s.class_name ?? "").trim();
-          return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas" && Number(s.earned_points ?? 0) > 0);
-        });
-
+        const validScores = (scores ?? []).filter((s) => { const c = (s.class_name ?? "").trim(); return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas" && Number(s.earned_points ?? 0) > 0); });
         const realValItems = valItemsCount ?? 0;
         const totalPoints = validScores.reduce((a, s) => a + Number(s.earned_points ?? 0), 0);
-
-        // If no active students with points exist yet, initialize scan metrics to 0 while maintaining real registered student count
-        if (validScores.length === 0 || totalPoints === 0) {
-          return {
-            totalPoints: 0,
-            totalItems: 0,
-            studentCount: totalStudentsCount ?? 0,
-            co2Kg: 0,
-            classes: [],
-          };
-        }
-
-        const calcTotalItems = realValItems > 0 
-          ? realValItems 
-          : validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
-
-        const avgCo2 = (items ?? []).length > 0
-          ? (items ?? []).reduce((a, i) => a + i.co2_grams, 0) / Math.max(1, (items ?? []).length)
-          : 68;
-
-        const co2Kg = Math.round((calcTotalItems * avgCo2) / 1000);
-
+        if (validScores.length === 0 || totalPoints === 0) return { totalPoints: 0, totalItems: 0, studentCount: totalStudentsCount ?? 0, co2Kg: 0, classes: [] };
+        const calcTotalItems = realValItems > 0 ? realValItems : validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
+        const avgCo2 = (items ?? []).length > 0 ? (items ?? []).reduce((a, i) => a + i.co2_grams, 0) / Math.max(1, (items ?? []).length) : 68;
         const classMap = new Map<string, { class_name: string; total_points: number; student_count: number }>();
-
-        validScores.forEach((s) => {
-          const name = (s.class_name ?? "").trim();
-          if (!name || name === "-" || name.toLowerCase() === "tanpa kelas") return;
-          const current = classMap.get(name) || { class_name: name, total_points: 0, student_count: 0 };
-          classMap.set(name, {
-            class_name: name,
-            total_points: current.total_points + Number(s.earned_points ?? 0),
-            student_count: current.student_count + 1,
-          });
-        });
-
-        const computedClasses = Array.from(classMap.values()).map((c) => ({
-          class_name: c.class_name,
-          student_count: c.student_count,
-          total_points: c.total_points,
-          avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
-        })).sort((a, b) => b.avg_points - a.avg_points || b.total_points - a.total_points);
-
-        return {
-          totalPoints,
-          totalItems: calcTotalItems,
-          studentCount: totalStudentsCount ?? 0,
-          co2Kg,
-          classes: computedClasses.slice(0, 5),
-        };
+        validScores.forEach((s) => { const name = (s.class_name ?? "").trim(); const current = classMap.get(name) || { class_name: name, total_points: 0, student_count: 0 }; classMap.set(name, { class_name: name, total_points: current.total_points + Number(s.earned_points ?? 0), student_count: current.student_count + 1 }); });
+        const computedClasses = Array.from(classMap.values()).map((c) => ({ class_name: c.class_name, student_count: c.student_count, total_points: c.total_points, avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0 })).sort((a, b) => b.total_points - a.total_points);
+        return { totalPoints, totalItems: calcTotalItems, studentCount: totalStudentsCount ?? 0, co2Kg: Math.round((calcTotalItems * avgCo2) / 1000), classes: computedClasses.slice(0, 5) };
       } catch (err) {
         console.error("Error fetching school stats:", err);
-        return {
-          totalPoints: 0,
-          totalItems: 0,
-          studentCount: 0,
-          co2Kg: 0,
-          classes: [],
-        };
+        return { totalPoints: 0, totalItems: 0, studentCount: 0, co2Kg: 0, classes: [] };
       }
     },
   });

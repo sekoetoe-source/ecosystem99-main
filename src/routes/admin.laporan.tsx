@@ -88,11 +88,11 @@ type ReportData = {
 
 function FormalReportDocument({
   d,
-  month,
+  period,
   isModal = false,
 }: {
   d: ReportData | undefined;
-  month: string;
+  period: { name: string; start_date: string; end_date: string } | undefined;
   isModal?: boolean;
 }) {
   return (
@@ -136,7 +136,7 @@ function FormalReportDocument({
                   Monthly Environmental Program Report
                 </p>
                 <p className="mt-1 text-sm font-bold text-primary">
-                  Periode / Period: {monthLabel(month)}
+                  Periode / Period: {period?.name ?? "-"} ({period?.start_date ?? "-"} – {period?.end_date ?? "-"})
                 </p>
               </div>
 
@@ -256,7 +256,7 @@ function FormalReportDocument({
                   </div>
                 </div>
                 <div>
-                  <p>Jakarta, {monthLabel(month)}</p>
+                  <p>Jakarta, {period?.name ?? "-"}</p>
                   <p>Koordinator Program / Program Coordinator</p>
                   <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
                     <p className="font-bold">{SCHOOL.coordinator}</p>
@@ -273,143 +273,48 @@ function FormalReportDocument({
 }
 
 function LaporanPage() {
-  const months = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 6 }, (_, i) =>
-      monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1)),
-    );
-  }, []);
-  const [month, setMonth] = useState(months[0]!);
   const [previewOpen, setPreviewOpen] = useState(false);
-
-  const report = useQuery({
-    queryKey: ["formal-report", month],
+  const periods = useQuery({
+    queryKey: ["periods"],
     queryFn: async () => {
-      const { start, end } = monthRange(month);
-      const prevIdx = months.indexOf(month) + 1;
-      const prev = months[prevIdx];
-
-      const [{ data: students }, { data: items }, prevItems] = await Promise.all([
-        supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
-        supabase
-          .from("validation_items")
-          .select("item_code, points, student_id, day, validations!inner(status)")
-          .gte("day", start)
-          .lt("day", end),
-        prev
-          ? supabase
-              .from("validation_items")
-              .select("points, validations!inner(status)")
-              .gte("day", monthRange(prev).start)
-              .lt("day", monthRange(prev).end)
-          : Promise.resolve({
-              data: [] as { points: number; validations: { status: string } | null }[],
-            }),
-      ]);
-
-      // Filter to only include active students who have a valid class assigned
-      const validStudents = (students ?? []).filter((s) => {
-        const className = (s.classes as { name: string } | null)?.name?.trim();
-        return Boolean(
-          s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas",
-        );
-      });
-
-      const approved = (items ?? []).filter(
-        (i) => (i.validations as { status: string } | null)?.status === "approved",
-      );
-      const prevApproved = ((prevItems.data ?? []) as {
-        points: number;
-        validations: unknown;
-      }[]).filter((i) => (i.validations as { status: string } | null)?.status === "approved");
-
-      const classOf = new Map<string, string>();
-      for (const s of validStudents) {
-        const className = (s.classes as { name: string } | null)!.name.trim();
-        classOf.set(s.id, className);
-      }
-
-      const classes = new Map<string, ClassRow>();
-      for (const s of validStudents) {
-        const name = classOf.get(s.id)!;
-        const row = classes.get(name) ?? { name, students: 0, points: 0, tumbler: 0, lunchbox: 0 };
-        row.students += 1;
-        classes.set(name, row);
-      }
-
-      const tumblerUsers = new Set<string>();
-      const lunchboxUsers = new Set<string>();
-      const classTumbler = new Map<string, Set<string>>();
-      const classLunchbox = new Map<string, Set<string>>();
-
-      const approvedValid = approved.filter((i) => classOf.has(i.student_id));
-
-      for (const i of approvedValid) {
-        const name = classOf.get(i.student_id)!;
-        const row = classes.get(name) ?? { name, students: 0, points: 0, tumbler: 0, lunchbox: 0 };
-        row.points += Number(i.points ?? 0);
-        classes.set(name, row);
-
-        if (i.item_code === "break_combo") {
-          if (!classTumbler.has(name)) classTumbler.set(name, new Set());
-          if (!classLunchbox.has(name)) classLunchbox.set(name, new Set());
-          classTumbler.get(name)!.add(i.student_id);
-          classLunchbox.get(name)!.add(i.student_id);
-          tumblerUsers.add(i.student_id);
-          lunchboxUsers.add(i.student_id);
-        } else {
-          const bucket = i.item_code === "tumbler" ? classTumbler : classLunchbox;
-          if (!bucket.has(name)) bucket.set(name, new Set());
-          bucket.get(name)!.add(i.student_id);
-          (i.item_code === "tumbler" ? tumblerUsers : lunchboxUsers).add(i.student_id);
-        }
-      }
-
-      const rows = [...classes.values()]
-        .map((r) => ({
-          ...r,
-          tumbler: Math.round(
-            ((classTumbler.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100,
-          ),
-          lunchbox: Math.round(
-            ((classLunchbox.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100,
-          ),
-        }))
-        .sort((a, b) => b.points - a.points);
-
-      const totalStudents = validStudents.length;
-      const totalPoints = approvedValid.reduce((a, i) => a + Number(i.points ?? 0), 0);
-      const prevPoints = prevApproved.reduce((a, i) => a + Number(i.points ?? 0), 0);
-
-      return {
-        rows,
-        totalStudents,
-        totalItems: approvedValid.length,
-        totalPoints,
-        tumblerRate: Math.round((tumblerUsers.size / Math.max(1, totalStudents)) * 100),
-        lunchboxRate: Math.round((lunchboxUsers.size / Math.max(1, totalStudents)) * 100),
-        growth: prevPoints > 0 ? Math.round(((totalPoints - prevPoints) / prevPoints) * 100) : null,
-        topClass: rows[0]?.name ?? "-",
-      };
+      const { data, error } = await supabase.from("periods").select("id, name, status, start_date, end_date").order("start_date", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
   });
-
+  const [periodId, setPeriodId] = useState("");
+  const selectedPeriod = periods.data?.find((p) => p.id === (periodId || periods.data?.find((p) => p.status === "ACTIVE")?.id));
+  const report = useQuery({
+    queryKey: ["formal-report", selectedPeriod?.id],
+    enabled: !!selectedPeriod,
+    queryFn: async () => {
+      const period = selectedPeriod!;
+      const previous = periods.data?.find((p) => p.end_date < period.start_date);
+      const [{ data: students }, { data: items }, prevItems] = await Promise.all([
+        supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
+        supabase.from("validation_items").select("item_code, points, student_id, day, validations!inner(status, period_id)").eq("validations.period_id", period.id).gte("day", period.start_date).lte("day", period.end_date),
+        previous ? supabase.from("validation_items").select("points, validations!inner(status, period_id)").eq("validations.period_id", previous.id) : Promise.resolve({ data: [] as { points: number; validations: unknown }[] }),
+      ]);
+      const validStudents = (students ?? []).filter((s) => { const className = (s.classes as { name: string } | null)?.name?.trim(); return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas"); });
+      const approved = (items ?? []).filter((i) => (i.validations as { status: string } | null)?.status === "approved");
+      const prevApproved = (prevItems.data ?? []).filter((i) => (i.validations as { status: string } | null)?.status === "approved");
+      const classOf = new Map(validStudents.map((s) => [s.id, (s.classes as { name: string }).name.trim()]));
+      const classes = new Map<string, ClassRow>(); const tumblerUsers = new Set<string>(); const lunchboxUsers = new Set<string>();
+      const classTumbler = new Map<string, Set<string>>(); const classLunchbox = new Map<string, Set<string>>();
+      for (const s of validStudents) { const name = classOf.get(s.id)!; classes.set(name, classes.get(name) ?? { name, students: 0, points: 0, tumbler: 0, lunchbox: 0 }); classes.get(name)!.students += 1; }
+      for (const i of approved.filter((item) => classOf.has(item.student_id))) {
+        const name = classOf.get(i.student_id)!; const row = classes.get(name)!; row.points += Number(i.points ?? 0);
+        const bucket = i.item_code === "tumbler" || i.item_code === "break_combo" ? classTumbler : classLunchbox; if (!bucket.has(name)) bucket.set(name, new Set()); bucket.get(name)!.add(i.student_id); (i.item_code === "tumbler" || i.item_code === "break_combo" ? tumblerUsers : lunchboxUsers).add(i.student_id);
+      }
+      const rows = [...classes.values()].map((r) => ({ ...r, tumbler: Math.round(((classTumbler.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100), lunchbox: Math.round(((classLunchbox.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100) })).sort((a, b) => b.points - a.points);
+      const totalPoints = approved.reduce((a, i) => a + Number(i.points ?? 0), 0); const prevPoints = prevApproved.reduce((a, i) => a + Number(i.points ?? 0), 0);
+      return { rows, totalStudents: validStudents.length, totalItems: approved.length, totalPoints, tumblerRate: Math.round((tumblerUsers.size / Math.max(1, validStudents.length)) * 100), lunchboxRate: Math.round((lunchboxUsers.size / Math.max(1, validStudents.length)) * 100), growth: prevPoints > 0 ? Math.round(((totalPoints - prevPoints) / prevPoints) * 100) : null, topClass: rows[0]?.name ?? "-" };
+    },
+  });
   const d = report.data;
-
-  function exportCsv() {
-    const header = "Peringkat,Kelas,Siswa,Poin,Tumbler Rate,Lunchbox Rate\n";
-    const body = (d?.rows ?? [])
-      .map((r, i) => `${i + 1},${r.name},${r.students},${r.points},${r.tumbler}%,${r.lunchbox}%`)
-      .join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([header + body], { type: "text/csv;charset=utf-8;" }));
-    a.download = `laporan-lingkungan-${month}.csv`;
-    a.click();
-  }
-
-  function handlePrintDirect() {
-    window.print();
-  }
+  const periodLabel = selectedPeriod?.name ?? "Periode";
+  function exportCsv() { const header = "Peringkat,Kelas,Siswa,Poin,Tumbler Rate,Lunchbox Rate\n"; const body = (d?.rows ?? []).map((r, i) => `${i + 1},${r.name},${r.students},${r.points},${r.tumbler}%,${r.lunchbox}%`).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([header + body], { type: "text/csv;charset=utf-8;" })); a.download = `laporan-lingkungan-${selectedPeriod?.id ?? "periode"}.csv`; a.click(); }
+  function handlePrintDirect() { window.print(); }
 
   return (
     <div className="space-y-5">
@@ -419,14 +324,14 @@ function LaporanPage() {
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
+            value={selectedPeriod?.id ?? ""}
+            onChange={(e) => setPeriodId(e.target.value)}
             className="h-9 rounded-xl border border-input bg-background px-3 text-sm font-semibold"
             aria-label="Pilih periode laporan"
           >
-            {months.map((m) => (
-              <option key={m} value={m}>
-                {monthLabel(m)}
+            {periods.data?.map((period) => (
+              <option key={period.id} value={period.id}>
+                {period.name} ({period.status})
               </option>
             ))}
           </select>
@@ -444,7 +349,7 @@ function LaporanPage() {
       </header>
 
       {/* DOCUMENT ON MAIN PAGE */}
-      <FormalReportDocument d={d} month={month} isModal={false} />
+      <FormalReportDocument d={d} period={selectedPeriod} isModal={false} />
 
       {/* POP UP PREVIEW PDF MODAL */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
@@ -462,7 +367,7 @@ function LaporanPage() {
                 </Badge>
               </div>
               <DialogDescription className="text-xs text-muted-foreground">
-                Periode: <strong>{monthLabel(month)}</strong> · SMP Negeri 99 Jakarta
+                Periode: <strong>{periodLabel}</strong> · SMP Negeri 99 Jakarta
               </DialogDescription>
             </div>
 
@@ -488,7 +393,7 @@ function LaporanPage() {
           {/* SCROLLABLE PDF SIMULATION VIEWER */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-100 dark:bg-slate-900/60">
             <div className="mx-auto flex flex-col items-center">
-              <FormalReportDocument d={d} month={month} isModal={true} />
+              <FormalReportDocument d={d} period={selectedPeriod} isModal={true} />
             </div>
           </div>
         </DialogContent>

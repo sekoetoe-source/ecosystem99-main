@@ -62,6 +62,9 @@ function AdminDashboard() {
         queryClient.invalidateQueries({ queryKey: ["leaderboard"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-kpi"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-queue"] }),
+        queryClient.invalidateQueries({ queryKey: ["formal-report"] }),
+        queryClient.invalidateQueries({ queryKey: ["school-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["jawara-data"] }),
       ]);
       if (!data || typeof data !== "object" || Array.isArray(data)) return;
       const targetPeriodName = data["target_period_name"];
