@@ -11,28 +11,45 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
   const [tab, setTab] = useState<Tab>("siswa");
   const [q, setQ] = useState("");
 
-  const students = useQuery({
-    queryKey: ["leaderboard", "siswa"],
+  const activePeriod = useQuery({
+    queryKey: ["active-period"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("student_scores")
+        .from("periods")
+        .select("id")
+        .eq("status", "ACTIVE")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const activePeriodId = activePeriod.data?.id;
+
+  const students = useQuery({
+    queryKey: ["leaderboard", "siswa", activePeriodId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("period_student_scores")
         .select("student_id, full_name, nis, class_name, earned_points")
-        .order("earned_points", { ascending: false })
-        .limit(100);
+        .eq("period_id", activePeriodId)
+        .order("earned_points", { ascending: false });
       if (error) throw error;
       return (data ?? []).filter((s) => {
         const c = (s.class_name ?? "").trim();
         return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
       });
     },
+    enabled: !!activePeriodId,
   });
 
   const classes = useQuery({
-    queryKey: ["leaderboard", "kelas"],
+    queryKey: ["leaderboard", "kelas", activePeriodId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("class_scores")
+        .from("period_class_scores")
         .select("class_id, class_name, student_count, total_points, avg_points")
+        .eq("period_id", activePeriodId)
         .order("total_points", { ascending: false });
       if (error) throw error;
       return (data ?? []).filter((c) => {
@@ -40,6 +57,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         return Boolean(name && name !== "-" && name.toLowerCase() !== "tanpa kelas");
       });
     },
+    enabled: !!activePeriodId,
   });
 
   // Aggregate real student scores by class for accurate class leaderboard

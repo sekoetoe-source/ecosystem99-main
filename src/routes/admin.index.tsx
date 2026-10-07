@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Leaf, TrendingUp, Users, X, RotateCcw, AlertCircle } from "lucide-react";
@@ -30,6 +31,7 @@ function todayJakarta() {
 function AdminDashboard() {
   const { me } = useMe();
   const queryClient = useQueryClient();
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const activePeriod = useQuery({
     queryKey: ["active-period"],
@@ -46,22 +48,25 @@ function AdminDashboard() {
 
   const resetPoint = useMutation({
     mutationFn: async () => {
-      const confirmed = window.confirm(
-        `Reset point periode ${activePeriod.data?.name}?\n\nPeriode aktif akan ditutup dan periode baru dimulai dari 0 point.\n\nRiwayat validation dan Audit Trail tidak akan dihapus.\n\nLanjutkan?`,
-      );
-      if (!confirmed) return null;
       const { data, error } = await supabase.rpc("reset_point");
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      setResetConfirmOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["active-period"] }),
+        queryClient.invalidateQueries({ queryKey: ["periods"] }),
+        queryClient.invalidateQueries({ queryKey: ["period-student-scores"] }),
+        queryClient.invalidateQueries({ queryKey: ["period-class-scores"] }),
+        queryClient.invalidateQueries({ queryKey: ["leaderboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-kpi"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-queue"] }),
+      ]);
       if (!data || typeof data !== "object" || Array.isArray(data)) return;
       const targetPeriodName = data["target_period_name"];
       if (typeof targetPeriodName !== "string") return;
       toast.success(`Reset point berhasil. Periode ${targetPeriodName} telah dimulai dari 0 point.`);
-      queryClient.invalidateQueries({ queryKey: ["active-period"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-kpi"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-queue"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal mereset point"),
   });
@@ -165,7 +170,7 @@ function AdminDashboard() {
             <p className="mt-2 text-xs font-medium text-blue-700">Status: ACTIVE • Poin periode dimulai dari 0</p>
           </div>
           <Button
-            onClick={() => resetPoint.mutate()}
+            onClick={() => setResetConfirmOpen(true)}
             disabled={!activePeriod.data || resetPoint.isPending}
             size="lg"
             className="gap-2 self-start"
@@ -265,6 +270,42 @@ function AdminDashboard() {
           ))}
         </div>
       </div>
+      {resetConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-point-title"
+            className="w-full max-w-md rounded-2xl border border-border bg-white p-6 shadow-xl"
+          >
+            <h2 id="reset-point-title" className="text-xl font-bold text-foreground">
+              Reset point periode {activePeriod.data?.name}?
+            </h2>
+            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+              <p>Periode aktif akan ditutup dan periode baru dimulai dari 0 point.</p>
+              <p>Riwayat validation dan Audit Trail tidak akan dihapus.</p>
+              <p className="font-semibold text-foreground">Lanjutkan?</p>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setResetConfirmOpen(false)}
+                disabled={resetPoint.isPending}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={() => resetPoint.mutate()}
+                disabled={resetPoint.isPending}
+              >
+                {resetPoint.isPending ? "Memproses..." : "Reset Point"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
