@@ -29,6 +29,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
   const students = useQuery({
     queryKey: ["leaderboard", "siswa", activePeriodId],
     queryFn: async () => {
+      if (!activePeriodId) return [];
       const { data, error } = await supabase
         .from("period_student_scores")
         .select("student_id, full_name, nis, class_name, earned_points")
@@ -46,6 +47,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
   const classes = useQuery({
     queryKey: ["leaderboard", "kelas", activePeriodId],
     queryFn: async () => {
+      if (!activePeriodId) return [];
       const { data, error } = await supabase
         .from("period_class_scores")
         .select("class_id, class_name, student_count, total_points, avg_points")
