@@ -72,15 +72,14 @@ function AdminDashboard() {
   });
 
   const kpi = useQuery({
-    queryKey: ["admin-kpi"],
+    queryKey: ["admin-kpi", activePeriod.data?.id],
+    enabled: !!activePeriod.data?.id,
     queryFn: async () => {
+      const period = activePeriod.data!;
       const [studentsRes, todayItems, scoresRes, pendingAccountsRes] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").not("class_id", "is", null),
-        supabase
-          .from("validation_items")
-          .select("student_id, points, validations!inner(status)")
-          .eq("day", todayJakarta()),
-        supabase.from("student_scores").select("earned_points, total_items, class_name"),
+        supabase.from("validation_items").select("student_id, points, validations!inner(status, period_id)").eq("day", todayJakarta()).eq("validations.period_id", period.id),
+        supabase.from("period_student_scores").select("earned_points, total_items, class_name").eq("period_id", period.id),
         supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_approved", false),
       ]);
 
@@ -88,24 +87,14 @@ function AdminDashboard() {
         const className = (s.classes as { name: string } | null)?.name?.trim();
         return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas");
       });
-
       const validScores = (scoresRes.data ?? []).filter((s) => {
         const c = (s.class_name ?? "").trim();
         return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
       });
-
-      const approvedToday = (todayItems.data ?? []).filter(
-        (i) => (i.validations as { status: string } | null)?.status === "approved",
-      );
+      const approvedToday = (todayItems.data ?? []).filter((i) => (i.validations as { status: string } | null)?.status === "approved");
       const participants = new Set(approvedToday.map((i) => i.student_id)).size;
       const totalItems = validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
-      return {
-        studentCount: validStudents.length,
-        participants,
-        pointsToday: approvedToday.reduce((a, i) => a + i.points, 0),
-        pendingCount: pendingAccountsRes.count ?? 0,
-        co2Kg: Math.round((totalItems * 70) / 1000),
-      };
+      return { studentCount: validStudents.length, participants, pointsToday: approvedToday.reduce((a, i) => a + i.points, 0), pendingCount: pendingAccountsRes.count ?? 0, co2Kg: Math.round((totalItems * 70) / 1000) };
     },
   });
 
