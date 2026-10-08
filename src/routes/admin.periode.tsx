@@ -57,23 +57,32 @@ function PeriodPage() {
   const [editing, setEditing] = useState<Session | null>(null);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
+    new Date(),
+  );
   const periods = useQuery({
-    queryKey: ["periods"],
+    queryKey: ["current-period", currentDate],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("periods")
         .select("id, name, status, start_date, end_date")
-        .order("start_date", { ascending: false });
+        .lte("start_date", currentDate)
+        .gte("end_date", currentDate)
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
-      return data ?? [];
+      return data;
     },
   });
   const sessions = useQuery({
-    queryKey: ["operational-sessions"],
+    queryKey: ["operational-sessions", periods.data?.id],
+    enabled: Boolean(periods.data?.id),
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("operational_sessions")
         .select("id, period_id, session_number, name, start_time, end_time, enabled")
+        .eq("period_id", periods.data!.id)
         .in("session_number", [1, 2])
         .order("session_number");
       if (error) throw error;
@@ -110,7 +119,8 @@ function PeriodPage() {
           enabled: input.enabled,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", input.id);
+        .eq("id", input.id)
+        .eq("period_id", periods.data?.id);
       if (error)
         throw new Error(
           error.code === "23P01" ? "Jam sesi bertumpuk dengan sesi lain." : error.message,
@@ -123,11 +133,8 @@ function PeriodPage() {
     },
     onError: (error: Error) => toast.error(error.message),
   });
-  const active = periods.data?.find((period) => period.status === "ACTIVE");
-  const visibleSessions = useMemo(
-    () => (sessions.data ?? []).filter((session) => session.session_number <= 2),
-    [sessions.data],
-  );
+  const active = periods.data;
+  const visibleSessions = useMemo(() => sessions.data ?? [], [sessions.data]);
   const openEditor = (session: Session) => {
     setEditing(session);
     setStartTime(session.start_time.slice(0, 5));

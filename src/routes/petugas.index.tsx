@@ -158,12 +158,32 @@ function ScannerPage() {
     },
   });
 
+  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
+    new Date(),
+  );
+  const currentPeriod = useQuery({
+    queryKey: ["current-period", currentDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("periods")
+        .select("id")
+        .lte("start_date", currentDate)
+        .gte("end_date", currentDate)
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
   const operationalSessions = useQuery({
-    queryKey: ["operational-sessions"],
+    queryKey: ["operational-sessions", currentPeriod.data?.id],
+    enabled: Boolean(currentPeriod.data?.id),
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("operational_sessions")
         .select("session_number, start_time, end_time, enabled")
+        .eq("period_id", currentPeriod.data!.id)
         .in("session_number", [1, 2])
         .order("session_number");
       if (error) throw error;
