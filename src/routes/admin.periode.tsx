@@ -79,12 +79,9 @@ function PeriodPage() {
     queryKey: ["operational-sessions", periods.data?.id],
     enabled: Boolean(periods.data?.id),
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("operational_sessions")
-        .select("id, period_id, session_number, name, start_time, end_time, enabled")
-        .eq("period_id", periods.data!.id)
-        .in("session_number", [1, 2])
-        .order("session_number");
+      const { data, error } = await (supabase as any).rpc("get_current_operational_sessions", {
+        p_at: new Date().toISOString(),
+      });
       if (error) throw error;
       return (data ?? []) as Session[];
     },

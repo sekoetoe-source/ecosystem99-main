@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS public.operational_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   period_id uuid NOT NULL REFERENCES public.periods(id) ON DELETE CASCADE,
-  session_number integer NOT NULL CHECK (session_number BETWEEN 1 AND 3),
+  session_number integer NOT NULL CHECK (session_number BETWEEN 1 AND 2),
   name text NOT NULL,
   start_time time NOT NULL,
   end_time time NOT NULL,
@@ -26,7 +26,7 @@ $$;
 DROP TRIGGER IF EXISTS operational_sessions_no_overlap ON public.operational_sessions;
 CREATE TRIGGER operational_sessions_no_overlap BEFORE INSERT OR UPDATE ON public.operational_sessions FOR EACH ROW EXECUTE FUNCTION public.prevent_operational_session_overlap();
 INSERT INTO public.operational_sessions (period_id, session_number, name, start_time, end_time, enabled)
-SELECT p.id, v.session_number, v.name, v.start_time::time, v.end_time::time, true FROM public.periods p CROSS JOIN (VALUES (1, 'Sesi 1', '06:30', '07:30'), (2, 'Sesi 2', '09:00', '10:00'), (3, 'Sesi 3', '11:30', '12:30')) v(session_number, name, start_time, end_time)
+SELECT p.id, v.session_number, v.name, v.start_time::time, v.end_time::time, true FROM public.periods p CROSS JOIN (VALUES (1, 'Sesi 1', '06:30', '07:30'), (2, 'Sesi 2', '09:00', '10:00')) v(session_number, name, start_time, end_time)
 WHERE NOT EXISTS (SELECT 1 FROM public.operational_sessions s WHERE s.period_id = p.id AND s.session_number = v.session_number);
 ALTER TABLE public.operational_sessions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Authenticated users read operational sessions" ON public.operational_sessions;

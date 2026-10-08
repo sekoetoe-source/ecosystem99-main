@@ -180,12 +180,9 @@ function ScannerPage() {
     queryKey: ["operational-sessions", currentPeriod.data?.id],
     enabled: Boolean(currentPeriod.data?.id),
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("operational_sessions")
-        .select("session_number, start_time, end_time, enabled")
-        .eq("period_id", currentPeriod.data!.id)
-        .in("session_number", [1, 2])
-        .order("session_number");
+      const { data, error } = await (supabase as any).rpc("get_current_operational_sessions", {
+        p_at: new Date().toISOString(),
+      });
       if (error) throw error;
       return data ?? [];
     },
