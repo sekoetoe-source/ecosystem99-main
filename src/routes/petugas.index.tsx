@@ -43,12 +43,12 @@ import {
 export const Route = createFileRoute("/petugas/")({
   head: () => ({
     meta: [
-      { title: "Scanner Petugas — School Ecosystem" },
+      { title: "Scanner Petugas â€” School Ecosystem" },
       {
         name: "description",
         content: "Pindai QR siswa untuk memvalidasi tumbler dan kotak makan per sesi pemeriksaan.",
       },
-      { property: "og:title", content: "Scanner Petugas — School Ecosystem" },
+      { property: "og:title", content: "Scanner Petugas â€” School Ecosystem" },
       { property: "og:description", content: "Validasi Eco-Points siswa lewat pemindaian QR multi-sesi." },
     ],
   }),
@@ -203,7 +203,7 @@ function ScannerPage() {
 
       // 3. Resolve the scheduled operational session server-side.
       // The RPC evaluates the Jakarta date/time and enabled session windows.
-      const { data: activeSessionRows, error: sessionError } = await supabase.rpc(
+      const { data: activeSessionRows, error: sessionError } = await (supabase as any).rpc(
         "get_active_operational_session",
         { p_at: new Date().toISOString() }
       );
@@ -222,7 +222,7 @@ function ScannerPage() {
 
       // 4. Insert validation row
       const stationName = me?.officer?.station || SCAN_SESSIONS[activeSession].defaultStation;
-      const { data: validation, error: vError } = await supabase
+      const { data: validation, error: vError } = await (supabase as any)
         .from("validations")
         .insert({
           student_id: student.id,
@@ -315,7 +315,7 @@ function ScannerPage() {
           timestamp: new Date(),
         });
         toast.success(
-          `${res.student.full_name} — ${res.summaryLabel} — +${res.totalPointsAdded} poin`
+          `${res.student.full_name} â€” ${res.summaryLabel} â€” +${res.totalPointsAdded} poin`
         );
         setNis("");
         queryClient.invalidateQueries({ queryKey: ["officer-recent"] });
@@ -433,8 +433,8 @@ function ScannerPage() {
                   </div>
                   {feedback.status === "success" && (
                     <p className="text-sm font-medium">
-                      <span className="font-bold">{feedback.studentName}</span> —{" "}
-                      {feedback.itemSummary} —{" "}
+                      <span className="font-bold">{feedback.studentName}</span> â€”{" "}
+                      {feedback.itemSummary} â€”{" "}
                       <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
                         +{feedback.points} poin
                       </span>
@@ -470,7 +470,7 @@ function ScannerPage() {
                     : "border-amber-500/40 text-amber-600 bg-amber-500/10"
                 )}
               >
-                Aktif: {session === "entry" ? "Sesi 1 — Masuk" : "Sesi 2 — Istirahat"}
+                Aktif: {session === "entry" ? "Sesi 1 â€” Masuk" : "Sesi 2 â€” Istirahat"}
               </Badge>
             </div>
 
@@ -491,7 +491,7 @@ function ScannerPage() {
                     : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40"
                 )}
               >
-                <span className="text-lg leading-none shrink-0">🌅</span>
+                <span className="text-lg leading-none shrink-0">ðŸŒ…</span>
                 <div className="leading-tight text-center sm:text-left">
                   <span className="block font-black text-xs sm:text-sm">Sesi 1</span>
                   <span className="block text-[10px] sm:text-xs font-semibold opacity-90">Masuk Sekolah</span>
@@ -513,7 +513,7 @@ function ScannerPage() {
                     : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40"
                 )}
               >
-                <span className="text-lg leading-none shrink-0">🍱</span>
+                <span className="text-lg leading-none shrink-0">ðŸ±</span>
                 <div className="leading-tight text-center sm:text-left">
                   <span className="block font-black text-xs sm:text-sm">Sesi 2</span>
                   <span className="block text-[10px] sm:text-xs font-semibold opacity-90">Istirahat / Kantin</span>
@@ -779,9 +779,9 @@ function ScannerPage() {
                   <span className="font-medium text-foreground/80">
                     {sessMeta.shortLabel}
                   </span>
-                  <span>·</span>
+                  <span>Â·</span>
                   <span>{itemNames || "-"}</span>
-                  <span>·</span>
+                  <span>Â·</span>
                   <span>{new Date(r.created_at).toLocaleTimeString("id-ID")}</span>
                 </div>
               </div>

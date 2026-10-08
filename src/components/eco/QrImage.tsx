@@ -9,7 +9,7 @@ export function generateQrSvg(text: string): string {
   if (cached) return cached;
 
   try {
-    const qr = QRCode.create(text, { errorCorrectionLevel: "M", margin: 1 });
+    const qr = QRCode.create(text, { errorCorrectionLevel: "M" });
     const size = qr.modules.size;
     const data = qr.modules.data;
     let path = "";

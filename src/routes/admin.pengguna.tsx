@@ -33,12 +33,12 @@ import {
 export const Route = createFileRoute("/admin/pengguna")({
   head: () => ({
     meta: [
-      { title: "Data Pengguna — School Ecosystem" },
+      { title: "Data Pengguna â€” School Ecosystem" },
       {
         name: "description",
         content: "Daftar siswa, kelas, petugas pos, dan wali kelas yang terdaftar dalam ekosistem hijau sekolah.",
       },
-      { property: "og:title", content: "Data Pengguna — School Ecosystem" },
+      { property: "og:title", content: "Data Pengguna â€” School Ecosystem" },
       { property: "og:description", content: "Kelola data siswa dan petugas pos sekolah." },
     ],
   }),
@@ -130,7 +130,7 @@ function PenggunaPage() {
   const [addNewsOpen, setAddNewsOpen] = useState(false);
   const [newsTitle, setNewsTitle] = useState("");
   const [newsCategory, setNewsCategory] = useState<EcoNewsCategory>("lingkungan");
-  const [newsIcon, setNewsIcon] = useState("🌿");
+  const [newsIcon, setNewsIcon] = useState("ðŸŒ¿");
   const [newsSummary, setNewsSummary] = useState("");
   const [newsContent, setNewsContent] = useState("");
   const [newsSource, setNewsSource] = useState("");
@@ -151,7 +151,7 @@ function PenggunaPage() {
     const updated = addEcoNewsItemLocal({
       title: newsTitle.trim(),
       category: newsCategory,
-      icon: newsIcon || "🌿",
+      icon: newsIcon || "ðŸŒ¿",
       summary: newsSummary.trim(),
       content: newsContent.trim() || newsSummary.trim(),
       source: newsSource.trim() || "SMPN 99 Eco Care",
@@ -365,12 +365,12 @@ function PenggunaPage() {
         throw new Error("Wali Kelas wajib memilih kelas yang diampu");
       }
       const isClassRole = approveRole === "student" || approveRole === "teacher";
-      const { error } = await supabase.rpc("admin_approve_user", {
+      const { error } = await (supabase as any).rpc("admin_approve_user", {
         _user_id: approveUser.id,
         _role: approveRole,
-        _class_id: isClassRole && approveClassId ? approveClassId : null,
-        _nis: approveRole === "student" && approveNis ? approveNis : null,
-        _station: approveRole === "officer" ? approveStation : null,
+        ...(isClassRole && approveClassId ? { _class_id: approveClassId } : {}),
+        ...(approveRole === "student" && approveNis ? { _nis: approveNis } : {}),
+        ...(approveRole === "officer" ? { _station: approveStation } : {}),
       });
       if (error) throw error;
 
@@ -532,7 +532,7 @@ function PenggunaPage() {
   const createUserMutation = useMutation({
     mutationFn: async () => {
       if (!addEmail || !addPassword || !addFullName) throw new Error("Email, password, dan nama wajib diisi");
-      
+
       let finalEmail = addEmail.trim();
       if (!finalEmail.includes("@")) {
         finalEmail = `${finalEmail}@smpn99.sch.id`;
@@ -544,8 +544,8 @@ function PenggunaPage() {
         _password: addPassword,
         _full_name: addFullName,
         _role: addRole,
-        _class_id: (addRole === "student" || addRole === "teacher") && addClassId ? addClassId : null,
-        _station: addRole === "officer" ? addStation : null,
+        ...(addRole === "student" || addRole === "teacher") && addClassId ? { _class_id: addClassId } : {},
+        ...(addRole === "officer" ? { _station: addStation } : {}),
       });
 
       if (!rpcRes.error) {
@@ -555,7 +555,7 @@ function PenggunaPage() {
       // 2. Fallback jika admin_create_user belum tersedia: Buat auth terisolasi lalu approve via canonical RPC admin_approve_user
       const SUPABASE_URL = (import.meta as any).env['VITE_SUPABASE_URL'] || (process as any).env['SUPABASE_URL'];
       const SUPABASE_PUBLISHABLE_KEY = (import.meta as any).env['VITE_SUPABASE_PUBLISHABLE_KEY'] || (process as any).env['SUPABASE_PUBLISHABLE_KEY'];
-      
+
       const tempSupabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
@@ -579,9 +579,9 @@ function PenggunaPage() {
       const { error: approveErr } = await supabase.rpc("admin_approve_user", {
         _user_id: newUserId,
         _role: addRole,
-        _class_id: (addRole === "student" || addRole === "teacher") && addClassId ? addClassId : null,
-        _nis: null,
-        _station: addRole === "officer" ? addStation : null,
+        ...(addRole === "student" || addRole === "teacher") && addClassId ? { _class_id: addClassId } : {},
+
+        ...(addRole === "officer" ? { _station: addStation } : {}),
       });
 
       if (approveErr) {
@@ -700,12 +700,12 @@ function PenggunaPage() {
       }
       const isClassRole = newRole === "student" || newRole === "teacher";
       const targetNis = newRole === "student" ? (newNis.trim() || changeRoleUser.nis || null) : null;
-      const { error } = await supabase.rpc("admin_approve_user", {
+      const { error } = await (supabase as any).rpc("admin_approve_user", {
         _user_id: changeRoleUser.id,
         _role: newRole,
-        _class_id: isClassRole && newClassId ? newClassId : null,
-        _nis: targetNis,
-        _station: newRole === "officer" ? newStation : null,
+        ...(isClassRole && newClassId ? { _class_id: newClassId } : {}),
+        ...(targetNis ? { _nis: targetNis } : {}),
+        ...(newRole === "officer" ? { _station: newStation } : {}),
       });
       if (error) throw error;
 
@@ -881,6 +881,7 @@ function PenggunaPage() {
         document.title = originalTitle;
       };
     }
+    return undefined;
   }, [printClass]);
 
   return (
@@ -892,7 +893,7 @@ function PenggunaPage() {
           { id: "petugas", label: "Petugas Pos" },
           { id: "semua", label: "Semua Akun & Role" },
           { id: "persetujuan", label: "Persetujuan Akun" },
-          { id: "running-text", label: "📢 Running Text (AI Info)" },
+          { id: "running-text", label: "ðŸ“¢ Running Text (AI Info)" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1013,8 +1014,8 @@ function PenggunaPage() {
                 >
                   <option value="nama-asc">Urutkan: Nama (A - Z)</option>
                   <option value="nama-desc">Urutkan: Nama (Z - A)</option>
-                  <option value="kelas-asc">Urutkan: Kelas (7A → 9H)</option>
-                  <option value="kelas-desc">Urutkan: Kelas (9H → 7A)</option>
+                  <option value="kelas-asc">Urutkan: Kelas (7A â†’ 9H)</option>
+                  <option value="kelas-desc">Urutkan: Kelas (9H â†’ 7A)</option>
                   <option value="nis-asc">Urutkan: NIS</option>
                   <option value="poin-desc">Urutkan: Poin Terbanyak</option>
                 </select>
@@ -1450,7 +1451,7 @@ function PenggunaPage() {
           <header className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl flex items-center gap-2">
-                📢 Info Berjalan (Running Text Lingkungan & Kesehatan)
+                ðŸ“¢ Info Berjalan (Running Text Lingkungan & Kesehatan)
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Headline berita & tips kesehatan remaja/sekolah (AQI Jakarta, bebas plastik, hidrasi, dll) yang berjalan di beranda dan dasbor.
@@ -1468,11 +1469,11 @@ function PenggunaPage() {
                   setNewsContent(ai.content);
                   setNewsSource(ai.source);
                   setAddNewsOpen(true);
-                  toast.success(`✨ AI News Generator dibuka! Berita "${ai.label}" telah disiapkan.`);
+                  toast.success(`âœ¨ AI News Generator dibuka! Berita "${ai.label}" telah disiapkan.`);
                 }}
                 className="gap-2 rounded-full font-bold border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 shadow-sm"
               >
-                <Sparkles className="size-4 text-emerald-600 animate-pulse" /> ✨ Generate AI News
+                <Sparkles className="size-4 text-emerald-600 animate-pulse" /> âœ¨ Generate AI News
               </Button>
               <Button
                 onClick={() => setAddNewsOpen(true)}
@@ -1512,7 +1513,7 @@ function PenggunaPage() {
                 return (
                   <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-muted/20 transition-colors">
                     <div className="flex items-start gap-3.5">
-                      <span className="text-3xl shrink-0 p-2 rounded-2xl bg-muted/60">{item.icon || "🌿"}</span>
+                      <span className="text-3xl shrink-0 p-2 rounded-2xl bg-muted/60">{item.icon || "ðŸŒ¿"}</span>
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${getCategoryBadgeStyle(item.category)}`}>
@@ -1568,7 +1569,7 @@ function PenggunaPage() {
         <DialogContent className="max-w-sm text-center">
           <DialogHeader>
             <DialogTitle>QR Code Siswa</DialogTitle>
-            <DialogDescription>{selectedStudent?.full_name} · NIS {selectedStudent?.nis}</DialogDescription>
+            <DialogDescription>{selectedStudent?.full_name} Â· NIS {selectedStudent?.nis}</DialogDescription>
           </DialogHeader>
           <div className="rounded-2xl border border-border bg-white p-4 shadow-inner">
             <QrImage value={String(selectedStudent?.nis ?? "")} size={280} />
@@ -2033,7 +2034,7 @@ function PenggunaPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-extrabold text-xs text-emerald-800 dark:text-emerald-300">
                   <Sparkles className="size-4 text-emerald-600 animate-pulse" />
-                  <span>✨ AI Eco-Health News Generator</span>
+                  <span>âœ¨ AI Eco-Health News Generator</span>
                 </div>
                 <span className="text-[10px] bg-emerald-600 text-white font-extrabold px-2 py-0.5 rounded-full shadow-sm">
                   Smart AI Prompts
@@ -2042,7 +2043,7 @@ function PenggunaPage() {
               <p className="text-[11px] text-muted-foreground leading-snug">
                 Pilih topik AI di bawah ini atau klik <strong>Generate Acak AI</strong> untuk membuat berita/tips kesehatan & lingkungan otomatis:
               </p>
-              
+
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {AI_NEWS_PROMPTS.map((prompt) => (
                   <button
@@ -2056,7 +2057,7 @@ function PenggunaPage() {
                       setNewsSummary(ai.summary);
                       setNewsContent(ai.content);
                       setNewsSource(ai.source);
-                      toast.success(`✨ Berita AI "${ai.label}" berhasil digenerate!`);
+                      toast.success(`âœ¨ Berita AI "${ai.label}" berhasil digenerate!`);
                     }}
                     className="text-[10px] font-bold bg-background hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 border border-border hover:border-emerald-600 px-2.5 py-1 rounded-xl transition-all shadow-xs"
                   >
@@ -2078,7 +2079,7 @@ function PenggunaPage() {
                   setNewsSummary(ai.summary);
                   setNewsContent(ai.content);
                   setNewsSource(ai.source);
-                  toast.success(`✨ AI berhasil meng-generate berita acak!`);
+                  toast.success(`âœ¨ AI berhasil meng-generate berita acak!`);
                 }}
               >
                 <Wand2 className="size-3.5 text-emerald-600" />
@@ -2090,7 +2091,7 @@ function PenggunaPage() {
               <label className="text-xs font-bold text-foreground">Judul Headline / Berita</label>
               <input
                 type="text"
-                placeholder="Contoh: 🥤 Tips Hidrasi Remaja Saat Jam Istirahat"
+                placeholder="Contoh: ðŸ¥¤ Tips Hidrasi Remaja Saat Jam Istirahat"
                 value={newsTitle}
                 onChange={(e) => setNewsTitle(e.target.value)}
                 className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
@@ -2116,7 +2117,7 @@ function PenggunaPage() {
                 <label className="text-xs font-bold text-foreground">Ikon Emoji</label>
                 <input
                   type="text"
-                  placeholder="Contoh: 🌿"
+                  placeholder="Contoh: ðŸŒ¿"
                   value={newsIcon}
                   onChange={(e) => setNewsIcon(e.target.value)}
                   className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
@@ -2221,10 +2222,10 @@ function PenggunaPage() {
                         style={{ breakInside: "avoid", pageBreakInside: "avoid" }}
                       >
                         <div className="gradient-hero w-full rounded-lg p-1.5 text-primary-foreground shadow-sm">
-                          <span className="label-xs text-primary-foreground/80 text-[7px] block">ECO TAG • SMPN 99</span>
+                          <span className="label-xs text-primary-foreground/80 text-[7px] block">ECO TAG â€¢ SMPN 99</span>
                           <h3 className="mt-0.5 text-[11px] font-extrabold truncate leading-tight">{s.full_name}</h3>
                           <p className="text-[9px] opacity-90 leading-tight">
-                            Kelas {s.class_name || "-"} · NIS {s.nis}
+                            Kelas {s.class_name || "-"} Â· NIS {s.nis}
                           </p>
                         </div>
                         <div className="my-1 rounded-lg bg-card p-1 shadow-sm border border-border flex items-center justify-center mx-auto text-center w-full max-w-[120px]">
