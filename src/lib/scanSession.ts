@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Domain concepts and business rules for Multi-Session Eco Scan.
  */
 
@@ -22,7 +22,7 @@ export const SCAN_SESSIONS: Record<ScanSession, SessionConfig> = {
     badge: "SESI 1",
     description: "Pagi hari di gerbang utama / pos kedatangan sekolah",
     defaultStation: "Gerbang Utama",
-    icon: "🌅",
+    icon: "entry",
   },
   break: {
     key: "break",
@@ -31,7 +31,7 @@ export const SCAN_SESSIONS: Record<ScanSession, SessionConfig> = {
     badge: "SESI 2",
     description: "Jam istirahat dan jajan ramah lingkungan di kantin",
     defaultStation: "Kantin",
-    icon: "🍱",
+    icon: "break",
   },
 };
 
@@ -176,3 +176,4 @@ export function formatJakartaDate(isoString: string): string {
     return "";
   }
 }
+

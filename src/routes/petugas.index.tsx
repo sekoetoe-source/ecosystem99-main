@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
 import {
@@ -43,12 +43,12 @@ import {
 export const Route = createFileRoute("/petugas/")({
   head: () => ({
     meta: [
-      { title: "Scanner Petugas â€” School Ecosystem" },
+      { title: "Scanner Petugas Ã¢â‚¬â€ School Ecosystem" },
       {
         name: "description",
         content: "Pindai QR siswa untuk memvalidasi tumbler dan kotak makan per sesi pemeriksaan.",
       },
-      { property: "og:title", content: "Scanner Petugas â€” School Ecosystem" },
+      { property: "og:title", content: "Scanner Petugas Ã¢â‚¬â€ School Ecosystem" },
       { property: "og:description", content: "Validasi Eco-Points siswa lewat pemindaian QR multi-sesi." },
     ],
   }),
@@ -315,7 +315,7 @@ function ScannerPage() {
           timestamp: new Date(),
         });
         toast.success(
-          `${res.student.full_name} â€” ${res.summaryLabel} â€” +${res.totalPointsAdded} poin`
+          `${res.student.full_name} Ã¢â‚¬â€ ${res.summaryLabel} Ã¢â‚¬â€ +${res.totalPointsAdded} poin`
         );
         setNis("");
         queryClient.invalidateQueries({ queryKey: ["officer-recent"] });
@@ -433,8 +433,8 @@ function ScannerPage() {
                   </div>
                   {feedback.status === "success" && (
                     <p className="text-sm font-medium">
-                      <span className="font-bold">{feedback.studentName}</span> â€”{" "}
-                      {feedback.itemSummary} â€”{" "}
+                      <span className="font-bold">{feedback.studentName}</span> Ã¢â‚¬â€{" "}
+                      {feedback.itemSummary} Ã¢â‚¬â€{" "}
                       <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
                         +{feedback.points} poin
                       </span>
@@ -470,7 +470,7 @@ function ScannerPage() {
                     : "border-amber-500/40 text-amber-600 bg-amber-500/10"
                 )}
               >
-                Aktif: {session === "entry" ? "Sesi 1 â€” Masuk" : "Sesi 2 â€” Istirahat"}
+                Aktif: {session === "entry" ? "Sesi 1 — Masuk" : "Sesi 2 — Istirahat"}
               </Badge>
             </div>
 
@@ -491,7 +491,7 @@ function ScannerPage() {
                     : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40"
                 )}
               >
-                <span className="text-lg leading-none shrink-0">ðŸŒ…</span>
+                <span className="text-lg leading-none shrink-0">Ã°Å¸Å’â€¦</span>
                 <div className="leading-tight text-center sm:text-left">
                   <span className="block font-black text-xs sm:text-sm">Sesi 1</span>
                   <span className="block text-[10px] sm:text-xs font-semibold opacity-90">Masuk Sekolah</span>
@@ -513,7 +513,7 @@ function ScannerPage() {
                     : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40"
                 )}
               >
-                <span className="text-lg leading-none shrink-0">ðŸ±</span>
+                <span className="text-lg leading-none shrink-0">Ã°Å¸ÂÂ±</span>
                 <div className="leading-tight text-center sm:text-left">
                   <span className="block font-black text-xs sm:text-sm">Sesi 2</span>
                   <span className="block text-[10px] sm:text-xs font-semibold opacity-90">Istirahat / Kantin</span>
@@ -779,9 +779,9 @@ function ScannerPage() {
                   <span className="font-medium text-foreground/80">
                     {sessMeta.shortLabel}
                   </span>
-                  <span>Â·</span>
+                  <span>Ã‚Â·</span>
                   <span>{itemNames || "-"}</span>
-                  <span>Â·</span>
+                  <span>Ã‚Â·</span>
                   <span>{new Date(r.created_at).toLocaleTimeString("id-ID")}</span>
                 </div>
               </div>
@@ -803,3 +803,5 @@ function ScannerPage() {
     </div>
   );
 }
+
+
