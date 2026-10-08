@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
 import {
@@ -12,6 +12,7 @@ import {
   Loader2,
   ScanLine,
   Sparkles,
+  School,
   UtensilsCrossed,
   XCircle,
 } from "lucide-react";
@@ -40,16 +41,39 @@ import {
   playErrorSound,
 } from "@/lib/scannerAudio";
 
+function getJakartaMinutes() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  return (
+    Number(parts.find((part) => part.type === "hour")?.value ?? 0) * 60 +
+    Number(parts.find((part) => part.type === "minute")?.value ?? 0)
+  );
+}
+
+function getRuntimeStatus(startTime: string, endTime: string) {
+  const now = getJakartaMinutes();
+  const start = Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3, 5));
+  const end = Number(endTime.slice(0, 2)) * 60 + Number(endTime.slice(3, 5));
+  return now < start ? "Belum dimulai" : now < end ? "Sedang berlangsung" : "Selesai";
+}
+
 export const Route = createFileRoute("/petugas/")({
   head: () => ({
     meta: [
-      { title: "Scanner Petugas Ã¢â‚¬â€ School Ecosystem" },
+      { title: "Scanner Petugas — School Ecosystem" },
       {
         name: "description",
         content: "Pindai QR siswa untuk memvalidasi tumbler dan kotak makan per sesi pemeriksaan.",
       },
-      { property: "og:title", content: "Scanner Petugas Ã¢â‚¬â€ School Ecosystem" },
-      { property: "og:description", content: "Validasi Eco-Points siswa lewat pemindaian QR multi-sesi." },
+      { property: "og:title", content: "Scanner Petugas — School Ecosystem" },
+      {
+        property: "og:description",
+        content: "Validasi Eco-Points siswa lewat pemindaian QR multi-sesi.",
+      },
     ],
   }),
   component: ScannerPage,
@@ -126,11 +150,24 @@ function ScannerPage() {
       const { data } = await supabase
         .from("validations")
         .select(
-          "id, status, created_at, session, station, students(full_name, nis), validation_items(item_code, points)"
+          "id, status, created_at, session, station, students(full_name, nis), validation_items(item_code, points)",
         )
         .order("created_at", { ascending: false })
         .limit(10);
       return (data as any[]) ?? [];
+    },
+  });
+
+  const operationalSessions = useQuery({
+    queryKey: ["operational-sessions"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("operational_sessions")
+        .select("session_number, start_time, end_time, enabled")
+        .in("session_number", [1, 2])
+        .order("session_number");
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -155,7 +192,7 @@ function ScannerPage() {
 
       const { allocations, totalPoints, summaryLabel } = calculateSessionPoints(
         activeSession,
-        itemsToValidate
+        itemsToValidate,
       );
       if (allocations.length === 0) {
         throw new Error("Pilih minimal satu item yang dibawa siswa");
@@ -205,17 +242,19 @@ function ScannerPage() {
       // The RPC evaluates the Jakarta date/time and enabled session windows.
       const { data: activeSessionRows, error: sessionError } = await (supabase as any).rpc(
         "get_active_operational_session",
-        { p_at: new Date().toISOString() }
+        { p_at: new Date().toISOString() },
       );
       if (sessionError) throw sessionError;
-      const activeSessionConfig = (activeSessionRows as Array<{
-        id: string;
-        period_id: string;
-        session_number: number;
-        name: string;
-        start_time: string;
-        end_time: string;
-      }> | null)?.[0];
+      const activeSessionConfig = (
+        activeSessionRows as Array<{
+          id: string;
+          period_id: string;
+          session_number: number;
+          name: string;
+          start_time: string;
+          end_time: string;
+        }> | null
+      )?.[0];
       if (!activeSessionConfig) {
         throw new Error("Tidak ada sesi operasional aktif saat ini.");
       }
@@ -315,7 +354,7 @@ function ScannerPage() {
           timestamp: new Date(),
         });
         toast.success(
-          `${res.student.full_name} Ã¢â‚¬â€ ${res.summaryLabel} Ã¢â‚¬â€ +${res.totalPointsAdded} poin`
+          `${res.student.full_name} — ${res.summaryLabel} — +${res.totalPointsAdded} poin`,
         );
         setNis("");
         queryClient.invalidateQueries({ queryKey: ["officer-recent"] });
@@ -369,7 +408,10 @@ function ScannerPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-extrabold">Pos {me?.officer?.station ?? "Scanner"}</h1>
-                <Badge variant="outline" className="text-xs font-semibold text-primary border-primary/30">
+                <Badge
+                  variant="outline"
+                  className="text-xs font-semibold text-primary border-primary/30"
+                >
                   {currentSessionMeta.badge}
                 </Badge>
               </div>
@@ -411,7 +453,7 @@ function ScannerPage() {
                 feedback.status === "duplicate" &&
                   "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300",
                 feedback.status === "error" &&
-                  "bg-destructive/10 border-destructive/30 text-destructive dark:text-destructive"
+                  "bg-destructive/10 border-destructive/30 text-destructive dark:text-destructive",
               )}
             >
               <div className="flex items-start gap-3">
@@ -433,22 +475,18 @@ function ScannerPage() {
                   </div>
                   {feedback.status === "success" && (
                     <p className="text-sm font-medium">
-                      <span className="font-bold">{feedback.studentName}</span> Ã¢â‚¬â€{" "}
-                      {feedback.itemSummary} Ã¢â‚¬â€{" "}
+                      <span className="font-bold">{feedback.studentName}</span> —{" "}
+                      {feedback.itemSummary} —{" "}
                       <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
                         +{feedback.points} poin
                       </span>
                     </p>
                   )}
                   {feedback.status === "duplicate" && (
-                    <p className="text-sm font-medium leading-relaxed">
-                      {feedback.message}
-                    </p>
+                    <p className="text-sm font-medium leading-relaxed">{feedback.message}</p>
                   )}
                   {feedback.status === "error" && (
-                    <p className="text-sm font-medium leading-relaxed">
-                      {feedback.message}
-                    </p>
+                    <p className="text-sm font-medium leading-relaxed">{feedback.message}</p>
                   )}
                 </div>
               </div>
@@ -467,7 +505,7 @@ function ScannerPage() {
                   "text-xs font-bold px-2 py-0.5",
                   session === "entry"
                     ? "border-emerald-500/40 text-emerald-600 bg-emerald-500/10"
-                    : "border-amber-500/40 text-amber-600 bg-amber-500/10"
+                    : "border-amber-500/40 text-amber-600 bg-amber-500/10",
                 )}
               >
                 Aktif: {session === "entry" ? "Sesi 1 — Masuk" : "Sesi 2 — Istirahat"}
@@ -475,7 +513,11 @@ function ScannerPage() {
             </div>
 
             {/* Dua pilihan berdampingan yang pasti terlihat di mobile & desktop */}
-            <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Pilih Sesi Pemeriksaan">
+            <div
+              className="grid grid-cols-2 gap-2"
+              role="tablist"
+              aria-label="Pilih Sesi Pemeriksaan"
+            >
               <button
                 type="button"
                 role="tab"
@@ -488,13 +530,15 @@ function ScannerPage() {
                   "flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 p-3 rounded-xl border-2 text-center transition-all cursor-pointer",
                   session === "entry"
                     ? "border-primary bg-primary text-primary-foreground font-black shadow-md ring-2 ring-primary/20"
-                    : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40"
+                    : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40",
                 )}
               >
-                <span className="text-lg leading-none shrink-0">Ã°Å¸Å’â€¦</span>
+                <School className="size-5 shrink-0" aria-hidden="true" />
                 <div className="leading-tight text-center sm:text-left">
                   <span className="block font-black text-xs sm:text-sm">Sesi 1</span>
-                  <span className="block text-[10px] sm:text-xs font-semibold opacity-90">Masuk Sekolah</span>
+                  <span className="block text-[10px] sm:text-xs font-semibold opacity-90">
+                    Masuk Sekolah
+                  </span>
                 </div>
               </button>
 
@@ -510,15 +554,47 @@ function ScannerPage() {
                   "flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 p-3 rounded-xl border-2 text-center transition-all cursor-pointer",
                   session === "break"
                     ? "border-primary bg-primary text-primary-foreground font-black shadow-md ring-2 ring-primary/20"
-                    : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40"
+                    : "border-border bg-card text-foreground font-bold hover:border-primary/40 hover:bg-muted/40",
                 )}
               >
-                <span className="text-lg leading-none shrink-0">Ã°Å¸ÂÂ±</span>
+                <UtensilsCrossed className="size-5 shrink-0" aria-hidden="true" />
                 <div className="leading-tight text-center sm:text-left">
                   <span className="block font-black text-xs sm:text-sm">Sesi 2</span>
-                  <span className="block text-[10px] sm:text-xs font-semibold opacity-90">Istirahat / Kantin</span>
+                  <span className="block text-[10px] sm:text-xs font-semibold opacity-90">
+                    Istirahat / Kantin
+                  </span>
                 </div>
               </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              {(operationalSessions.data ?? []).map(
+                (configured: {
+                  session_number: number;
+                  start_time: string;
+                  end_time: string;
+                  enabled: boolean;
+                }) => {
+                  const status = getRuntimeStatus(configured.start_time, configured.end_time);
+                  return (
+                    <div
+                      key={configured.session_number}
+                      className={cn(
+                        "rounded-lg border px-2 py-1.5",
+                        status === "Sedang berlangsung" &&
+                          "border-blue-500 bg-blue-500/10 text-blue-700",
+                      )}
+                    >
+                      <span className="font-bold">Sesi {configured.session_number}</span>
+                      <span className="ml-1">
+                        {configured.start_time.slice(0, 5)}–{configured.end_time.slice(0, 5)} WIB
+                      </span>
+                      <span className="block">
+                        Status: {configured.enabled ? status : "Tidak digunakan"}
+                      </span>
+                    </div>
+                  );
+                },
+              )}
             </div>
           </div>
 
@@ -535,26 +611,26 @@ function ScannerPage() {
                     ? entryTumbler && entryLunchbox
                       ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
                       : entryTumbler || entryLunchbox
-                      ? "bg-primary/10 text-primary border-primary/20"
-                      : "bg-destructive/10 text-destructive border-destructive/20"
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "bg-destructive/10 text-destructive border-destructive/20"
                     : breakOption === "break_combo"
-                    ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
-                    : "bg-primary/10 text-primary border-primary/20"
+                      ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                      : "bg-primary/10 text-primary border-primary/20",
                 )}
               >
                 {session === "entry"
                   ? entryTumbler && entryLunchbox
                     ? "Total: +150 poin (Keduanya)"
                     : entryTumbler
-                    ? "Total: +100 poin (Tumbler)"
-                    : entryLunchbox
-                    ? "Total: +50 poin (Kotak Makan)"
-                    : "Pilih minimal 1 item"
+                      ? "Total: +100 poin (Tumbler)"
+                      : entryLunchbox
+                        ? "Total: +50 poin (Kotak Makan)"
+                        : "Pilih minimal 1 item"
                   : breakOption === "break_combo"
-                  ? "Total: +250 poin (Combo)"
-                  : breakOption === "tumbler"
-                  ? "Total: +100 poin (Tumbler saja)"
-                  : "Total: +50 poin (Kotak Makan saja)"}
+                    ? "Total: +250 poin (Combo)"
+                    : breakOption === "tumbler"
+                      ? "Total: +100 poin (Tumbler saja)"
+                      : "Total: +50 poin (Kotak Makan saja)"}
               </span>
             </div>
 
@@ -568,7 +644,7 @@ function ScannerPage() {
                       "flex items-center gap-2.5 rounded-xl border-2 p-3 transition-all cursor-pointer",
                       entryTumbler
                         ? "border-emerald-600 bg-emerald-500/10 shadow-xs ring-2 ring-emerald-500/20"
-                        : "border-border bg-card hover:bg-muted/40"
+                        : "border-border bg-card hover:bg-muted/40",
                     )}
                   >
                     <input
@@ -580,7 +656,9 @@ function ScannerPage() {
                     <Coffee
                       className={cn(
                         "size-4 sm:size-5 shrink-0",
-                        entryTumbler ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                        entryTumbler
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-muted-foreground",
                       )}
                     />
                     <div className="flex-1 min-w-0">
@@ -597,7 +675,7 @@ function ScannerPage() {
                       "flex items-center gap-2.5 rounded-xl border-2 p-3 transition-all cursor-pointer",
                       entryLunchbox
                         ? "border-emerald-600 bg-emerald-500/10 shadow-xs ring-2 ring-emerald-500/20"
-                        : "border-border bg-card hover:bg-muted/40"
+                        : "border-border bg-card hover:bg-muted/40",
                     )}
                   >
                     <input
@@ -609,11 +687,15 @@ function ScannerPage() {
                     <UtensilsCrossed
                       className={cn(
                         "size-4 sm:size-5 shrink-0",
-                        entryLunchbox ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                        entryLunchbox
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-muted-foreground",
                       )}
                     />
                     <div className="flex-1 min-w-0">
-                      <span className="block font-bold text-xs sm:text-sm truncate">Kotak Makan</span>
+                      <span className="block font-bold text-xs sm:text-sm truncate">
+                        Kotak Makan
+                      </span>
                       <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
                         +50 poin
                       </span>
@@ -622,7 +704,8 @@ function ScannerPage() {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                  * Checkbox independen: Tumbler (+100), Kotak Makan (+50). Boleh dipilih salah satu atau keduanya (total +150 poin).
+                  * Checkbox independen: Tumbler (+100), Kotak Makan (+50). Boleh dipilih salah satu
+                  atau keduanya (total +150 poin).
                 </p>
               </div>
             ) : (
@@ -663,7 +746,7 @@ function ScannerPage() {
                             ? opt.isCombo
                               ? "border-amber-500 bg-amber-500/10 shadow-xs ring-2 ring-amber-500/30"
                               : "border-primary bg-primary/10 shadow-xs ring-2 ring-primary/20"
-                            : "border-border bg-card hover:bg-muted/40"
+                            : "border-border bg-card hover:bg-muted/40",
                         )}
                       >
                         <input
@@ -681,7 +764,7 @@ function ScannerPage() {
                               ? opt.isCombo
                                 ? "text-amber-500"
                                 : "text-primary"
-                              : "text-muted-foreground"
+                              : "text-muted-foreground",
                           )}
                         />
                         <div className="flex-1 min-w-0">
@@ -701,8 +784,8 @@ function ScannerPage() {
                               opt.isCombo
                                 ? "text-amber-600 dark:text-amber-400"
                                 : isSelected
-                                ? "text-primary"
-                                : "text-muted-foreground"
+                                  ? "text-primary"
+                                  : "text-muted-foreground",
                             )}
                           >
                             +{opt.points} poin
@@ -714,7 +797,8 @@ function ScannerPage() {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                  * Pilihan saling eksklusif (radio): hanya satu opsi yang aktif. Combo bernilai utuh +250 poin.
+                  * Pilihan saling eksklusif (radio): hanya satu opsi yang aktif. Combo bernilai
+                  utuh +250 poin.
                 </p>
               </div>
             )}
@@ -757,31 +841,31 @@ function ScannerPage() {
           </span>
         </div>
         {(recent.data ?? []).map((r: any) => {
-          const sessMeta = SCAN_SESSIONS[(r.session as ScanSession) || "entry"] || SCAN_SESSIONS.entry;
+          const sessMeta =
+            SCAN_SESSIONS[(r.session as ScanSession) || "entry"] || SCAN_SESSIONS.entry;
           const totalPts = (r.validation_items ?? []).reduce(
             (acc: number, item: any) => acc + Number(item.points || 0),
-            0
+            0,
           );
           const itemNames = formatValidationItemsLabel(r.session, r.validation_items);
 
           return (
-            <div key={r.id} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
+            <div
+              key={r.id}
+              className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors"
+            >
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold">
-                    {r.students?.full_name ?? "Siswa"}
-                  </p>
+                  <p className="text-sm font-semibold">{r.students?.full_name ?? "Siswa"}</p>
                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                     NIS {r.students?.nis ?? "-"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                  <span className="font-medium text-foreground/80">
-                    {sessMeta.shortLabel}
-                  </span>
-                  <span>Ã‚Â·</span>
+                  <span className="font-medium text-foreground/80">{sessMeta.shortLabel}</span>
+                  <span>·</span>
                   <span>{itemNames || "-"}</span>
-                  <span>Ã‚Â·</span>
+                  <span>·</span>
                   <span>{new Date(r.created_at).toLocaleTimeString("id-ID")}</span>
                 </div>
               </div>
@@ -803,5 +887,3 @@ function ScannerPage() {
     </div>
   );
 }
-
-
