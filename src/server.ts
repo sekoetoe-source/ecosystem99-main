@@ -49,13 +49,33 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      return applyDeploymentCachePolicy(request, normalized);
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {
         status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
       });
     }
   },
 };
+
+function applyDeploymentCachePolicy(request: Request, response: Response): Response {
+  const contentType = response.headers.get("content-type") ?? "";
+  const pathname = new URL(request.url).pathname;
+  const isDocument = request.method === "GET" &&
+    (request.headers.get("accept")?.includes("text/html") || contentType.includes("text/html"));
+  const isStaticAsset = pathname.startsWith("/_build/") ||
+    pathname.startsWith("/_assets/") ||
+    /\.[a-f0-9]{8,}\.(?:js|css|map|woff2?|png|jpg|jpeg|svg|webp)$/.test(pathname);
+
+  if (!isStaticAsset && isDocument) {
+    const headers = new Headers(response.headers);
+    headers.set("cache-control", "no-store, max-age=0");
+    headers.set("pragma", "no-cache");
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }
+
+  return response;
+}
