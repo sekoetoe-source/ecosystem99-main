@@ -201,20 +201,23 @@ function ScannerPage() {
         };
       }
 
-      // 3. Resolve the operational period for the Jakarta business date.
-      // Status alone is insufficient after a period rollover: a stale ACTIVE row
-      // must not shadow the period whose configured dates contain today.
-      const { data: activePeriod, error: periodError } = await supabase
-        .from("periods")
-        .select("id, start_date, end_date")
-        .eq("status", "ACTIVE")
-        .lte("start_date", today)
-        .gte("end_date", today)
-        .maybeSingle();
-      if (periodError) throw periodError;
-      if (!activePeriod) throw new Error("Tidak ada periode operasional aktif");
-      if (today < activePeriod.start_date || today > activePeriod.end_date) {
-        throw new Error("Tanggal hari ini berada di luar periode operasional aktif");
+      // 3. Resolve the scheduled operational session server-side.
+      // The RPC evaluates the Jakarta date/time and enabled session windows.
+      const { data: activeSessionRows, error: sessionError } = await supabase.rpc(
+        "get_active_operational_session",
+        { p_at: new Date().toISOString() }
+      );
+      if (sessionError) throw sessionError;
+      const activeSessionConfig = (activeSessionRows as Array<{
+        id: string;
+        period_id: string;
+        session_number: number;
+        name: string;
+        start_time: string;
+        end_time: string;
+      }> | null)?.[0];
+      if (!activeSessionConfig) {
+        throw new Error("Tidak ada sesi operasional aktif saat ini.");
       }
 
       // 4. Insert validation row
@@ -224,7 +227,8 @@ function ScannerPage() {
         .insert({
           student_id: student.id,
           officer_id: me?.officer?.id ?? null,
-          period_id: activePeriod.id,
+          period_id: activeSessionConfig.period_id,
+          operational_session_id: activeSessionConfig.id,
           status: "approved",
           source,
           session: activeSession,
