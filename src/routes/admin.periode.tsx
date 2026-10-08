@@ -69,15 +69,14 @@ function PeriodPage() {
         .lte("start_date", currentDate)
         .gte("end_date", currentDate)
         .order("start_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
   });
   const sessions = useQuery({
-    queryKey: ["operational-sessions", periods.data?.id],
-    enabled: Boolean(periods.data?.id),
+    queryKey: ["operational-sessions", periods.data?.[0]?.id],
+    enabled: Boolean(periods.data?.[0]?.id),
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("get_current_operational_sessions", {
         p_at: new Date().toISOString(),
@@ -117,7 +116,7 @@ function PeriodPage() {
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.id)
-        .eq("period_id", periods.data?.id);
+        .eq("period_id", periods.data?.[0]?.id);
       if (error)
         throw new Error(
           error.code === "23P01" ? "Jam sesi bertumpuk dengan sesi lain." : error.message,
@@ -130,7 +129,7 @@ function PeriodPage() {
     },
     onError: (error: Error) => toast.error(error.message),
   });
-  const active = periods.data;
+  const active = periods.data?.[0];
   const visibleSessions = useMemo(() => sessions.data ?? [], [sessions.data]);
   const openEditor = (session: Session) => {
     setEditing(session);
