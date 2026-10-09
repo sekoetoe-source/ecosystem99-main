@@ -212,10 +212,20 @@
     size: A4 portrait;
     margin: 5mm;
   }
-  .no-print, header, nav, sidebar, [role="navigation"], form, input, button, select, .no-print-area {
+  .no-print,
+  header,
+  nav,
+  sidebar,
+  [role="navigation"],
+  form,
+  input,
+  button,
+  select,
+  .no-print-area {
     display: none !important;
   }
-  body, html {
+  body,
+  html {
     background: #ffffff !important;
     color: #000000 !important;
     overflow: visible !important;
@@ -227,7 +237,8 @@
   }
 
   /* Print Report Document */
-  .print-report-sheet, .print-report-sheet * {
+  .print-report-sheet,
+  .print-report-sheet * {
     visibility: visible !important;
   }
   .print-report-sheet {
@@ -287,8 +298,28 @@
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  .print-card svg, .print-card img {
+  .print-card svg,
+  .print-card img {
     margin: 0 auto !important;
     display: block !important;
+  }
+}
+
+@media print {
+  .print-report-sheet {
+    break-inside: auto;
+  }
+  .print-report-sheet table {
+    page-break-inside: auto;
+  }
+  .print-report-sheet tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-report-sheet thead {
+    display: table-header-group;
+  }
+  .print-report-sheet .overflow-x-auto {
+    overflow: visible !important;
   }
 }

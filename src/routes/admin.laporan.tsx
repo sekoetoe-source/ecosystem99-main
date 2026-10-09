@@ -67,7 +67,7 @@ function monthRange(key: string) {
   return { start, end };
 }
 
-type ClassRow = {
+type KelasRow = {
   name: string;
   students: number;
   points: number;
@@ -76,14 +76,14 @@ type ClassRow = {
 };
 
 type ReportData = {
-  rows: ClassRow[];
+  rows: KelasRow[];
   totalStudents: number;
   totalItems: number;
-  totalPoints: number;
+  totalPoin: number;
   tumblerRate: number;
   lunchboxRate: number;
   growth: number | null;
-  topClass: string;
+  topKelas: string;
 };
 
 function FormalReportDocument({
@@ -130,13 +130,10 @@ function FormalReportDocument({
             <td className="w-full">
               <div className="text-center">
                 <h3 className="text-base font-extrabold uppercase tracking-tight sm:text-xl text-foreground">
-                  Laporan Bulanan Program Lingkungan
+                  LAPORAN BULANAN PROGRAM LINGKUNGAN
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Monthly Environmental Program Report
-                </p>
                 <p className="mt-1 text-sm font-bold text-primary">
-                  Periode / Period: {period?.name ?? "-"} ({period?.start_date ?? "-"} – {period?.end_date ?? "-"})
+                  {period ? monthLabel(period.start_date.slice(0, 7)) : "-"}
                 </p>
               </div>
 
@@ -144,15 +141,15 @@ function FormalReportDocument({
                 {[
                   {
                     v: `${d?.tumblerRate ?? 0}%`,
-                    t: "Total Tumbler Usage",
+                    t: "Total Penggunaan Tumbler",
                     s: "Penggunaan Tumbler",
                   },
                   {
                     v: `${d?.lunchboxRate ?? 0}%`,
-                    t: "Total Lunchbox Usage",
+                    t: "Total Penggunaan Kotak Makan",
                     s: "Penggunaan Kotak Makan",
                   },
-                  { v: d?.topClass ?? "-", t: "Top Performing Class", s: "Kelas Terbaik" },
+                  { v: d?.topKelas ?? "-", t: "Performa Kelas Terbaik", s: "Kelas Terbaik" },
                 ].map((c) => (
                   <div
                     key={c.t}
@@ -168,7 +165,7 @@ function FormalReportDocument({
               </div>
 
               <h4 className="mt-8 text-base font-extrabold sm:text-lg text-foreground">
-                Tren Partisipasi / Participation Trends
+                Tren Partisipasi
               </h4>
               <div className="mt-3 grid gap-3 lg:grid-cols-2">
                 <div className="rounded-2xl border border-border p-5">
@@ -177,7 +174,7 @@ function FormalReportDocument({
                     {[
                       ["Siswa aktif terdaftar", (d?.totalStudents ?? 0).toLocaleString("id-ID")],
                       ["Item eco tervalidasi", (d?.totalItems ?? 0).toLocaleString("id-ID")],
-                      ["Total Eco-Points", (d?.totalPoints ?? 0).toLocaleString("id-ID")],
+                      ["Total Eco-Poin", (d?.totalPoin ?? 0).toLocaleString("id-ID")],
                       [
                         "Estimasi CO2 dihemat",
                         `${Math.round(((d?.totalItems ?? 0) * 70) / 1000)} kg`,
@@ -200,23 +197,29 @@ function FormalReportDocument({
                         ? "—"
                         : `${d.growth > 0 ? "+" : ""}${d.growth}%`}
                     </p>
-                    <p className="mt-1 text-sm text-muted-foreground">Growth from last month</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Perkembangan dari Bulan Lalu
+                    </p>
                   </div>
                 </div>
               </div>
 
               <h4 className="mt-8 text-base font-extrabold sm:text-lg text-foreground">
-                Peringkat Jawara Lingkungan / Environmental Champion Rankings
+                Peringkat Jawara Lingkungan / Environmental Champion Peringkatings
               </h4>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[34rem] text-sm">
                   <thead>
                     <tr className="border-y border-border bg-surface-low text-left">
-                      <th className="label-xs px-3 py-3">Rank</th>
-                      <th className="label-xs px-3 py-3">Class</th>
-                      <th className="label-xs px-3 py-3 text-right">Points</th>
-                      <th className="label-xs px-3 py-3 text-right">Tumbler Rate</th>
-                      <th className="label-xs px-3 py-3 text-right">Lunchbox Rate</th>
+                      <th className="label-xs px-3 py-3">Peringkat</th>
+                      <th className="label-xs px-3 py-3">Kelas</th>
+                      <th className="label-xs px-3 py-3 text-right">Poin</th>
+                      <th className="label-xs px-3 py-3 text-right">
+                        Persentase Penggunaan Tumbler
+                      </th>
+                      <th className="label-xs px-3 py-3 text-right">
+                        Persentase Penggunaan Kotak Makan
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -248,16 +251,16 @@ function FormalReportDocument({
 
               <div className="mt-12 grid gap-10 text-center text-sm sm:grid-cols-2 text-foreground">
                 <div>
-                  <p>Mengetahui / Acknowledged by,</p>
-                  <p>Kepala Sekolah / Principal</p>
+                  <p>Mengetahui,</p>
+                  <p>Kepala Sekolah</p>
                   <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
                     <p className="font-bold">{SCHOOL.principal}</p>
                     <p className="text-xs text-primary">{SCHOOL.principalNip}</p>
                   </div>
                 </div>
                 <div>
-                  <p>Jakarta, {period?.name ?? "-"}</p>
-                  <p>Koordinator Program / Program Coordinator</p>
+                  <p>Jakarta, {period ? monthLabel(period.start_date.slice(0, 7)) : "-"}</p>
+                  <p>Koordinator Program</p>
                   <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
                     <p className="font-bold">{SCHOOL.coordinator}</p>
                     <p className="text-xs text-primary">{SCHOOL.coordinatorNip}</p>
@@ -277,13 +280,18 @@ function LaporanPage() {
   const periods = useQuery({
     queryKey: ["periods"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("periods").select("id, name, status, start_date, end_date").order("start_date", { ascending: false });
+      const { data, error } = await supabase
+        .from("periods")
+        .select("id, name, status, start_date, end_date")
+        .order("start_date", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
   });
   const [periodId, setPeriodId] = useState("");
-  const selectedPeriod = periods.data?.find((p) => p.id === (periodId || periods.data?.find((p) => p.status === "ACTIVE")?.id));
+  const selectedPeriod = periods.data?.find(
+    (p) => p.id === (periodId || periods.data?.find((p) => p.status === "ACTIVE")?.id),
+  );
   const report = useQuery({
     queryKey: ["formal-report", selectedPeriod?.id],
     enabled: !!selectedPeriod,
@@ -292,29 +300,101 @@ function LaporanPage() {
       const previous = periods.data?.find((p) => p.end_date < period.start_date);
       const [{ data: students }, { data: items }, prevItems] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
-        supabase.from("validation_items").select("item_code, points, student_id, day, validations!inner(status, period_id)").eq("validations.period_id", period.id).gte("day", period.start_date).lte("day", period.end_date),
-        previous ? supabase.from("validation_items").select("points, validations!inner(status, period_id)").eq("validations.period_id", previous.id) : Promise.resolve({ data: [] as { points: number; validations: unknown }[] }),
+        supabase
+          .from("validation_items")
+          .select("item_code, points, student_id, day, validations!inner(status, period_id)")
+          .eq("validations.period_id", period.id)
+          .gte("day", period.start_date)
+          .lte("day", period.end_date),
+        previous
+          ? supabase
+              .from("validation_items")
+              .select("points, validations!inner(status, period_id)")
+              .eq("validations.period_id", previous.id)
+          : Promise.resolve({ data: [] as { points: number; validations: unknown }[] }),
       ]);
-      const validStudents = (students ?? []).filter((s) => { const className = (s.classes as { name: string } | null)?.name?.trim(); return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas"); });
-      const approved = (items ?? []).filter((i) => (i.validations as { status: string } | null)?.status === "approved");
-      const prevApproved = (prevItems.data ?? []).filter((i) => (i.validations as { status: string } | null)?.status === "approved");
-      const classOf = new Map(validStudents.map((s) => [s.id, (s.classes as { name: string }).name.trim()]));
-      const classes = new Map<string, ClassRow>(); const tumblerUsers = new Set<string>(); const lunchboxUsers = new Set<string>();
-      const classTumbler = new Map<string, Set<string>>(); const classLunchbox = new Map<string, Set<string>>();
-      for (const s of validStudents) { const name = classOf.get(s.id)!; classes.set(name, classes.get(name) ?? { name, students: 0, points: 0, tumbler: 0, lunchbox: 0 }); classes.get(name)!.students += 1; }
-      for (const i of approved.filter((item) => classOf.has(item.student_id))) {
-        const name = classOf.get(i.student_id)!; const row = classes.get(name)!; row.points += Number(i.points ?? 0);
-        const bucket = i.item_code === "tumbler" || i.item_code === "break_combo" ? classTumbler : classLunchbox; if (!bucket.has(name)) bucket.set(name, new Set()); bucket.get(name)!.add(i.student_id); (i.item_code === "tumbler" || i.item_code === "break_combo" ? tumblerUsers : lunchboxUsers).add(i.student_id);
+      const validStudents = (students ?? []).filter((s) => {
+        const className = (s.classes as { name: string } | null)?.name?.trim();
+        return Boolean(
+          s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas",
+        );
+      });
+      const approved = (items ?? []).filter(
+        (i) => (i.validations as { status: string } | null)?.status === "approved",
+      );
+      const prevApproved = (prevItems.data ?? []).filter(
+        (i) => (i.validations as { status: string } | null)?.status === "approved",
+      );
+      const classOf = new Map(
+        validStudents.map((s) => [s.id, (s.classes as { name: string }).name.trim()]),
+      );
+      const classes = new Map<string, KelasRow>();
+      const tumblerUsers = new Set<string>();
+      const lunchboxUsers = new Set<string>();
+      const classTumbler = new Map<string, Set<string>>();
+      const classLunchbox = new Map<string, Set<string>>();
+      for (const s of validStudents) {
+        const name = classOf.get(s.id)!;
+        classes.set(
+          name,
+          classes.get(name) ?? { name, students: 0, points: 0, tumbler: 0, lunchbox: 0 },
+        );
+        classes.get(name)!.students += 1;
       }
-      const rows = [...classes.values()].map((r) => ({ ...r, tumbler: Math.round(((classTumbler.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100), lunchbox: Math.round(((classLunchbox.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100) })).sort((a, b) => b.points - a.points);
-      const totalPoints = approved.reduce((a, i) => a + Number(i.points ?? 0), 0); const prevPoints = prevApproved.reduce((a, i) => a + Number(i.points ?? 0), 0);
-      return { rows, totalStudents: validStudents.length, totalItems: approved.length, totalPoints, tumblerRate: Math.round((tumblerUsers.size / Math.max(1, validStudents.length)) * 100), lunchboxRate: Math.round((lunchboxUsers.size / Math.max(1, validStudents.length)) * 100), growth: prevPoints > 0 ? Math.round(((totalPoints - prevPoints) / prevPoints) * 100) : null, topClass: rows[0]?.name ?? "-" };
+      for (const i of approved.filter((item) => classOf.has(item.student_id))) {
+        const name = classOf.get(i.student_id)!;
+        const row = classes.get(name)!;
+        row.points += Number(i.points ?? 0);
+        const bucket =
+          i.item_code === "tumbler" || i.item_code === "break_combo" ? classTumbler : classLunchbox;
+        if (!bucket.has(name)) bucket.set(name, new Set());
+        bucket.get(name)!.add(i.student_id);
+        (i.item_code === "tumbler" || i.item_code === "break_combo"
+          ? tumblerUsers
+          : lunchboxUsers
+        ).add(i.student_id);
+      }
+      const rows = [...classes.values()]
+        .map((r) => ({
+          ...r,
+          tumbler: Math.round(
+            ((classTumbler.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100,
+          ),
+          lunchbox: Math.round(
+            ((classLunchbox.get(r.name)?.size ?? 0) / Math.max(1, r.students)) * 100,
+          ),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, "id"));
+      const totalPoin = approved.reduce((a, i) => a + Number(i.points ?? 0), 0);
+      const prevPoin = prevApproved.reduce((a, i) => a + Number(i.points ?? 0), 0);
+      return {
+        rows,
+        totalStudents: validStudents.length,
+        totalItems: approved.length,
+        totalPoin,
+        tumblerRate: Math.round((tumblerUsers.size / Math.max(1, validStudents.length)) * 100),
+        lunchboxRate: Math.round((lunchboxUsers.size / Math.max(1, validStudents.length)) * 100),
+        growth: prevPoin > 0 ? Math.round(((totalPoin - prevPoin) / prevPoin) * 100) : null,
+        topKelas: rows[0]?.name ?? "-",
+      };
     },
   });
   const d = report.data;
   const periodLabel = selectedPeriod?.name ?? "Periode";
-  function exportCsv() { const header = "Peringkat,Kelas,Siswa,Poin,Tumbler Rate,Lunchbox Rate\n"; const body = (d?.rows ?? []).map((r, i) => `${i + 1},${r.name},${r.students},${r.points},${r.tumbler}%,${r.lunchbox}%`).join("\n"); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([header + body], { type: "text/csv;charset=utf-8;" })); a.download = `laporan-lingkungan-${selectedPeriod?.id ?? "periode"}.csv`; a.click(); }
-  function handlePrintDirect() { window.print(); }
+  function exportCsv() {
+    const header =
+      "Peringkat,Kelas,Siswa,Poin,Persentase Penggunaan Tumbler,Persentase Penggunaan Kotak Makan\n";
+    const body = (d?.rows ?? [])
+      .map((r, i) => `${i + 1},${r.name},${r.students},${r.points},${r.tumbler}%,${r.lunchbox}%`)
+      .join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([header + body], { type: "text/csv;charset=utf-8;" }));
+    a.download = `laporan-lingkungan-${selectedPeriod?.id ?? "periode"}.csv`;
+    a.click();
+  }
+  function handlePrintDirect() {
+    window.print();
+  }
 
   return (
     <div className="space-y-5">
