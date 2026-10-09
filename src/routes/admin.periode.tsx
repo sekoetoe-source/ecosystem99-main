@@ -178,14 +178,19 @@ function PeriodPage() {
 
   return (
     <AdminShell>
-      <section className="mx-auto w-full max-w-6xl space-y-6">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Periode dan Sesi Operasional</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Periode menentukan siklus poin. Sesi menentukan kapan pemindaian biasa dibuka. Semua
-            jadwal mengikuti waktu WIB.
-          </p>
-        </div>
+      <div className="space-y-5">
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
+          <div>
+            <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">
+              Periode dan Sesi Operasional
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Periode menentukan siklus poin. Sesi menentukan kapan pemindaian biasa dibuka. Semua
+              jadwal mengikuti waktu WIB.
+            </p>
+          </div>
+        </header>
+        <section className="mx-auto w-full max-w-6xl space-y-6">
         <div className="surface-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="label-xs text-muted-foreground">Periode berjalan</p>
@@ -415,3 +420,6 @@ function PeriodPage() {
     </AdminShell>
   );
 }
+
+
+
