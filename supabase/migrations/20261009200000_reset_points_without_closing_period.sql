@@ -29,7 +29,7 @@ CREATE TRIGGER point_reset_audit_immutable
   BEFORE UPDATE OR DELETE ON public.point_reset_audit_events
   FOR EACH ROW EXECUTE FUNCTION public.prevent_point_reset_audit_mutation();
 
-CREATE OR REPLACE FUNCTION public.reset_point()
+CREATE OR REPLACE FUNCTION public.reset_active_period_points_only()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -88,5 +88,16 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.reset_active_period_points_only() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.reset_active_period_points_only() TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.reset_point()
+RETURNS jsonb
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.reset_active_period_points_only();
+$$;
 REVOKE EXECUTE ON FUNCTION public.reset_point() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.reset_point() TO authenticated;

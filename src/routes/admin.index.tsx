@@ -51,7 +51,7 @@ function AdminDashboard() {
 
   const resetPoint = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc("reset_point");
+      const { data, error } = await supabase.rpc("reset_active_period_points_only" as never);
       if (error) throw error;
       return data;
     },
