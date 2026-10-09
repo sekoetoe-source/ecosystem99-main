@@ -27,6 +27,14 @@ type Session = {
   enabled: boolean;
 };
 
+type Period = {
+  id: string;
+  name: string;
+  status: "DRAFT" | "ACTIVE" | "CLOSED";
+  start_date: string;
+  end_date: string;
+};
+
 type RuntimeStatus = "Belum dimulai" | "Sedang berlangsung" | "Selesai";
 
 function jakartaMinutes() {
@@ -52,6 +60,21 @@ function runtimeStatus(session: Session): RuntimeStatus {
   return "Selesai";
 }
 
+function periodStatusLabel(status: Period["status"]) {
+  if (status === "ACTIVE") return "Aktif";
+  if (status === "CLOSED") return "Ditutup";
+  return "Belum dibuka";
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00+07:00`));
+}
+
 function PeriodPage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Session | null>(null);
@@ -61,37 +84,43 @@ function PeriodPage() {
     new Date(),
   );
   const periods = useQuery({
-    queryKey: ["current-period", currentDate],
+    queryKey: ["period-history"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("periods")
         .select("id, name, status, start_date, end_date")
-        .lte("start_date", currentDate)
-        .gte("end_date", currentDate)
         .order("start_date", { ascending: false })
-        .limit(1);
+        .limit(8);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Period[];
     },
   });
   const sessions = useQuery({
-    queryKey: ["operational-sessions", periods.data?.[0]?.id],
-    enabled: Boolean(periods.data?.[0]?.id),
+    queryKey: [
+      "operational-sessions",
+      periods.data?.find((period) => period.status === "ACTIVE")?.id,
+    ],
+    enabled: Boolean(periods.data?.some((period) => period.status === "ACTIVE")),
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("get_current_operational_sessions", {
-        p_at: new Date().toISOString(),
-      });
+      const period = periods.data?.find((candidate) => candidate.status === "ACTIVE");
+      if (!period) return [] as Session[];
+      const { data, error } = await supabase
+        .from("operational_sessions")
+        .select("id, period_id, session_number, name, start_time, end_time, enabled")
+        .eq("period_id", period.id)
+        .in("session_number", [1, 2])
+        .order("session_number");
       if (error) throw error;
       return (data ?? []) as Session[];
     },
   });
   const audits = useQuery({
-    queryKey: ["period-reset-audit-events"],
+    queryKey: ["point-reset-audit-events"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("period_reset_audit_events")
+      const { data, error } = await (supabase as any)
+        .from("point_reset_audit_events")
         .select(
-          "id, occurred_at, source_period_name, target_period_name, source_start_date, source_end_date",
+          "id, occurred_at, period_name, before_total_points, before_students_with_points, reset_validation_items, reason",
         )
         .order("occurred_at", { ascending: false });
       if (error) throw error;
@@ -116,7 +145,7 @@ function PeriodPage() {
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.id)
-        .eq("period_id", periods.data?.[0]?.id);
+        .eq("period_id", periods.data?.find((period) => period.status === "ACTIVE")?.id);
       if (error)
         throw new Error(
           error.code === "23P01" ? "Jam sesi bertumpuk dengan sesi lain." : error.message,
@@ -129,7 +158,17 @@ function PeriodPage() {
     },
     onError: (error: Error) => toast.error(error.message),
   });
-  const active = periods.data?.[0];
+  const active = periods.data?.find((period) => period.status === "ACTIVE");
+  const activePeriodContainsToday = Boolean(
+    active && active.start_date <= currentDate && active.end_date >= currentDate,
+  );
+  const activePeriodDateStatus = active
+    ? currentDate < active.start_date
+      ? "Periode belum dimulai"
+      : currentDate > active.end_date
+        ? "Tanggal periode sudah berakhir"
+        : "Periode berjalan"
+    : "Tidak ada periode berjalan";
   const visibleSessions = useMemo(() => sessions.data ?? [], [sessions.data]);
   const openEditor = (session: Session) => {
     setEditing(session);
@@ -141,34 +180,80 @@ function PeriodPage() {
     <AdminShell>
       <section className="mx-auto w-full max-w-6xl space-y-6">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Periode & Sesi Operasional</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight">Periode dan Sesi Operasional</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Atur jam sesi. Runtime status dihitung otomatis menurut waktu Asia/Jakarta.
+            Periode menentukan siklus poin. Sesi menentukan kapan pemindaian biasa dibuka. Semua
+            jadwal mengikuti waktu WIB.
           </p>
         </div>
         <div className="surface-card p-5">
-          <p className="label-xs text-muted-foreground">Periode aktif</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="label-xs text-muted-foreground">Periode berjalan</p>
+            {active && (
+              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-700">
+                {periodStatusLabel(active.status)}
+              </span>
+            )}
+          </div>
           {active ? (
             <>
               <h2 className="mt-2 text-2xl font-bold">{active.name}</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {active.start_date} – {active.end_date}
+                {formatDate(active.start_date)} – {formatDate(active.end_date)}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{activePeriodDateStatus}</p>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+                Pemindaian biasa dan pemindaian susulan masuk ke periode ini selama periode
+                berstatus aktif dan tanggalnya masih berlaku. Reset poin untuk uji coba mengosongkan
+                nilai poin pada periode aktif, tetapi tidak menutup periode dan tidak menghapus
+                catatan pemindaian. Periode ditutup hanya saat masa operasionalnya berakhir dan
+                admin mengarsipkannya.
               </p>
             </>
           ) : (
-            <p className="mt-2 text-sm text-muted-foreground">Tidak ada periode aktif.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Tidak ada periode berstatus aktif. Pemindaian baru tidak dapat dicatat sampai admin
+              membuka periode berikutnya. Laporan periode yang sudah ditutup tetap dapat dilihat.
+            </p>
           )}
+        </div>
+        <div className="surface-card p-5">
+          <h2 className="font-bold">Alur periode dan pemindaian</h2>
+          <ol className="mt-3 grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
+            <li className="rounded-xl bg-surface-low p-4">
+              <strong className="text-foreground">1. Periode aktif.</strong> Poin hasil pemindaian
+              dicatat pada periode yang sedang berjalan.
+            </li>
+            <li className="rounded-xl bg-surface-low p-4">
+              <strong className="text-foreground">2. Dua sesi harian.</strong> Setiap siswa dapat
+              tercatat satu kali pada Sesi 1 dan satu kali pada Sesi 2 dalam satu hari.
+            </li>
+            <li className="rounded-xl bg-surface-low p-4">
+              <strong className="text-foreground">3. Pemindaian susulan.</strong> Petugas dapat
+              mencatat sesi yang terlewat pada hari yang sama setelah sesi berakhir, paling lambat
+              pukul 17.00 WIB. Catatan tetap masuk ke sesi asal.
+            </li>
+            <li className="rounded-xl bg-surface-low p-4">
+              <strong className="text-foreground">4. Periode ditutup.</strong> Periode yang sudah
+              diarsipkan tidak menerima pemindaian atau poin baru. Reset poin uji coba tidak menutup
+              periode dan hanya mengosongkan nilai poin yang ada.
+            </li>
+          </ol>
         </div>
         <div className="surface-card overflow-hidden">
           <div className="border-b border-border p-5">
             <h2 className="font-bold">Pengaturan Sesi Operasional</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Hanya Sesi 1 dan Sesi 2 yang digunakan.
+              Jam tetap tersimpan untuk membuka sesi otomatis, tetapi tidak ditampilkan pada kartu.
             </p>
           </div>
           <div className="grid gap-4 p-5 md:grid-cols-2">
             {visibleSessions.map((session) => {
-              const status = runtimeStatus(session);
+              const status = !session.enabled
+                ? "Tidak digunakan"
+                : activePeriodContainsToday
+                  ? runtimeStatus(session)
+                  : activePeriodDateStatus;
               const Icon = session.session_number === 1 ? School : UtensilsCrossed;
               return (
                 <div
@@ -190,12 +275,11 @@ function PeriodPage() {
                       onClick={() => openEditor(session)}
                     >
                       <Pencil className="size-3.5" />
-                      Edit
+                      Atur Jadwal
                     </Button>
                   </div>
-                  <p className="mt-6 text-2xl font-black tracking-tight">
-                    {session.start_time.slice(0, 5)} — {session.end_time.slice(0, 5)}{" "}
-                    <span className="text-sm font-semibold text-muted-foreground">WIB</span>
+                  <p className="mt-6 text-sm text-muted-foreground">
+                    Pemindaian biasa dibuka otomatis sesuai jadwal yang tersimpan.
                   </p>
                   <div className="mt-3 flex items-center justify-between text-sm">
                     <span
@@ -221,6 +305,10 @@ function PeriodPage() {
         <div className="surface-card overflow-hidden">
           <div className="border-b border-border p-5">
             <h2 className="font-bold">Riwayat periode</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Status menunjukkan siklus mana yang menerima pemindaian baru dan mana yang hanya
+              menjadi arsip laporan.
+            </p>
           </div>
           <div className="divide-y divide-border">
             {periods.data?.map((period) => (
@@ -231,11 +319,11 @@ function PeriodPage() {
                 <div>
                   <p className="font-semibold">{period.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {period.start_date} – {period.end_date}
+                    {formatDate(period.start_date)} – {formatDate(period.end_date)}
                   </p>
                 </div>
                 <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">
-                  {period.status}
+                  {periodStatusLabel(period.status)}
                 </span>
               </div>
             ))}
@@ -243,17 +331,20 @@ function PeriodPage() {
         </div>
         <div className="surface-card overflow-hidden">
           <div className="border-b border-border p-5">
-            <h2 className="font-bold">Audit reset point</h2>
+            <h2 className="font-bold">Riwayat reset poin</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Setiap reset mengosongkan poin periode aktif untuk keperluan uji coba. Riwayat
+              pemindaian tetap tersimpan.
+            </p>
           </div>
           <div className="divide-y divide-border">
             {audits.data?.map((audit) => (
               <div key={audit.id} className="p-5 text-sm">
-                <p className="font-semibold">
-                  {audit.source_period_name} → {audit.target_period_name}
-                </p>
+                <p className="font-semibold">Poin periode {audit.period_name} dihapus</p>
                 <p className="mt-1 text-muted-foreground">
-                  {new Date(audit.occurred_at).toLocaleString("id-ID")} · {audit.source_start_date}{" "}
-                  – {audit.source_end_date} ditutup
+                  {new Date(audit.occurred_at).toLocaleString("id-ID")} ·{" "}
+                  {audit.before_total_points} poin dari {audit.before_students_with_points} siswa
+                  dihapus pada {audit.reset_validation_items} catatan.
                 </p>
               </div>
             ))}

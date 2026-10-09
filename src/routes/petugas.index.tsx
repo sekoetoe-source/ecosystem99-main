@@ -87,6 +87,7 @@ type ScanFeedback =
       sessionLabel: string;
       itemSummary: string;
       points: number;
+      isLate?: boolean;
       timestamp: Date;
     }
   | {
@@ -114,6 +115,8 @@ function ScannerPage() {
   const queryClient = useQueryClient();
   const [nis, setNis] = useState("");
   const [camera, setCamera] = useState(false);
+  const [lateEntry, setLateEntry] = useState(false);
+  const [lateReason, setLateReason] = useState("");
 
   // Active session domain state (Default: entry)
   const [session, setSession] = useState<ScanSession>("entry");
@@ -166,9 +169,10 @@ function ScannerPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("periods")
-        .select("id")
+        .select("id, status, start_date, end_date")
         .lte("start_date", currentDate)
         .gte("end_date", currentDate)
+        .eq("status", "ACTIVE")
         .order("start_date", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -180,9 +184,12 @@ function ScannerPage() {
     queryKey: ["operational-sessions", currentPeriod.data?.id],
     enabled: Boolean(currentPeriod.data?.id),
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("get_current_operational_sessions", {
-        p_at: new Date().toISOString(),
-      });
+      const { data, error } = await supabase
+        .from("operational_sessions")
+        .select("id, period_id, session_number, name, start_time, end_time, enabled")
+        .eq("period_id", currentPeriod.data?.id)
+        .in("session_number", [1, 2])
+        .order("session_number");
       if (error) throw error;
       return data ?? [];
     },
@@ -193,10 +200,14 @@ function ScannerPage() {
       code,
       source,
       session: sessionParam,
+      late: isLate,
+      reason,
     }: {
       code: string;
       source: "scan" | "manual";
       session?: ScanSession;
+      late: boolean;
+      reason: string;
     }) => {
       const activeSession = sessionParam ?? session;
       const cleanCode = code.trim();
@@ -228,6 +239,41 @@ function ScannerPage() {
       }
 
       const today = todayJakarta();
+
+      if (isLate) {
+        const { data, error } = await (supabase as any).rpc("record_late_validation", {
+          p_student_id: student.id,
+          p_session: activeSession,
+          p_item_codes: allocations.map((allocation) => allocation.itemCode),
+          p_reason: reason,
+          p_source: source,
+          p_station: me?.officer?.station || SCAN_SESSIONS[activeSession].defaultStation,
+        });
+        if (error) throw error;
+        const result = data as {
+          kind: "success" | "duplicate";
+          message: string;
+          points_added?: number;
+        };
+        if (result.kind === "duplicate") {
+          return {
+            kind: "duplicate" as const,
+            student,
+            session: activeSession,
+            timeStr: "",
+            message: result.message,
+          };
+        }
+        return {
+          kind: "success" as const,
+          student,
+          session: activeSession,
+          summaryLabel,
+          totalPointsAdded: Number(result.points_added ?? 0),
+          isLate: true,
+          resultMessage: result.message,
+        };
+      }
 
       // 2. Validate Duplicate: student + date + session
       const { data: existingValidation } = await supabase
@@ -272,8 +318,12 @@ function ScannerPage() {
           end_time: string;
         }> | null
       )?.[0];
+      const targetSessionNumber = activeSession === "entry" ? 1 : 2;
       if (!activeSessionConfig) {
         throw new Error("Tidak ada sesi operasional aktif saat ini.");
+      }
+      if (activeSessionConfig.session_number !== targetSessionNumber) {
+        throw new Error("Sesi yang dipilih bukan sesi yang sedang berlangsung.");
       }
 
       // 4. Insert validation row
@@ -342,6 +392,8 @@ function ScannerPage() {
         session: activeSession,
         summaryLabel,
         totalPointsAdded: totalPoints,
+        isLate: false,
+        resultMessage: "Pemindaian berhasil dicatat.",
       };
     },
     onSuccess: (res) => {
@@ -350,7 +402,7 @@ function ScannerPage() {
         playDuplicateSound();
         setFeedback({
           status: "duplicate",
-          title: "Scan Ditolak",
+          title: "Pemindaian Ditolak",
           studentName: res.student.full_name,
           sessionLabel: SCAN_SESSIONS[res.session].label,
           timeStr: res.timeStr,
@@ -363,17 +415,19 @@ function ScannerPage() {
         playSuccessSound();
         setFeedback({
           status: "success",
-          title: "Scan Berhasil",
+          title: res.isLate ? "Pemindaian Susulan Berhasil" : "Pemindaian Berhasil",
           studentName: res.student.full_name,
-          sessionLabel: SCAN_SESSIONS[res.session].label,
+          sessionLabel: `${SCAN_SESSIONS[res.session].label}${res.isLate ? " (Susulan)" : ""}`,
           itemSummary: res.summaryLabel,
           points: res.totalPointsAdded,
+          isLate: res.isLate,
           timestamp: new Date(),
         });
         toast.success(
-          `${res.student.full_name} — ${res.summaryLabel} — +${res.totalPointsAdded} poin`,
+          `${res.student.full_name} — ${res.summaryLabel} — +${res.totalPointsAdded} poin. ${res.resultMessage}`,
         );
         setNis("");
+        if (res.isLate) setLateReason("");
         queryClient.invalidateQueries({ queryKey: ["officer-recent"] });
         queryClient.invalidateQueries({ queryKey: ["student-summary"] });
         queryClient.invalidateQueries({ queryKey: ["admin-students"] });
@@ -404,6 +458,10 @@ function ScannerPage() {
 
   const handleTriggerScan = (codeText: string, source: "scan" | "manual") => {
     if (processLockRef.current || submit.isPending) return;
+    if (lateEntry && !lateReason.trim()) {
+      toast.error("Isi alasan sebelum mencatat pemindaian susulan.");
+      return;
+    }
     processLockRef.current = true;
     setIsProcessing(true);
 
@@ -411,10 +469,11 @@ function ScannerPage() {
     unlockAudio();
     playScanDetectedSound();
 
-    submit.mutate({ code: codeText, source, session });
+    submit.mutate({ code: codeText, source, session, late: lateEntry, reason: lateReason });
   };
 
   const currentSessionMeta = SCAN_SESSIONS[session];
+  const lateDeadlinePassed = getJakartaMinutes() > 17 * 60;
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -613,6 +672,58 @@ function ScannerPage() {
                 },
               )}
             </div>
+          </div>
+
+          <div className="space-y-2 rounded-xl border border-border p-3">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Jenis Pencatatan
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={lateEntry ? "outline" : "default"}
+                onClick={() => setLateEntry(false)}
+                className="w-full"
+              >
+                Pemindaian Biasa
+              </Button>
+              <Button
+                type="button"
+                variant={lateEntry ? "default" : "outline"}
+                disabled={lateDeadlinePassed}
+                onClick={() => setLateEntry(true)}
+                className="w-full"
+              >
+                Pemindaian Susulan
+              </Button>
+            </div>
+            {lateEntry ? (
+              <div className="space-y-2">
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Catatan masuk ke Sesi {session === "entry" ? "1" : "2"} yang dipilih. Gunakan
+                  untuk siswa yang terlewat atau barang yang belum tercatat. Batasnya pukul 17.00
+                  WIB pada hari yang sama.
+                </p>
+                <Label htmlFor="late-entry-reason">Alasan pencatatan susulan</Label>
+                <textarea
+                  id="late-entry-reason"
+                  value={lateReason}
+                  onChange={(event) => setLateReason(event.target.value)}
+                  maxLength={300}
+                  required
+                  placeholder="Contoh: siswa terlewat dipindai pada sesi pagi"
+                  className="min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Jika catatan sesi ini sudah ada, pilih hanya barang yang belum tercatat. Poin
+                  dihitung otomatis dan alasan disimpan untuk pemeriksaan.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Pemindaian biasa hanya tersedia saat sesi yang dipilih sedang berlangsung.
+              </p>
+            )}
           </div>
 
           {/* 5. ITEM YANG DIBAWA SESUAI SESI */}

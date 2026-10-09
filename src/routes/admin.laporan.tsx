@@ -37,7 +37,7 @@ const SCHOOL = {
   name: "SMP NEGERI 99 JAKARTA",
   address: "Jalan Sirap, Kelurahan Kayu Putih, Kecamatan Pulo Gadung, Jakarta Timur",
   contact: "Telp. 021.4891456 Fax. 47881356",
-  emailWebsite: "Email: smpn99dki@yahoo.co.id | Website: https://smpn99jkt.sch.id",
+  emailWebsite: "Surel: smpn99dki@yahoo.co.id | Situs web: https://smpn99jkt.sch.id",
   principal: "Etty Indarti, S.Pd",
   principalNip: "NIP. 19700418 1998022 001",
   coordinator: "Indah Novitasari, S.Pd, M.Si",
@@ -57,6 +57,21 @@ function monthLabel(key: string) {
   return new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(
     new Date(y!, (m ?? 1) - 1, 1),
   );
+}
+
+function monthsInPeriods(periods: { start_date: string; end_date: string }[]) {
+  const months = new Set<string>([monthKey(new Date())]);
+  for (const period of periods) {
+    const cursor = new Date(`${period.start_date}T00:00:00Z`);
+    const last = new Date(`${period.end_date}T00:00:00Z`);
+    cursor.setUTCDate(1);
+    last.setUTCDate(1);
+    while (cursor <= last) {
+      months.add(cursor.toISOString().slice(0, 7));
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+  }
+  return [...months].sort((a, b) => b.localeCompare(a));
 }
 
 function monthRange(key: string) {
@@ -88,11 +103,11 @@ type ReportData = {
 
 function FormalReportDocument({
   d,
-  period,
+  month,
   isModal = false,
 }: {
   d: ReportData | undefined;
-  period: { name: string; start_date: string; end_date: string } | undefined;
+  month: string | undefined;
   isModal?: boolean;
 }) {
   return (
@@ -133,7 +148,7 @@ function FormalReportDocument({
                   LAPORAN BULANAN PROGRAM LINGKUNGAN
                 </h3>
                 <p className="mt-1 text-sm font-bold text-primary">
-                  {period ? monthLabel(period.start_date.slice(0, 7)) : "-"}
+                  Periode: {month ? monthLabel(month) : "-"}
                 </p>
               </div>
 
@@ -142,14 +157,12 @@ function FormalReportDocument({
                   {
                     v: `${d?.tumblerRate ?? 0}%`,
                     t: "Total Penggunaan Tumbler",
-                    s: "Penggunaan Tumbler",
                   },
                   {
                     v: `${d?.lunchboxRate ?? 0}%`,
                     t: "Total Penggunaan Kotak Makan",
-                    s: "Penggunaan Kotak Makan",
                   },
-                  { v: d?.topKelas ?? "-", t: "Performa Kelas Terbaik", s: "Kelas Terbaik" },
+                  { v: d?.topKelas ?? "-", t: "Performa Kelas Terbaik" },
                 ].map((c) => (
                   <div
                     key={c.t}
@@ -159,7 +172,6 @@ function FormalReportDocument({
                       {c.v}
                     </p>
                     <p className="mt-2 text-sm font-bold text-foreground">{c.t}</p>
-                    <p className="text-xs text-muted-foreground">{c.s}</p>
                   </div>
                 ))}
               </div>
@@ -173,10 +185,13 @@ function FormalReportDocument({
                   <dl className="mt-3 space-y-2 text-sm">
                     {[
                       ["Siswa aktif terdaftar", (d?.totalStudents ?? 0).toLocaleString("id-ID")],
-                      ["Item eco tervalidasi", (d?.totalItems ?? 0).toLocaleString("id-ID")],
-                      ["Total Eco-Poin", (d?.totalPoin ?? 0).toLocaleString("id-ID")],
                       [
-                        "Estimasi CO2 dihemat",
+                        "Aktivitas lingkungan tervalidasi",
+                        (d?.totalItems ?? 0).toLocaleString("id-ID"),
+                      ],
+                      ["Total Poin Lingkungan", (d?.totalPoin ?? 0).toLocaleString("id-ID")],
+                      [
+                        "Perkiraan Pengurangan Emisi Karbon Dioksida",
                         `${Math.round(((d?.totalItems ?? 0) * 70) / 1000)} kg`,
                       ],
                     ].map(([k, v]) => (
@@ -205,7 +220,7 @@ function FormalReportDocument({
               </div>
 
               <h4 className="mt-8 text-base font-extrabold sm:text-lg text-foreground">
-                Peringkat Jawara Lingkungan / Environmental Champion Peringkatings
+                Peringkat Jawara Lingkungan
               </h4>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[34rem] text-sm">
@@ -259,7 +274,7 @@ function FormalReportDocument({
                   </div>
                 </div>
                 <div>
-                  <p>Jakarta, {period ? monthLabel(period.start_date.slice(0, 7)) : "-"}</p>
+                  <p>Jakarta, {month ? monthLabel(month) : "-"}</p>
                   <p>Koordinator Program</p>
                   <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
                     <p className="font-bold">{SCHOOL.coordinator}</p>
@@ -288,30 +303,27 @@ function LaporanPage() {
       return data ?? [];
     },
   });
-  const [periodId, setPeriodId] = useState("");
-  const selectedPeriod = periods.data?.find(
-    (p) => p.id === (periodId || periods.data?.find((p) => p.status === "ACTIVE")?.id),
-  );
+  const [selectedMonth, setSelectedMonth] = useState(() => monthKey(new Date()));
+  const availableMonths = monthsInPeriods(periods.data ?? []);
   const report = useQuery({
-    queryKey: ["formal-report", selectedPeriod?.id],
-    enabled: !!selectedPeriod,
+    queryKey: ["formal-report", selectedMonth],
     queryFn: async () => {
-      const period = selectedPeriod!;
-      const previous = periods.data?.find((p) => p.end_date < period.start_date);
+      const currentRange = monthRange(selectedMonth);
+      const [year, month] = selectedMonth.split("-").map(Number);
+      const previousMonthDate = new Date(Date.UTC(year!, month! - 2, 1));
+      const previousRange = monthRange(monthKey(previousMonthDate));
       const [{ data: students }, { data: items }, prevItems] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
         supabase
           .from("validation_items")
           .select("item_code, points, student_id, day, validations!inner(status, period_id)")
-          .eq("validations.period_id", period.id)
-          .gte("day", period.start_date)
-          .lte("day", period.end_date),
-        previous
-          ? supabase
-              .from("validation_items")
-              .select("points, validations!inner(status, period_id)")
-              .eq("validations.period_id", previous.id)
-          : Promise.resolve({ data: [] as { points: number; validations: unknown }[] }),
+          .gte("day", currentRange.start)
+          .lt("day", currentRange.end),
+        supabase
+          .from("validation_items")
+          .select("item_code, validations!inner(status, period_id)")
+          .gte("day", previousRange.start)
+          .lt("day", previousRange.end),
       ]);
       const validStudents = (students ?? []).filter((s) => {
         const className = (s.classes as { name: string } | null)?.name?.trim();
@@ -345,14 +357,16 @@ function LaporanPage() {
         const name = classOf.get(i.student_id)!;
         const row = classes.get(name)!;
         row.points += Number(i.points ?? 0);
-        const bucket =
-          i.item_code === "tumbler" || i.item_code === "break_combo" ? classTumbler : classLunchbox;
-        if (!bucket.has(name)) bucket.set(name, new Set());
-        bucket.get(name)!.add(i.student_id);
-        (i.item_code === "tumbler" || i.item_code === "break_combo"
-          ? tumblerUsers
-          : lunchboxUsers
-        ).add(i.student_id);
+        if (i.item_code === "tumbler" || i.item_code === "break_combo") {
+          if (!classTumbler.has(name)) classTumbler.set(name, new Set());
+          classTumbler.get(name)!.add(i.student_id);
+          tumblerUsers.add(i.student_id);
+        }
+        if (i.item_code === "lunchbox" || i.item_code === "break_combo") {
+          if (!classLunchbox.has(name)) classLunchbox.set(name, new Set());
+          classLunchbox.get(name)!.add(i.student_id);
+          lunchboxUsers.add(i.student_id);
+        }
       }
       const rows = [...classes.values()]
         .map((r) => ({
@@ -366,7 +380,22 @@ function LaporanPage() {
         }))
         .sort((a, b) => a.name.localeCompare(b.name, "id"));
       const totalPoin = approved.reduce((a, i) => a + Number(i.points ?? 0), 0);
-      const prevPoin = prevApproved.reduce((a, i) => a + Number(i.points ?? 0), 0);
+      const usageCount = (values: typeof approved) =>
+        values.reduce(
+          (total, item) =>
+            total +
+            (item.item_code === "break_combo"
+              ? 2
+              : item.item_code === "tumbler" || item.item_code === "lunchbox"
+                ? 1
+                : 0),
+          0,
+        );
+      const monthlyUsage = usageCount(approved);
+      const previousMonthlyUsage = usageCount(prevApproved);
+      const topClass = [...rows].sort(
+        (a, b) => b.points - a.points || a.name.localeCompare(b.name, "id"),
+      )[0];
       return {
         rows,
         totalStudents: validStudents.length,
@@ -374,13 +403,15 @@ function LaporanPage() {
         totalPoin,
         tumblerRate: Math.round((tumblerUsers.size / Math.max(1, validStudents.length)) * 100),
         lunchboxRate: Math.round((lunchboxUsers.size / Math.max(1, validStudents.length)) * 100),
-        growth: prevPoin > 0 ? Math.round(((totalPoin - prevPoin) / prevPoin) * 100) : null,
-        topKelas: rows[0]?.name ?? "-",
+        growth:
+          previousMonthlyUsage > 0
+            ? Math.round(((monthlyUsage - previousMonthlyUsage) / previousMonthlyUsage) * 100)
+            : null,
+        topKelas: topClass && topClass.points > 0 ? topClass.name : "-",
       };
     },
   });
   const d = report.data;
-  const periodLabel = selectedPeriod?.name ?? "Periode";
   function exportCsv() {
     const header =
       "Peringkat,Kelas,Siswa,Poin,Persentase Penggunaan Tumbler,Persentase Penggunaan Kotak Makan\n";
@@ -389,7 +420,7 @@ function LaporanPage() {
       .join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([header + body], { type: "text/csv;charset=utf-8;" }));
-    a.download = `laporan-lingkungan-${selectedPeriod?.id ?? "periode"}.csv`;
+    a.download = `laporan-lingkungan-${selectedMonth}.csv`;
     a.click();
   }
   function handlePrintDirect() {
@@ -400,18 +431,18 @@ function LaporanPage() {
     <div className="space-y-5">
       <header className="no-print grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
         <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">
-          Laporan Formal
+          Laporan Resmi
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            value={selectedPeriod?.id ?? ""}
-            onChange={(e) => setPeriodId(e.target.value)}
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
             className="h-9 rounded-xl border border-input bg-background px-3 text-sm font-semibold"
-            aria-label="Pilih periode laporan"
+            aria-label="Pilih bulan laporan"
           >
-            {periods.data?.map((period) => (
-              <option key={period.id} value={period.id}>
-                {period.name} ({period.status})
+            {availableMonths.map((month) => (
+              <option key={month} value={month}>
+                {monthLabel(month)}
               </option>
             ))}
           </select>
@@ -429,7 +460,7 @@ function LaporanPage() {
       </header>
 
       {/* DOCUMENT ON MAIN PAGE */}
-      <FormalReportDocument d={d} period={selectedPeriod} isModal={false} />
+      <FormalReportDocument d={d} month={selectedMonth} isModal={false} />
 
       {/* POP UP PREVIEW PDF MODAL */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
@@ -447,7 +478,7 @@ function LaporanPage() {
                 </Badge>
               </div>
               <DialogDescription className="text-xs text-muted-foreground">
-                Periode: <strong>{periodLabel}</strong> · SMP Negeri 99 Jakarta
+                Periode: <strong>{monthLabel(selectedMonth)}</strong> · SMP Negeri 99 Jakarta
               </DialogDescription>
             </div>
 
@@ -473,7 +504,7 @@ function LaporanPage() {
           {/* SCROLLABLE PDF SIMULATION VIEWER */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-100 dark:bg-slate-900/60">
             <div className="mx-auto flex flex-col items-center">
-              <FormalReportDocument d={d} period={selectedPeriod} isModal={true} />
+              <FormalReportDocument d={d} month={selectedMonth} isModal={true} />
             </div>
           </div>
         </DialogContent>

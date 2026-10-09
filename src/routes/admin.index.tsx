@@ -18,7 +18,10 @@ export const Route = createFileRoute("/admin/")({
         content: "Pantau partisipasi, setujui klaim validasi, dan kelola ekosistem hijau sekolah.",
       },
       { property: "og:title", content: "Dasbor Admin — School Ecosystem" },
-      { property: "og:description", content: "KPI partisipasi dan antrean validasi klaim eco-point." },
+      {
+        property: "og:description",
+        content: "KPI partisipasi dan antrean validasi klaim eco-point.",
+      },
     ],
   }),
   component: AdminDashboard,
@@ -65,11 +68,12 @@ function AdminDashboard() {
         queryClient.invalidateQueries({ queryKey: ["formal-report"] }),
         queryClient.invalidateQueries({ queryKey: ["school-stats"] }),
         queryClient.invalidateQueries({ queryKey: ["jawara-data"] }),
+        queryClient.invalidateQueries({ queryKey: ["point-reset-audit-events"] }),
       ]);
       if (!data || typeof data !== "object" || Array.isArray(data)) return;
-      const targetPeriodName = data["target_period_name"];
-      if (typeof targetPeriodName !== "string") return;
-      toast.success(`Reset point berhasil. Periode ${targetPeriodName} telah dimulai dari 0 point.`);
+      const periodName = data["period_name"];
+      if (typeof periodName !== "string") return;
+      toast.success(`Poin hasil uji coba pada periode ${periodName} telah dihapus.`);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal mereset point"),
   });
@@ -81,23 +85,43 @@ function AdminDashboard() {
       const period = activePeriod.data!;
       const [studentsRes, todayItems, scoresRes, pendingAccountsRes] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").not("class_id", "is", null),
-        supabase.from("validation_items").select("student_id, points, validations!inner(status, period_id)").eq("day", todayJakarta()).eq("validations.period_id", period.id),
-        supabase.from("period_student_scores").select("earned_points, total_items, class_name").eq("period_id", period.id),
-        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_approved", false),
+        supabase
+          .from("validation_items")
+          .select("student_id, points, validations!inner(status, period_id)")
+          .eq("day", todayJakarta())
+          .eq("validations.period_id", period.id),
+        supabase
+          .from("period_student_scores")
+          .select("earned_points, total_items, class_name")
+          .eq("period_id", period.id),
+        supabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("is_approved", false),
       ]);
 
       const validStudents = (studentsRes.data ?? []).filter((s) => {
         const className = (s.classes as { name: string } | null)?.name?.trim();
-        return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas");
+        return Boolean(
+          s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas",
+        );
       });
       const validScores = (scoresRes.data ?? []).filter((s) => {
         const c = (s.class_name ?? "").trim();
         return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
       });
-      const approvedToday = (todayItems.data ?? []).filter((i) => (i.validations as { status: string } | null)?.status === "approved");
+      const approvedToday = (todayItems.data ?? []).filter(
+        (i) => (i.validations as { status: string } | null)?.status === "approved",
+      );
       const participants = new Set(approvedToday.map((i) => i.student_id)).size;
       const totalItems = validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
-      return { studentCount: validStudents.length, participants, pointsToday: approvedToday.reduce((a, i) => a + i.points, 0), pendingCount: pendingAccountsRes.count ?? 0, co2Kg: Math.round((totalItems * 70) / 1000) };
+      return {
+        studentCount: validStudents.length,
+        participants,
+        pointsToday: approvedToday.reduce((a, i) => a + i.points, 0),
+        pendingCount: pendingAccountsRes.count ?? 0,
+        co2Kg: Math.round((totalItems * 70) / 1000),
+      };
     },
   });
 
@@ -106,7 +130,9 @@ function AdminDashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("validations")
-        .select("id, status, source, station, day, students(full_name, nis), validation_items(item_code, points)")
+        .select(
+          "id, status, source, station, day, students(full_name, nis), validation_items(item_code, points)",
+        )
         .eq("status", "pending")
         .order("day", { ascending: false })
         .limit(10);
@@ -126,23 +152,50 @@ function AdminDashboard() {
     },
   });
 
-  const participation = kpi.data?.studentCount ? Math.round((kpi.data.participants / kpi.data.studentCount) * 100) : 0;
+  const participation = kpi.data?.studentCount
+    ? Math.round((kpi.data.participants / kpi.data.studentCount) * 100)
+    : 0;
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Dasbor Admin</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Pantau operasional ekosistem dan validasi klaim point</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pantau operasional ekosistem dan validasi klaim point
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Partisipasi hari ini", value: `${participation}%`, icon: TrendingUp, color: "text-blue-600" },
-          { label: "Siswa terdaftar", value: kpi.data?.studentCount ?? 0, icon: Users, color: "text-emerald-600" },
-          { label: "Poin hari ini", value: (kpi.data?.pointsToday ?? 0).toLocaleString("id-ID"), icon: Leaf, color: "text-green-600" },
-          { label: "Akun menunggu", value: kpi.data?.pendingCount ?? 0, icon: AlertCircle, color: "text-orange-600" },
+          {
+            label: "Partisipasi hari ini",
+            value: `${participation}%`,
+            icon: TrendingUp,
+            color: "text-blue-600",
+          },
+          {
+            label: "Siswa terdaftar",
+            value: kpi.data?.studentCount ?? 0,
+            icon: Users,
+            color: "text-emerald-600",
+          },
+          {
+            label: "Poin hari ini",
+            value: (kpi.data?.pointsToday ?? 0).toLocaleString("id-ID"),
+            icon: Leaf,
+            color: "text-green-600",
+          },
+          {
+            label: "Akun menunggu",
+            value: kpi.data?.pendingCount ?? 0,
+            icon: AlertCircle,
+            color: "text-orange-600",
+          },
         ].map((k) => (
-          <div key={k.label} className="rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div
+            key={k.label}
+            className="rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
+          >
             <k.icon className={`size-6 ${k.color}`} />
             <p className="mt-4 text-3xl font-extrabold text-foreground">{k.value}</p>
             <p className="mt-1 text-sm font-medium text-muted-foreground">{k.label}</p>
@@ -159,7 +212,13 @@ function AdminDashboard() {
                 ? `${activePeriod.data.name} · ${activePeriod.data.start_date} – ${activePeriod.data.end_date}`
                 : "Memuat periode aktif..."}
             </p>
-            <p className="mt-2 text-xs font-medium text-blue-700">Status: ACTIVE • Poin periode dimulai dari 0</p>
+            <p className="mt-2 text-xs font-medium text-blue-700">
+              Status: Aktif • Periode tetap berjalan
+            </p>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Reset poin menghapus nilai poin hasil uji coba pada periode ini. Riwayat pemindaian
+              tetap tersimpan dan periode tidak ditutup.
+            </p>
           </div>
           <Button
             onClick={() => setResetConfirmOpen(true)}
@@ -168,7 +227,7 @@ function AdminDashboard() {
             className="gap-2 self-start"
           >
             <RotateCcw className="size-4" />
-            {resetPoint.isPending ? "Memproses..." : "Reset Point"}
+            {resetPoint.isPending ? "Memproses..." : "Hapus Poin Uji Coba"}
           </Button>
         </div>
       </div>
@@ -189,18 +248,24 @@ function AdminDashboard() {
       <div>
         <div className="mb-4">
           <h2 className="text-lg font-bold text-foreground">Antrean Validasi Klaim</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{queue.data?.length ?? 0} klaim menunggu validasi</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {queue.data?.length ?? 0} klaim menunggu validasi
+          </p>
         </div>
 
         <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
           {(queue.data ?? []).length > 0 ? (
             <div className="divide-y divide-border">
               {queue.data?.map((v) => (
-                <div key={v.id} className="flex flex-col gap-4 p-6 hover:bg-gray-50 transition-colors">
+                <div
+                  key={v.id}
+                  className="flex flex-col gap-4 p-6 hover:bg-gray-50 transition-colors"
+                >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-foreground">
-                        {(v.students as { full_name: string; nis: string } | null)?.full_name ?? "-"}
+                        {(v.students as { full_name: string; nis: string } | null)?.full_name ??
+                          "-"}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         NIS {(v.students as { nis: string } | null)?.nis}
@@ -211,8 +276,10 @@ function AdminDashboard() {
 
                   <p className="text-sm text-muted-foreground">
                     {(v.validation_items ?? []).map((i) => i.item_code).join(" + ")} •{" "}
-                    <span className="font-semibold">{(v.validation_items ?? []).reduce((a, i) => a + i.points, 0)} poin</span> • {v.source === "manual" ? "Input manual" : "Scan"}{" "}
-                    • {v.station ?? "-"}
+                    <span className="font-semibold">
+                      {(v.validation_items ?? []).reduce((a, i) => a + i.points, 0)} poin
+                    </span>{" "}
+                    • {v.source === "manual" ? "Input manual" : "Scan"} • {v.station ?? "-"}
                   </p>
 
                   <div className="flex gap-2 pt-2">
@@ -236,7 +303,9 @@ function AdminDashboard() {
               ))}
             </div>
           ) : (
-            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Tidak ada klaim menunggu validasi.</p>
+            <p className="px-6 py-12 text-center text-sm text-muted-foreground">
+              Tidak ada klaim menunggu validasi.
+            </p>
           )}
         </div>
       </div>
@@ -256,7 +325,9 @@ function AdminDashboard() {
             >
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{link.icon}</span>
-                <span className="font-medium text-foreground group-hover:text-blue-700">{link.label}</span>
+                <span className="font-medium text-foreground group-hover:text-blue-700">
+                  {link.label}
+                </span>
               </div>
             </Link>
           ))}
@@ -271,12 +342,17 @@ function AdminDashboard() {
             className="w-full max-w-md rounded-2xl border border-border bg-white p-6 shadow-xl"
           >
             <h2 id="reset-point-title" className="text-xl font-bold text-foreground">
-              Reset point periode {activePeriod.data?.name}?
+              Hapus poin uji coba periode {activePeriod.data?.name}?
             </h2>
             <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <p>Periode aktif akan ditutup dan periode baru dimulai dari 0 point.</p>
-              <p>Riwayat validation dan Audit Trail tidak akan dihapus.</p>
-              <p className="font-semibold text-foreground">Lanjutkan?</p>
+              <p>Nilai poin pada catatan pemindaian di periode aktif akan diubah menjadi 0.</p>
+              <p>
+                Catatan pemindaian tetap tersimpan. Periode tetap aktif, dan pemindaian berikutnya
+                tetap dapat menambah poin.
+              </p>
+              <p className="font-semibold text-foreground">
+                Tindakan ini tidak dapat dibatalkan. Lanjutkan?
+              </p>
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <Button
@@ -292,7 +368,7 @@ function AdminDashboard() {
                 onClick={() => resetPoint.mutate()}
                 disabled={resetPoint.isPending}
               >
-                {resetPoint.isPending ? "Memproses..." : "Reset Point"}
+                {resetPoint.isPending ? "Memproses..." : "Ya, Hapus Poin"}
               </Button>
             </div>
           </div>
