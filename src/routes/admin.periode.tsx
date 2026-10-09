@@ -177,7 +177,8 @@ function PeriodPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <AdminShell>
+      <div className="space-y-5">
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
         <div>
           <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">
@@ -419,3 +420,4 @@ function PeriodPage() {
     </div>
   );
 }
+
