@@ -190,7 +190,7 @@ function PeriodPage() {
             </p>
           </div>
         </header>
-        <section className="mx-auto w-full max-w-6xl space-y-6">
+        <section className="space-y-6">
           <div className="surface-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="label-xs text-muted-foreground">Periode berjalan</p>
