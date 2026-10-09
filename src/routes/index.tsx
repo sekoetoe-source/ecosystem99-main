@@ -369,7 +369,7 @@ function MobileUserGuideSection() {
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
                 <li>Petugas akan meng-scan QR HP Anda atau memasukkan NIS Anda.</li>
                 <li>
-                  Poin +100 (Tumbler) dan +50 (Kotak Makan){" "}
+                  Poin tumbler saja +100, kotak makan saja +50, atau keduanya sekaligus +250 poin.
                   <strong>langsung bertambah otomatis</strong> ke perolehan poin Anda!
                 </li>
                 <li>
@@ -402,7 +402,8 @@ function MobileUserGuideSection() {
                 </strong>
                 <p className="text-muted-foreground">
                   Refresh halaman dasbor Anda. Validasi petugas pos langsung ter-approve secara
-                  realtime sehingga poin (+100/+50) masuk seketika.
+                  realtime sehingga poin sesuai pilihan masuk seketika: +100, +50, atau +250 untuk
+                  keduanya.
                 </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
@@ -461,9 +462,10 @@ function MobileUserGuideSection() {
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
                 <li>
                   <strong>Checklist Item yang Dibawa:</strong> Centang{" "}
-                  <span className="font-bold text-foreground">Tumbler (+100 poin)</span> dan/atau{" "}
-                  <span className="font-bold text-foreground">Kotak Makan (+50 poin)</span> sesuai
-                  barang fisik yang ditunjukkan siswa.
+                  <span className="font-bold text-foreground">Tumbler saja (+100 poin)</span>{" "}
+                  dan/atau{" "}
+                  <span className="font-bold text-foreground">Kotak Makan saja (+50 poin)</span>{" "}
+                  sesuai barang fisik yang ditunjukkan siswa.
                 </li>
                 <li>
                   <strong>Tombol Kamera / Scanner:</strong> Klik untuk mengaktifkan pemindai kamera
@@ -1000,7 +1002,7 @@ function Index() {
               </div>
             </div>
             <div className="surface-card absolute right-0 top-8 hidden px-4 py-3 text-xs font-bold sm:block">
-              +150 Eco Points
+              +250 Eco Points
               <span className="label-xs block text-muted-foreground">Tumbler + Lunchbox</span>
             </div>
             <div className="surface-card absolute bottom-24 left-0 hidden px-4 py-3 text-xs font-bold sm:block">

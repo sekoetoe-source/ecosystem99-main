@@ -748,11 +748,11 @@ function ScannerPage() {
               >
                 {session === "entry"
                   ? entryTumbler && entryLunchbox
-                    ? "Total: +150 poin (Keduanya)"
+                    ? "Total: +250 poin (Keduanya)"
                     : entryTumbler
-                      ? "Total: +100 poin (Tumbler)"
+                      ? "Total: +100 poin (Tumbler saja)"
                       : entryLunchbox
-                        ? "Total: +50 poin (Kotak Makan)"
+                        ? "Total: +50 poin (Kotak Makan saja)"
                         : "Pilih minimal 1 item"
                   : breakOption === "break_combo"
                     ? "Total: +250 poin (Combo)"
@@ -763,7 +763,7 @@ function ScannerPage() {
             </div>
 
             {session === "entry" ? (
-              // SESI 1: Checkbox Independen (Tumbler +100, Kotak Makan +50, Keduanya +150)
+              // SESI 1: Checkbox Independen (Tumbler +100, Kotak Makan +50, Keduanya +250)
               <div className="space-y-2">
                 <div className="grid gap-2 grid-cols-2">
                   <label
@@ -832,8 +832,9 @@ function ScannerPage() {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                  * Checkbox independen: Tumbler (+100), Kotak Makan (+50). Boleh dipilih salah satu
-                  atau keduanya (total +150 poin).
+                  * Checkbox independen: Tumbler (+100), Kotak Makan (+50). Pilih salah satu atau
+                  gunakan pilihan kombinasi untuk mendapatkan +250 poin atau keduanya (total +250
+                  poin).
                 </p>
               </div>
             ) : (
@@ -926,7 +927,7 @@ function ScannerPage() {
 
                 <p className="text-[11px] text-muted-foreground">
                   * Pilihan saling eksklusif (radio): hanya satu opsi yang aktif. Combo bernilai
-                  utuh +250 poin.
+                  utuh dan mendapatkan +250 poin.
                 </p>
               </div>
             )}
