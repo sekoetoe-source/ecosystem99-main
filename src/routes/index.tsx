@@ -87,9 +87,7 @@ export const Route = createFileRoute("/")({
       },
       { name: "twitter:image", content: "https://ecosystem99.web.id/logo-smpn99.png" },
     ],
-    links: [
-      { rel: "canonical", href: "https://ecosystem99.web.id/" },
-    ],
+    links: [{ rel: "canonical", href: "https://ecosystem99.web.id/" }],
   }),
 });
 
@@ -107,7 +105,11 @@ const useSchoolStats = () => {
   const activePeriod = useQuery({
     queryKey: ["active-period"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("periods").select("id").eq("status", "ACTIVE").maybeSingle();
+      const { data, error } = await supabase
+        .from("periods")
+        .select("id")
+        .eq("status", "ACTIVE")
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -118,22 +120,79 @@ const useSchoolStats = () => {
     queryFn: async () => {
       try {
         const periodId = activePeriod.data!.id;
-        const [{ count: totalStudentsCount }, { data: scores }, { data: items }, { count: valItemsCount }] = await Promise.all([
+        const [
+          { count: totalStudentsCount },
+          { data: scores },
+          { data: items },
+          { count: valItemsCount },
+        ] = await Promise.all([
           supabase.from("students").select("id", { count: "exact", head: true }),
-          supabase.from("period_student_scores").select("earned_points, total_items, class_name").eq("period_id", periodId),
+          supabase
+            .from("period_student_scores")
+            .select("earned_points, total_items, class_name")
+            .eq("period_id", periodId),
           supabase.from("eco_items").select("code, co2_grams"),
-          supabase.from("validation_items").select("id", { count: "exact", head: true }).eq("period_id", periodId),
+          supabase
+            .from("validation_items")
+            .select("id", { count: "exact", head: true })
+            .eq("period_id", periodId),
         ]);
-        const validScores = (scores ?? []).filter((s) => { const c = (s.class_name ?? "").trim(); return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas" && Number(s.earned_points ?? 0) > 0); });
+        const validScores = (scores ?? []).filter((s) => {
+          const c = (s.class_name ?? "").trim();
+          return Boolean(
+            c && c !== "-" && c.toLowerCase() !== "tanpa kelas" && Number(s.earned_points ?? 0) > 0,
+          );
+        });
         const realValItems = valItemsCount ?? 0;
         const totalPoints = validScores.reduce((a, s) => a + Number(s.earned_points ?? 0), 0);
-        if (validScores.length === 0 || totalPoints === 0) return { totalPoints: 0, totalItems: 0, studentCount: totalStudentsCount ?? 0, co2Kg: 0, classes: [] };
-        const calcTotalItems = realValItems > 0 ? realValItems : validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
-        const avgCo2 = (items ?? []).length > 0 ? (items ?? []).reduce((a, i) => a + i.co2_grams, 0) / Math.max(1, (items ?? []).length) : 68;
-        const classMap = new Map<string, { class_name: string; total_points: number; student_count: number }>();
-        validScores.forEach((s) => { const name = (s.class_name ?? "").trim(); const current = classMap.get(name) || { class_name: name, total_points: 0, student_count: 0 }; classMap.set(name, { class_name: name, total_points: current.total_points + Number(s.earned_points ?? 0), student_count: current.student_count + 1 }); });
-        const computedClasses = Array.from(classMap.values()).map((c) => ({ class_name: c.class_name, student_count: c.student_count, total_points: c.total_points, avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0 })).sort((a, b) => b.total_points - a.total_points);
-        return { totalPoints, totalItems: calcTotalItems, studentCount: totalStudentsCount ?? 0, co2Kg: Math.round((calcTotalItems * avgCo2) / 1000), classes: computedClasses.slice(0, 5) };
+        if (validScores.length === 0 || totalPoints === 0)
+          return {
+            totalPoints: 0,
+            totalItems: 0,
+            studentCount: totalStudentsCount ?? 0,
+            co2Kg: 0,
+            classes: [],
+          };
+        const calcTotalItems =
+          realValItems > 0
+            ? realValItems
+            : validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
+        const avgCo2 =
+          (items ?? []).length > 0
+            ? (items ?? []).reduce((a, i) => a + i.co2_grams, 0) / Math.max(1, (items ?? []).length)
+            : 68;
+        const classMap = new Map<
+          string,
+          { class_name: string; total_points: number; student_count: number }
+        >();
+        validScores.forEach((s) => {
+          const name = (s.class_name ?? "").trim();
+          const current = classMap.get(name) || {
+            class_name: name,
+            total_points: 0,
+            student_count: 0,
+          };
+          classMap.set(name, {
+            class_name: name,
+            total_points: current.total_points + Number(s.earned_points ?? 0),
+            student_count: current.student_count + 1,
+          });
+        });
+        const computedClasses = Array.from(classMap.values())
+          .map((c) => ({
+            class_name: c.class_name,
+            student_count: c.student_count,
+            total_points: c.total_points,
+            avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
+          }))
+          .sort((a, b) => b.total_points - a.total_points);
+        return {
+          totalPoints,
+          totalItems: calcTotalItems,
+          studentCount: totalStudentsCount ?? 0,
+          co2Kg: Math.round((calcTotalItems * avgCo2) / 1000),
+          classes: computedClasses.slice(0, 5),
+        };
       } catch (err) {
         console.error("Error fetching school stats:", err);
         return { totalPoints: 0, totalItems: 0, studentCount: 0, co2Kg: 0, classes: [] };
@@ -160,7 +219,12 @@ function SectionHead({
         {title}
       </h2>
       {lead && (
-        <p className={cn("mt-4 text-base", invert ? "text-primary-foreground/75" : "text-muted-foreground")}>
+        <p
+          className={cn(
+            "mt-4 text-base",
+            invert ? "text-primary-foreground/75" : "text-muted-foreground",
+          )}
+        >
           {lead}
         </p>
       )}
@@ -190,11 +254,14 @@ function MobileUserGuideSection() {
   const [activeRoleTab, setActiveRoleTab] = useState<"siswa" | "petugas" | "walikelas">("siswa");
 
   return (
-    <section id="panduan" className="mx-auto max-w-6xl px-4 py-16 sm:py-24 border-t border-border/60">
+    <section
+      id="panduan"
+      className="mx-auto max-w-6xl px-4 py-16 sm:py-24 border-t border-border/60"
+    >
       <SectionHead
-        kicker="Mobile Guide & Account Support"
-        title="Panduan Penggunaan HP & Troubleshooting Akun"
-        lead="Langkah awal pendaftaran, panduan tampilan layar HP, hingga solusi masalah akun untuk role Siswa, Petugas Pos, dan Wali Kelas."
+        kicker="PANDUAN PENGGUNAAN DAN BANTUAN AKUN"
+        title="Panduan Penggunaan Sistem dan Solusi Kendala"
+        lead="Panduan terbaru untuk masuk, menjalankan tugas, dan menyelesaikan kendala pada akun Siswa, Petugas Pos, dan Wali Kelas."
       />
 
       {/* ROLE SWITCHER TABS */}
@@ -206,7 +273,7 @@ function MobileUserGuideSection() {
             "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all",
             activeRoleTab === "siswa"
               ? "bg-primary text-primary-foreground shadow-md scale-105"
-              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50",
           )}
         >
           <Smartphone className="size-4" /> Role Siswa 📱
@@ -218,7 +285,7 @@ function MobileUserGuideSection() {
             "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all",
             activeRoleTab === "petugas"
               ? "bg-primary text-primary-foreground shadow-md scale-105"
-              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50",
           )}
         >
           <ScanLine className="size-4" /> Role Petugas Pos 🔍
@@ -230,7 +297,7 @@ function MobileUserGuideSection() {
             "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all",
             activeRoleTab === "walikelas"
               ? "bg-primary text-primary-foreground shadow-md scale-105"
-              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50",
           )}
         >
           <BarChart2 className="size-4" /> Role Wali Kelas 📊
@@ -244,45 +311,70 @@ function MobileUserGuideSection() {
             <div className="surface-card p-6 border-l-4 border-l-eco">
               <span className="label-xs text-eco">Langkah 1</span>
               <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
-                <LogIn className="size-4 text-eco" /> Pendaftaran & Login HP
+                <LogIn className="size-4 text-eco" /> Daftar dan Masuk
               </h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                Buka website <strong className="text-foreground">ecosystem99.web.id</strong> di browser HP (Chrome/Safari). Klik <strong>Login</strong>.
+                Buka website <strong className="text-foreground">ecosystem99.web.id</strong> di
+                browser HP (Chrome/Safari). Klik <strong>Login</strong>.
               </p>
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
-                <li><strong>NIS Default:</strong> Masukkan NIS Anda (misal: <code className="text-primary font-bold">20762</code>) & Password bawaan <code className="text-primary font-bold">S!swa@Smpn99jkt</code>.</li>
-                <li><strong>Akun Google:</strong> Klik "Masuk dengan Google", pilih Role "Siswa", isi NIS & Kelas. Tunggu persetujuan Admin/Wali Kelas.</li>
+                <li>
+                  <strong>NIS Default:</strong> Masukkan NIS Anda (misal:{" "}
+                  <code className="text-primary font-bold">20762</code>) & Password bawaan{" "}
+                  <code className="text-primary font-bold">S!swa@Smpn99jkt</code>.
+                </li>
+                <li>
+                  <strong>Akun Google:</strong> Klik "Masuk dengan Google", pilih Role "Siswa", isi
+                  NIS & Kelas. Tunggu persetujuan Admin/Wali Kelas.
+                </li>
               </ul>
             </div>
 
             <div className="surface-card p-6 border-l-4 border-l-primary">
               <span className="label-xs text-primary">Langkah 2</span>
               <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
-                <Smartphone className="size-4 text-primary" /> Keterangan Layar HP Siswa
+                <Smartphone className="size-4 text-primary" /> Fitur Akun Siswa
               </h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                 Fitur-fitur di Dasbor Mobile Siswa:
               </p>
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
-                <li><strong>Kartu QR Eco Tag:</strong> Tunjukkan kode QR di layar HP ke Petugas di pos sekolah untuk di-scan.</li>
-                <li><strong>Total Perolehan Poin:</strong> Poin akumulasi dari membawa Tumbler (+100) dan Kotak Makan (+50).</li>
-                <li><strong>Eco Streak (🔥):</strong> Jumlah hari berturut-turut Anda aktif membawa wadah ramah lingkungan.</li>
-                <li><strong>Tukar Reward:</strong> Tukar poin Anda dengan voucher jajan kantin atau piagam penghargaan.</li>
+                <li>
+                  <strong>Kartu QR Eco Tag:</strong> Tunjukkan kode QR di layar HP ke Petugas di pos
+                  sekolah untuk di-scan.
+                </li>
+                <li>
+                  <strong>Total Perolehan Poin:</strong> Poin akumulasi dari membawa Tumbler (+100)
+                  dan Kotak Makan (+50).
+                </li>
+                <li>
+                  <strong>Eco Streak (🔥):</strong> Jumlah hari berturut-turut Anda aktif membawa
+                  wadah ramah lingkungan.
+                </li>
+                <li>
+                  <strong>Tukar Reward:</strong> Tukar poin Anda dengan voucher jajan kantin atau
+                  piagam penghargaan.
+                </li>
               </ul>
             </div>
 
             <div className="surface-card p-6 border-l-4 border-l-amber-500">
               <span className="label-xs text-amber-600">Langkah 3</span>
               <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
-                <ShieldCheck className="size-4 text-amber-500" /> Bawa Tumbler & Lunchbox
+                <ShieldCheck className="size-4 text-amber-500" /> Bawa Tumbler dan Kotak Makan
               </h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                 Setiap pagi & jam istirahat, tunjukkan wadah makan ke Pos Kantin / Gerbang Utama:
               </p>
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
                 <li>Petugas akan meng-scan QR HP Anda atau memasukkan NIS Anda.</li>
-                <li>Poin +100 (Tumbler) dan +50 (Kotak Makan) <strong>langsung bertambah otomatis</strong> ke perolehan poin Anda!</li>
-                <li>Bantu kelasmu meraih posisi <strong>Jawara Lingkungan</strong>!</li>
+                <li>
+                  Poin +100 (Tumbler) dan +50 (Kotak Makan){" "}
+                  <strong>langsung bertambah otomatis</strong> ke perolehan poin Anda!
+                </li>
+                <li>
+                  Bantu kelasmu meraih posisi <strong>Jawara Lingkungan</strong>!
+                </li>
               </ul>
             </div>
           </div>
@@ -290,24 +382,46 @@ function MobileUserGuideSection() {
           {/* TROUBLESHOOTING SISWA */}
           <div className="surface-card p-6 rounded-3xl bg-amber-500/5 border-amber-500/20">
             <h4 className="text-base font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-2 mb-3">
-              <ShieldAlert className="size-5 text-amber-600" /> FAQ & Troubleshooting Masalah Akun Siswa
+              <ShieldAlert className="size-5 text-amber-600" /> Pertanyaan Umum dan Solusi Akun
+              Siswa
             </h4>
             <div className="grid gap-3 sm:grid-cols-2 text-xs">
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Gagal login dengan NIS atau Password Salah?</strong>
-                <p className="text-muted-foreground">Pastikan NIS ditulis angka tanpa spasi. Password default siswa adalah <code className="font-bold text-primary">S!swa@Smpn99jkt</code> (perhatikan huruf besar/kecil & simbol!).</p>
+                <strong className="text-foreground block mb-1">
+                  Tidak dapat masuk dengan NIS atau kata sandi?
+                </strong>
+                <p className="text-muted-foreground">
+                  Pastikan NIS ditulis angka tanpa spasi. Password default siswa adalah{" "}
+                  <code className="font-bold text-primary">S!swa@Smpn99jkt</code> (perhatikan huruf
+                  besar/kecil & simbol!).
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Mengapa Poin Belum Bertambah Setelah Petugas Scan?</strong>
-                <p className="text-muted-foreground">Refresh halaman dasbor Anda. Validasi petugas pos langsung ter-approve secara realtime sehingga poin (+100/+50) masuk seketika.</p>
+                <strong className="text-foreground block mb-1">
+                  Poin belum bertambah setelah pencatatan?
+                </strong>
+                <p className="text-muted-foreground">
+                  Refresh halaman dasbor Anda. Validasi petugas pos langsung ter-approve secara
+                  realtime sehingga poin (+100/+50) masuk seketika.
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Akun Google Masih "Menunggu Persetujuan Admin"?</strong>
-                <p className="text-muted-foreground">Minta Wali Kelas atau Admin Sekolah untuk membuka menu "Persetujuan Akun Google" di dashboard admin dan menyetujui akun Anda.</p>
+                <strong className="text-foreground block mb-1">
+                  Akun Google masih menunggu persetujuan?
+                </strong>
+                <p className="text-muted-foreground">
+                  Minta Wali Kelas atau Admin Sekolah untuk membuka menu "Persetujuan Akun Google"
+                  di dashboard admin dan menyetujui akun Anda.
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: HP Mati / Tidak Ada Kuota Internet saat Scan?</strong>
-                <p className="text-muted-foreground">Tidak masalah! Cukup sebutkan NIS Anda kepada Petugas di pos, petugas akan memasukkan NIS manual Anda di HP petugas.</p>
+                <strong className="text-foreground block mb-1">
+                  Ponsel mati atau tidak ada internet saat pencatatan?
+                </strong>
+                <p className="text-muted-foreground">
+                  Tidak masalah! Cukup sebutkan NIS Anda kepada Petugas di pos, petugas akan
+                  memasukkan NIS manual Anda di HP petugas.
+                </p>
               </div>
             </div>
           </div>
@@ -321,13 +435,17 @@ function MobileUserGuideSection() {
             <div className="surface-card p-6 border-l-4 border-l-blue-500">
               <span className="label-xs text-blue-600">Langkah 1</span>
               <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
-                <LogIn className="size-4 text-blue-500" /> Login & Pilih Pos
+                <LogIn className="size-4 text-blue-500" /> Masuk dan Pilih Pos
               </h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                Petugas pos membuka website di browser HP dan login dengan akun Petugas Pos yang terdaftar.
+                Petugas pos membuka website di browser HP dan login dengan akun Petugas Pos yang
+                terdaftar.
               </p>
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
-                <li>Pos lokasi bertugas Anda (Gerbang Utama, Kantin, Koperasi, Greenhouse) akan tampil otomatis di atas halaman.</li>
+                <li>
+                  Pos lokasi bertugas Anda (Gerbang Utama, Kantin, Koperasi, Greenhouse) akan tampil
+                  otomatis di atas halaman.
+                </li>
                 <li>Gunakan HP Android / iPhone yang terhubung ke jaringan internet.</li>
               </ul>
             </div>
@@ -335,31 +453,51 @@ function MobileUserGuideSection() {
             <div className="surface-card p-6 border-l-4 border-l-eco">
               <span className="label-xs text-eco">Langkah 2</span>
               <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
-                <ScanLine className="size-4 text-eco" /> Keterangan Layar Scanner HP
+                <ScanLine className="size-4 text-eco" /> Fitur Layar Pemindai
               </h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                 Fitur utama pada layar HP Petugas Pos:
               </p>
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
-                <li><strong>Checklist Item yang Dibawa:</strong> Centang <span className="font-bold text-foreground">Tumbler (+100 poin)</span> dan/atau <span className="font-bold text-foreground">Kotak Makan (+50 poin)</span> sesuai barang fisik yang ditunjukkan siswa.</li>
-                <li><strong>Tombol Kamera / Scanner:</strong> Klik untuk mengaktifkan pemindai kamera HP secara langsung.</li>
-                <li><strong>Input NIS Manual:</strong> Ketik nomor NIS siswa jika QR tidak dapat di-scan.</li>
-                <li><strong>Aktivitas Terakhir:</strong> Riwayat hasil scan siswa yang berhasil divalidasi.</li>
+                <li>
+                  <strong>Checklist Item yang Dibawa:</strong> Centang{" "}
+                  <span className="font-bold text-foreground">Tumbler (+100 poin)</span> dan/atau{" "}
+                  <span className="font-bold text-foreground">Kotak Makan (+50 poin)</span> sesuai
+                  barang fisik yang ditunjukkan siswa.
+                </li>
+                <li>
+                  <strong>Tombol Kamera / Scanner:</strong> Klik untuk mengaktifkan pemindai kamera
+                  HP secara langsung.
+                </li>
+                <li>
+                  <strong>Input NIS Manual:</strong> Ketik nomor NIS siswa jika QR tidak dapat
+                  di-scan.
+                </li>
+                <li>
+                  <strong>Aktivitas Terakhir:</strong> Riwayat hasil scan siswa yang berhasil
+                  divalidasi.
+                </li>
               </ul>
             </div>
 
             <div className="surface-card p-6 border-l-4 border-l-emerald-500">
               <span className="label-xs text-emerald-600">Langkah 3</span>
               <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
-                <CheckCircle2 className="size-4 text-emerald-500" /> Proses Validasi Poin
+                <CheckCircle2 className="size-4 text-emerald-500" /> Catat Penggunaan dan Poin
               </h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                 Validasi dilakukan secara instan:
               </p>
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
                 <li>Arahkan kamera HP ke QR siswa. Sistem akan otomatis mendeteksi NIS.</li>
-                <li>Notifikasi hijau akan muncul menandakan poin berhasil ditambahkan ke perolehan siswa.</li>
-                <li>Satu siswa hanya dapat di-validasi 1x per jenis item dalam sehari untuk mencegah pengulangan.</li>
+                <li>
+                  Notifikasi hijau akan muncul menandakan poin berhasil ditambahkan ke perolehan
+                  siswa.
+                </li>
+                <li>
+                  Satu siswa hanya dapat di-validasi 1x per jenis item dalam sehari untuk mencegah
+                  pengulangan.
+                </li>
               </ul>
             </div>
           </div>
@@ -367,24 +505,47 @@ function MobileUserGuideSection() {
           {/* TROUBLESHOOTING PETUGAS */}
           <div className="surface-card p-6 rounded-3xl bg-blue-500/5 border-blue-500/20">
             <h4 className="text-base font-extrabold text-blue-900 dark:text-blue-200 flex items-center gap-2 mb-3">
-              <ShieldAlert className="size-5 text-blue-600" /> FAQ & Troubleshooting Masalah Akun Petugas Pos
+              <ShieldAlert className="size-5 text-blue-600" /> Pertanyaan Umum dan Solusi Petugas
+              Pos
             </h4>
             <div className="grid gap-3 sm:grid-cols-2 text-xs">
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Kamera HP Tidak Bisa Terbuka saat Klik "Kamera"?</strong>
-                <p className="text-muted-foreground">Pastikan Anda telah memberikan izin kamera (Allow Camera) pada browser HP (Chrome/Safari) Anda. Jika terblokir, buka Pengaturan Browser → Site Settings → Camera → Izinkan ecosystem99.web.id.</p>
+                <strong className="text-foreground block mb-1">
+                  Q: Kamera HP Tidak Bisa Terbuka saat Klik "Kamera"?
+                </strong>
+                <p className="text-muted-foreground">
+                  Pastikan Anda telah memberikan izin kamera (Izinkan Kamera) pada browser HP
+                  (Chrome/Safari) Anda. Jika terblokir, buka Pengaturan Browser → Site Settings →
+                  Camera → Izinkan ecosystem99.web.id.
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Muncul Pesan "Siswa sudah mendapat poin item tersebut hari ini"?</strong>
-                <p className="text-muted-foreground">Sistem mencegah pencatatan ganda. Berarti siswa tersebut sudah tervalidasi membawa item tumbler/lunchbox di pos lain pada hari ini.</p>
+                <strong className="text-foreground block mb-1">
+                  Q: Muncul Pesan "Siswa sudah mendapat poin item tersebut hari ini"?
+                </strong>
+                <p className="text-muted-foreground">
+                  Sistem mencegah pencatatan ganda. Berarti siswa tersebut sudah tervalidasi membawa
+                  item tumbler/lunchbox di pos lain pada hari ini.
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: QR Code di Layar HP Siswa Buram atau Terlalu Gelap?</strong>
-                <p className="text-muted-foreground">Gunakan fitur <strong>Input NIS Manual</strong> di bagian bawah scanner. Masukkan NIS siswa (misal: 20762) lalu klik "Validasi". Poin tetap akan bertambah langsung!</p>
+                <strong className="text-foreground block mb-1">
+                  Q: QR Code di Layar HP Siswa Buram atau Terlalu Gelap?
+                </strong>
+                <p className="text-muted-foreground">
+                  Gunakan fitur <strong>Input NIS Manual</strong> di bagian bawah scanner. Masukkan
+                  NIS siswa (misal: 20762) lalu klik "Validasi". Poin tetap akan bertambah langsung!
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Apakah Input NIS Manual Butuh Persetujuan Admin Lagi?</strong>
-                <p className="text-muted-foreground">Tidak! Input NIS manual oleh Petugas Pos terotorisasi kini langsung berstatus <span className="font-bold text-emerald-600">Approved</span> sehingga poin siswa langsung bertambah saat itu juga.</p>
+                <strong className="text-foreground block mb-1">
+                  Q: Apakah Input NIS Manual Butuh Persetujuan Admin Lagi?
+                </strong>
+                <p className="text-muted-foreground">
+                  Tidak! Input NIS manual oleh Petugas Pos terotorisasi kini langsung berstatus{" "}
+                  <span className="font-bold text-emerald-600">Disetujui</span> sehingga poin siswa
+                  langsung bertambah saat itu juga.
+                </p>
               </div>
             </div>
           </div>
@@ -398,44 +559,66 @@ function MobileUserGuideSection() {
             <div className="surface-card p-6 border-l-4 border-l-purple-500">
               <span className="label-xs text-purple-600">Langkah 1</span>
               <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
-                <LogIn className="size-4 text-purple-500" /> Akses Dasbor Wali Kelas
+                <LogIn className="size-4 text-purple-500" /> Masuk ke Dasbor Wali Kelas
               </h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                Wali Kelas mengakses platform melalui browser HP dengan akun guru/wali kelas yang telah terdaftar.
+                Wali Kelas mengakses platform melalui browser HP dengan akun guru/wali kelas yang
+                telah terdaftar.
               </p>
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
-                <li>Sistem akan otomatis mengenali kelas yang Anda ampu (misal: Kelas 7A, 8B, atau 9A).</li>
-                <li>Tampilan layar HP dioptimalkan untuk memantau grafik partisipasi kelas secara ringkas.</li>
+                <li>
+                  Sistem akan otomatis mengenali kelas yang Anda ampu (misal: Kelas 7A, 8B, atau
+                  9A).
+                </li>
+                <li>
+                  Tampilan layar HP dioptimalkan untuk memantau grafik partisipasi kelas secara
+                  ringkas.
+                </li>
               </ul>
             </div>
 
             <div className="surface-card p-6 border-l-4 border-l-primary">
               <span className="label-xs text-primary">Langkah 2</span>
               <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
-                <BarChart2 className="size-4 text-primary" /> Keterangan Layar HP Wali Kelas
+                <BarChart2 className="size-4 text-primary" /> Fitur Dasbor Wali Kelas
               </h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                 Fitur pemantauan di HP Wali Kelas:
               </p>
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
-                <li><strong>Eco Score Kelas:</strong> Rata-rata poin per siswa di kelas Anda yang menentukan posisi di Leaderboard Sekolah.</li>
-                <li><strong>Tingkat Partisipasi Harian:</strong> Persentase siswa kelas Anda yang hari ini membawa tumbler & lunchbox.</li>
-                <li><strong>Daftar Perolehan Poin Siswa:</strong> Rincian poin individual tiap siswa untuk evaluasi bimbingan.</li>
-                <li><strong>Cetak QR Massal Kelas:</strong> Mengunduh/mencetak ulang kartu tag QR untuk seluruh siswa di kelas Anda.</li>
+                <li>
+                  <strong>Eco Score Kelas:</strong> Rata-rata poin per siswa di kelas Anda yang
+                  menentukan posisi di Leaderboard Sekolah.
+                </li>
+                <li>
+                  <strong>Tingkat Partisipasi Harian:</strong> Persentase siswa kelas Anda yang hari
+                  ini membawa tumbler & lunchbox.
+                </li>
+                <li>
+                  <strong>Daftar Perolehan Poin Siswa:</strong> Rincian poin individual tiap siswa
+                  untuk evaluasi bimbingan.
+                </li>
+                <li>
+                  <strong>Cetak QR Massal Kelas:</strong> Mengunduh/mencetak ulang kartu tag QR
+                  untuk seluruh siswa di kelas Anda.
+                </li>
               </ul>
             </div>
 
             <div className="surface-card p-6 border-l-4 border-l-amber-500">
               <span className="label-xs text-amber-600">Langkah 3</span>
               <h3 className="text-lg font-bold mt-1 flex items-center gap-2">
-                <Trophy className="size-4 text-amber-500" /> Bimbingan Jawara Lingkungan
+                <Trophy className="size-4 text-amber-500" /> Pembinaan Jawara Lingkungan
               </h3>
               <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                 Mendorong motivasi kelas:
               </p>
               <ul className="text-xs text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
                 <li>Berikan apresiasi kepada siswa dengan streak tertinggi di kelas Anda.</li>
-                <li>Dorong siswa yang belum aktif membawa tumbler untuk meningkatkan Eco Score kelas bersama-sama.</li>
+                <li>
+                  Dorong siswa yang belum aktif membawa tumbler untuk meningkatkan Eco Score kelas
+                  bersama-sama.
+                </li>
               </ul>
             </div>
           </div>
@@ -443,24 +626,47 @@ function MobileUserGuideSection() {
           {/* TROUBLESHOOTING WALI KELAS */}
           <div className="surface-card p-6 rounded-3xl bg-purple-500/5 border-purple-500/20">
             <h4 className="text-base font-extrabold text-purple-900 dark:text-purple-200 flex items-center gap-2 mb-3">
-              <ShieldAlert className="size-5 text-purple-600" /> FAQ & Troubleshooting Masalah Akun Wali Kelas
+              <ShieldAlert className="size-5 text-purple-600" /> Pertanyaan Umum dan Solusi Wali
+              Kelas
             </h4>
             <div className="grid gap-3 sm:grid-cols-2 text-xs">
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Dasbor Menampilkan "Belum Ada Kelas yang Diampu"?</strong>
-                <p className="text-muted-foreground">Admin Sekolah belum menautkan ID Kelas ke profil akun Wali Kelas Anda. Hubungi Admin Sekolah untuk menetapkan kelas ampunan Anda (misal: 9A).</p>
+                <strong className="text-foreground block mb-1">
+                  Q: Dasbor Menampilkan "Belum Ada Kelas yang Diampu"?
+                </strong>
+                <p className="text-muted-foreground">
+                  Admin Sekolah belum menautkan ID Kelas ke profil akun Wali Kelas Anda. Hubungi
+                  Admin Sekolah untuk menetapkan kelas ampunan Anda (misal: 9A).
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Ada Siswa Baru di Kelas yang Belum Terdaftar di Sistem?</strong>
-                <p className="text-muted-foreground">Wali Kelas atau Admin dapat menambahkan siswa baru melalui menu Admin Pengguna → Tambah Siswa Baru / Impor Excel.</p>
+                <strong className="text-foreground block mb-1">
+                  Q: Ada Siswa Baru di Kelas yang Belum Terdaftar di Sistem?
+                </strong>
+                <p className="text-muted-foreground">
+                  Wali Kelas atau Admin dapat menambahkan siswa baru melalui menu Admin Pengguna →
+                  Tambah Siswa Baru / Impor Excel.
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Bagaimana Cara Mencetak Ulang Kartu QR Siswa Satu Kelas?</strong>
-                <p className="text-muted-foreground">Buka menu Data Pengguna / Wali Kelas, pilih tombol <strong>Cetak Massal QR</strong>. Sistem akan otomatis membagi 12 siswa per lembar kertas A4 secara rapi siap cetak!</p>
+                <strong className="text-foreground block mb-1">
+                  Q: Bagaimana Cara Mencetak Ulang Kartu QR Siswa Satu Kelas?
+                </strong>
+                <p className="text-muted-foreground">
+                  Buka menu Data Pengguna / Wali Kelas, pilih tombol{" "}
+                  <strong>Cetak Massal QR</strong>. Sistem akan otomatis membagi 12 siswa per lembar
+                  kertas A4 secara rapi siap cetak!
+                </p>
               </div>
               <div className="p-3 rounded-2xl bg-background border border-border">
-                <strong className="text-foreground block mb-1">Q: Siswa Mengaku Sudah Bawa Tumbler Tapi Poin Belum Masuk?</strong>
-                <p className="text-muted-foreground">Pastikan siswa sudah mendatangi Petugas Pos di gerbang/kantin untuk di-scan atau diinput NIS-nya. Poin hanya dihitung setelah adanya catatan validasi dari petugas pos.</p>
+                <strong className="text-foreground block mb-1">
+                  Q: Siswa Mengaku Sudah Bawa Tumbler Tapi Poin Belum Masuk?
+                </strong>
+                <p className="text-muted-foreground">
+                  Pastikan siswa sudah mendatangi Petugas Pos di gerbang/kantin untuk di-scan atau
+                  diinput NIS-nya. Poin hanya dihitung setelah adanya catatan validasi dari petugas
+                  pos.
+                </p>
               </div>
             </div>
           </div>
@@ -499,7 +705,8 @@ function Index() {
       const urlParams = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.replace("#", "?"));
 
-      const status = urlParams.get("status") || hashParams.get("status") || urlParams.get("payment");
+      const status =
+        urlParams.get("status") || hashParams.get("status") || urlParams.get("payment");
       const invoiceId = urlParams.get("invoice_id") || urlParams.get("id");
 
       if (status === "success" || status === "paid" || status === "berhasil") {
@@ -508,7 +715,7 @@ function Index() {
         toast.success("Pembayaran Traktir Kopi berhasil! Terima kasih atas dukungan Anda.");
         if (invoiceId) {
           supabase.functions.invoke("verify-mayar-payment", {
-            body: { invoiceId, status: "success" }
+            body: { invoiceId, status: "success" },
           });
         }
         // Clean URL query params & smooth scroll to #kopi section
@@ -519,8 +726,15 @@ function Index() {
             kopiElem.scrollIntoView({ behavior: "smooth" });
           }
         }, 200);
-      } else if (status === "expired" || status === "cancelled" || status === "failed" || status === "canceled") {
-        toast.error("Batas waktu pembayaran (15 menit) telah habis atau dibatalkan. Silakan klik Traktir Kopi lagi untuk membuat transaksi baru.");
+      } else if (
+        status === "expired" ||
+        status === "cancelled" ||
+        status === "failed" ||
+        status === "canceled"
+      ) {
+        toast.error(
+          "Batas waktu pembayaran (15 menit) telah habis atau dibatalkan. Silakan klik Traktir Kopi lagi untuk membuat transaksi baru.",
+        );
         window.history.replaceState({}, document.title, window.location.pathname + "#kopi");
         setTimeout(() => {
           const kopiElem = document.getElementById("kopi");
@@ -560,7 +774,7 @@ function Index() {
     try {
       if (mayarInvoiceId) {
         await supabase.functions.invoke("verify-mayar-payment", {
-          body: { invoiceId: mayarInvoiceId, status: "success" }
+          body: { invoiceId: mayarInvoiceId, status: "success" },
         });
       }
       setMayarCheckoutModalOpen(false);
@@ -594,7 +808,7 @@ function Index() {
         toast.error("Minimal nominal traktir adalah Rp1.000");
         return;
       }
-      
+
       const currentOrigin = window.location.origin;
       const redirectUrl = `${currentOrigin}/?status=success&redirect=kopi`;
 
@@ -604,9 +818,9 @@ function Index() {
           redirectUrl,
           name: me?.fullName || "Donatur Kopi",
           email: me?.email || (me?.userId ? `${me.userId}@smpn99.sch.id` : undefined),
-        }
+        },
       });
-      
+
       if (error) {
         let errMsg = error.message;
         try {
@@ -616,7 +830,7 @@ function Index() {
         } catch (_) {}
         throw new Error(errMsg);
       }
-      
+
       const linkUrl = data?.linkUrl || data?.data?.link || data?.link;
       const invId = data?.invoiceId || data?.data?.id || data?.id;
 
@@ -636,9 +850,27 @@ function Index() {
   }
 
   const challengesList = [
-    { pill: "ACTIVE", name: "5 Hari Tumbler", title: "Build the streak.", body: "Minimal 5 record valid membawa tumbler dalam periode challenge.", pct: 72 },
-    { pill: "COMING SOON", name: "Full Reusable Class", title: "One class, one goal.", body: "Target reusable untuk kelas dengan progress yang dapat dipantau.", pct: 48 },
-    { pill: "ACTIVE", name: "Most Improved", title: "Progress matters.", body: "Apresiasi peningkatan, bukan hanya posisi tertinggi.", pct: 61 },
+    {
+      pill: "ACTIVE",
+      name: "5 Hari Tumbler",
+      title: "Build the streak.",
+      body: "Minimal 5 record valid membawa tumbler dalam periode challenge.",
+      pct: 72,
+    },
+    {
+      pill: "COMING SOON",
+      name: "Full Reusable Class",
+      title: "One class, one goal.",
+      body: "Target reusable untuk kelas dengan progress yang dapat dipantau.",
+      pct: 48,
+    },
+    {
+      pill: "ACTIVE",
+      name: "Most Improved",
+      title: "Progress matters.",
+      body: "Apresiasi peningkatan, bukan hanya posisi tertinggi.",
+      pct: 61,
+    },
   ];
 
   const stats = [
@@ -702,7 +934,10 @@ function Index() {
       </header>
 
       {/* HERO */}
-      <section id="home" className="border-b border-border/60 bg-gradient-to-b from-secondary/40 to-background">
+      <section
+        id="home"
+        className="border-b border-border/60 bg-gradient-to-b from-secondary/40 to-background"
+      >
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 lg:grid-cols-[1.03fr_.97fr]">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1.5 text-xs font-extrabold text-accent-foreground">
@@ -805,10 +1040,26 @@ function Index() {
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              ["01", "Pencatatan Lambat", "Proses manual membuat rekap harian lebih berat daripada seharusnya."],
-              ["02", "Tidak Ada Feedback", "Siswa sulit melihat apakah konsistensi mereka meningkat dari hari ke hari."],
-              ["03", "Performa Kelas Sulit Dilihat", "Wali kelas butuh insight sederhana, bukan tumpukan data mentah."],
-              ["04", "Data Belum Jadi Insight", "Sekolah butuh data siap pakai untuk evaluasi program lingkungan."],
+              [
+                "01",
+                "Pencatatan Lambat",
+                "Proses manual membuat rekap harian lebih berat daripada seharusnya.",
+              ],
+              [
+                "02",
+                "Tidak Ada Feedback",
+                "Siswa sulit melihat apakah konsistensi mereka meningkat dari hari ke hari.",
+              ],
+              [
+                "03",
+                "Performa Kelas Sulit Dilihat",
+                "Wali kelas butuh insight sederhana, bukan tumpukan data mentah.",
+              ],
+              [
+                "04",
+                "Data Belum Jadi Insight",
+                "Sekolah butuh data siap pakai untuk evaluasi program lingkungan.",
+              ],
             ].map(([n, t, b]) => (
               <article key={n} className="surface-card p-6">
                 <span className="grid size-10 place-items-center rounded-xl bg-secondary text-sm font-extrabold text-secondary-foreground">
@@ -895,7 +1146,9 @@ function Index() {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="gradient-eco rounded-3xl p-8 text-eco-foreground">
             <h3 className="text-2xl font-extrabold">Eco Points</h3>
-            <p className="mt-2 text-sm opacity-80">Setiap perilaku tervalidasi punya nilai jelas.</p>
+            <p className="mt-2 text-sm opacity-80">
+              Setiap perilaku tervalidasi punya nilai jelas.
+            </p>
             <p className="mt-6 text-6xl font-extrabold tracking-tight">+150</p>
             <p className="text-xs opacity-80">Tumbler + Lunchbox (Masuk Sekolah)</p>
             <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-eco-foreground/20">
@@ -908,7 +1161,9 @@ function Index() {
           </div>
           <div className="rounded-3xl bg-ink p-8 text-primary-foreground">
             <h3 className="text-2xl font-extrabold">Badge & Streak</h3>
-            <p className="mt-2 text-sm opacity-75">Progress dibuat terlihat dan terasa rewarding.</p>
+            <p className="mt-2 text-sm opacity-75">
+              Progress dibuat terlihat dan terasa rewarding.
+            </p>
             <div className="mt-6 flex flex-wrap gap-3">
               {["🌱", "🥤", "🍱", "♻️", "🏆"].map((b, i) => (
                 <span
@@ -1000,14 +1255,17 @@ function Index() {
           id="jawara"
           className="surface-card mt-6 flex flex-wrap items-center gap-6 bg-gradient-to-br from-accent/60 to-surface p-7"
         >
-          <span className="grid size-20 place-items-center rounded-3xl bg-surface text-4xl">🏆</span>
+          <span className="grid size-20 place-items-center rounded-3xl bg-surface text-4xl">
+            🏆
+          </span>
           <div className="flex-1">
             <p className="label-xs text-eco">Jawara Lingkungan Periode Ini</p>
             <h3 className="mt-1 text-2xl font-extrabold">
               {champion?.class_name ?? "Belum ada"} · #1 Eco Class
             </h3>
             <p className="text-sm text-muted-foreground">
-              {champion?.student_count ?? 0} siswa · total {Math.round(Number(champion?.total_points ?? 0))} poin
+              {champion?.student_count ?? 0} siswa · total{" "}
+              {Math.round(Number(champion?.total_points ?? 0))} poin
             </p>
           </div>
           <span className="text-3xl font-extrabold text-eco">
@@ -1031,7 +1289,10 @@ function Index() {
             {[
               ["Rekap Harian", "Validasi klaim tumbler & lunchbox lengkap dengan jejak petugas."],
               ["Laporan Dampak", "Estimasi sampah plastik dicegah dan CO₂ yang dihemat."],
-              ["Privacy by Design", "Halaman publik hanya menampilkan data agregat—tanpa NIS atau identitas QR."],
+              [
+                "Privacy by Design",
+                "Halaman publik hanya menampilkan data agregat—tanpa NIS atau identitas QR.",
+              ],
             ].map(([t, b]) => (
               <div key={t} className="surface-card p-6">
                 <strong className="text-base">{t}</strong>
@@ -1056,7 +1317,8 @@ function Index() {
                   Pembayaran Traktir Kopi Berhasil! 🎉
                 </h4>
                 <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
-                  Terima kasih atas dukungan Anda! Pembayaran via Mayar.id telah diverifikasi dan alokasi dana telah ditambahkan.
+                  Terima kasih atas dukungan Anda! Pembayaran via Mayar.id telah diverifikasi dan
+                  alokasi dana telah ditambahkan.
                 </p>
               </div>
             </div>
@@ -1100,7 +1362,9 @@ function Index() {
               title="Traktir Kopi, Dukung Sekolah Lebih Hijau."
               lead="Dukungan kecil membantu School Ecosystem tetap online sekaligus mendukung reward untuk siswa dan kelas yang konsisten."
             />
-            <p className="font-extrabold text-primary">“Secangkir kopi untuk developer, semangat untuk siswa.”</p>
+            <p className="font-extrabold text-primary">
+              “Secangkir kopi untuk developer, semangat untuk siswa.”
+            </p>
             <p className="label-xs mt-2 text-muted-foreground">
               Traktir Kopi bersifat sukarela dan bukan biaya akses.
             </p>
@@ -1110,24 +1374,31 @@ function Index() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border/60 pb-3">
                 <div>
                   <h4 className="text-sm font-extrabold text-foreground flex items-center gap-2">
-                    <Coffee className="size-4 text-warning" /> Total Pemasukan: Rp {Number(traktirStats.total_amount).toLocaleString("id-ID")}
+                    <Coffee className="size-4 text-warning" /> Total Pemasukan: Rp{" "}
+                    {Number(traktirStats.total_amount).toLocaleString("id-ID")}
                   </h4>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Terakumulasi dari {traktirStats.total_count} transaksi tervalidasi otomatis oleh Mayar.id.
+                    Terakumulasi dari {traktirStats.total_count} transaksi tervalidasi otomatis oleh
+                    Mayar.id.
                   </p>
                 </div>
-                <Badge variant="outline" className="w-fit font-bold border-emerald-500 text-emerald-600 bg-emerald-500/10">
+                <Badge
+                  variant="outline"
+                  className="w-fit font-bold border-emerald-500 text-emerald-600 bg-emerald-500/10"
+                >
                   ⚡ Sync Realtime Mayar
                 </Badge>
               </div>
-              
+
               <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="w-full text-left text-xs sm:text-sm">
                   <thead className="bg-muted/60 font-bold text-foreground">
                     <tr>
                       <th className="px-4 py-3 border-b border-border">Alokasi Dana</th>
                       <th className="px-4 py-3 border-b border-border text-center">Persentase</th>
-                      <th className="px-4 py-3 border-b border-border text-right">Estimasi Rupiah</th>
+                      <th className="px-4 py-3 border-b border-border text-right">
+                        Estimasi Rupiah
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -1166,7 +1437,8 @@ function Index() {
               </div>
 
               <p className="text-[11px] italic text-muted-foreground">
-                *Persentase tersebut merupakan ketetapan pengelola sejak peluncuran fitur Traktir Kopi untuk transparansi penggunaan dana publik via Mayar.id.
+                *Persentase tersebut merupakan ketetapan pengelola sejak peluncuran fitur Traktir
+                Kopi untuk transparansi penggunaan dana publik via Mayar.id.
               </p>
             </div>
           </div>
@@ -1177,14 +1449,14 @@ function Index() {
             <p className="mt-1 text-sm text-muted-foreground">
               Pilih nominal traktir atau masukkan nominal lainnya untuk mendukung program ini.
             </p>
-            
+
             <div className="mt-4 flex flex-wrap gap-2">
               {[
                 { label: "Rp5.000", value: 5000 },
                 { label: "Rp10.000", value: 10000 },
                 { label: "Rp20.000", value: 20000 },
                 { label: "Rp50.000", value: 50000 },
-                { label: "Nominal lain", value: "other" }
+                { label: "Nominal lain", value: "other" },
               ].map((item) => (
                 <button
                   key={item.label}
@@ -1202,7 +1474,9 @@ function Index() {
 
             {selectedNominal === "other" && (
               <div className="mt-3 space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground">Masukkan Nominal (Min: Rp1.000)</label>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Masukkan Nominal (Min: Rp1.000)
+                </label>
                 <input
                   type="number"
                   min="1000"
@@ -1214,8 +1488,12 @@ function Index() {
               </div>
             )}
 
-            <Button onClick={handleTraktir} disabled={loadingPayment} className="mt-4 w-full rounded-full gap-2 py-5 font-bold shadow-md hover:shadow-lg transition-all">
-              <Coffee className="size-4" /> 
+            <Button
+              onClick={handleTraktir}
+              disabled={loadingPayment}
+              className="mt-4 w-full rounded-full gap-2 py-5 font-bold shadow-md hover:shadow-lg transition-all"
+            >
+              <Coffee className="size-4" />
               {loadingPayment ? "Memproses Ke Mayar.id..." : "Traktir Kopi Sekarang"}
             </Button>
 
@@ -1230,11 +1508,15 @@ function Index() {
                 </span>
               </div>
               <p className="text-muted-foreground text-[11px] leading-relaxed">
-                Pembayaran diproses secara instant & aman via Mayar.id. Mendukung QRIS (GoPay, OVO, Dana, ShopeePay), Virtual Account, & Transfer Bank.
+                Pembayaran diproses secara instant & aman via Mayar.id. Mendukung QRIS (GoPay, OVO,
+                Dana, ShopeePay), Virtual Account, & Transfer Bank.
               </p>
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-xl">
                 <Clock className="size-3.5 shrink-0 text-amber-500" />
-                <span>Batas waktu pembayaran: <strong>15 menit</strong>. Lewat 15 menit otomatis dibatalkan.</span>
+                <span>
+                  Batas waktu pembayaran: <strong>15 menit</strong>. Lewat 15 menit otomatis
+                  dibatalkan.
+                </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <span className="inline-flex items-center gap-1 text-[10px] bg-background px-2 py-1 rounded-md border text-muted-foreground">
@@ -1250,7 +1532,8 @@ function Index() {
             </div>
 
             <p className="mt-4 text-xs text-muted-foreground">
-              Traktir Kopi tidak menghasilkan poin dan tidak memengaruhi ranking, badge, atau Jawara.
+              Traktir Kopi tidak menghasilkan poin dan tidak memengaruhi ranking, badge, atau
+              Jawara.
             </p>
             <p className="mt-3 rounded-2xl bg-accent px-4 py-2.5 text-xs font-extrabold text-accent-foreground text-center">
               No pay-to-win. Sukarela 100%.
@@ -1269,7 +1552,8 @@ function Index() {
                 Pembayaran Sukses
               </DialogTitle>
               <DialogDescription className="text-center text-sm mt-1">
-                Terima kasih! Dukungan Traktir Kopi Anda telah kami terima dengan sukses via Mayar.id.
+                Terima kasih! Dukungan Traktir Kopi Anda telah kami terima dengan sukses via
+                Mayar.id.
               </DialogDescription>
             </DialogHeader>
 
@@ -1291,11 +1575,15 @@ function Index() {
             </div>
 
             <p className="text-xs text-muted-foreground mt-2">
-              Dukungan Anda sangat berharga untuk kelangsungan operasional server dan program kebersihan lingkungan sekolah.
+              Dukungan Anda sangat berharga untuk kelangsungan operasional server dan program
+              kebersihan lingkungan sekolah.
             </p>
 
             <div className="mt-4 flex justify-center">
-              <Button onClick={() => setPaymentSuccessModalOpen(false)} className="rounded-full w-full py-5 font-bold">
+              <Button
+                onClick={() => setPaymentSuccessModalOpen(false)}
+                className="rounded-full w-full py-5 font-bold"
+              >
                 Kembali ke Halaman Utama
               </Button>
             </div>
@@ -1311,7 +1599,10 @@ function Index() {
                 <span className="font-extrabold text-sm sm:text-base">
                   Checkout Pembayaran Mayar.id
                 </span>
-                <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-300">
+                <Badge
+                  variant="outline"
+                  className="text-xs bg-amber-500/10 text-amber-600 border-amber-300"
+                >
                   ⏱️ Batas Waktu 15 Menit
                 </Badge>
               </div>
@@ -1344,7 +1635,8 @@ function Index() {
 
             <div className="p-4 bg-muted/20 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
               <p className="text-xs text-muted-foreground text-center sm:text-left">
-                Setelah menyelesaikan pembayaran QRIS / Bank di atas, klik tombol di kanan untuk mengonfirmasi.
+                Setelah menyelesaikan pembayaran QRIS / Bank di atas, klik tombol di kanan untuk
+                mengonfirmasi.
               </p>
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Button
@@ -1361,7 +1653,11 @@ function Index() {
                   onClick={() => handleVerifyCheckout(true)}
                   className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 w-full sm:w-auto"
                 >
-                  {verifyingPayment ? <RefreshCw className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                  {verifyingPayment ? (
+                    <RefreshCw className="size-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="size-4" />
+                  )}
                   Saya Sudah Bayar (Konfirmasi)
                 </Button>
               </div>
@@ -1378,16 +1674,42 @@ function Index() {
         <div className="mx-auto max-w-6xl px-4">
           <SectionHead kicker="FAQ" title="Pertanyaan yang Sering Muncul." />
           <div className="grid gap-3 md:grid-cols-2">
-            {([
-              ["Apa itu School Ecosystem?", "Platform untuk mencatat dan membangun kebiasaan membawa tumbler dan lunchbox melalui QR, gamifikasi, leaderboard, dan Eco Challenge."],
-              ["Apakah siswa butuh aplikasi khusus?", "Tidak. Sistem berbasis web dan dapat diakses melalui browser."],
-              ["Apakah HP bisa dipakai sebagai scanner?", "Ya. Petugas dapat menggunakan kamera HP melalui halaman Scanner."],
-              ["Bagaimana jika QR tidak terbaca?", "Petugas dapat mencari siswa berdasarkan nama atau NIS sebagai fallback."],
-              ["Bagaimana Eco Score dihitung?", "Eco Score memakai rata-rata poin perilaku ramah lingkungan yang tervalidasi."],
-              ["Apa itu Jawara Lingkungan?", "Kelas dengan Eco Score tertinggi pada periode berjalan."],
-              ["Apakah Traktir Kopi wajib?", "Tidak. Dukungan bersifat sukarela dan tidak memengaruhi akses maupun poin."],
-              ["Apakah data siswa tampil publik?", "Tidak. Halaman publik hanya menampilkan data agregat yang aman."],
-            ] as const).map(([q, a]) => (
+            {(
+              [
+                [
+                  "Apa itu School Ecosystem?",
+                  "Platform untuk mencatat dan membangun kebiasaan membawa tumbler dan lunchbox melalui QR, gamifikasi, leaderboard, dan Eco Challenge.",
+                ],
+                [
+                  "Apakah siswa butuh aplikasi khusus?",
+                  "Tidak. Sistem berbasis web dan dapat diakses melalui browser.",
+                ],
+                [
+                  "Apakah HP bisa dipakai sebagai scanner?",
+                  "Ya. Petugas dapat menggunakan kamera HP melalui halaman Scanner.",
+                ],
+                [
+                  "Bagaimana jika QR tidak terbaca?",
+                  "Petugas dapat mencari siswa berdasarkan nama atau NIS sebagai fallback.",
+                ],
+                [
+                  "Bagaimana Eco Score dihitung?",
+                  "Eco Score memakai rata-rata poin perilaku ramah lingkungan yang tervalidasi.",
+                ],
+                [
+                  "Apa itu Jawara Lingkungan?",
+                  "Kelas dengan Eco Score tertinggi pada periode berjalan.",
+                ],
+                [
+                  "Apakah Traktir Kopi wajib?",
+                  "Tidak. Dukungan bersifat sukarela dan tidak memengaruhi akses maupun poin.",
+                ],
+                [
+                  "Apakah data siswa tampil publik?",
+                  "Tidak. Halaman publik hanya menampilkan data agregat yang aman.",
+                ],
+              ] as const
+            ).map(([q, a]) => (
               <FaqItem key={q} q={q} a={a} />
             ))}
           </div>
@@ -1422,7 +1744,11 @@ function Index() {
         <div className="mx-auto grid max-w-6xl gap-10 px-4 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
             <div className="flex items-center gap-3">
-              <img src={logoAsset.url} alt="Logo SMP Negeri 99 Jakarta" className="size-10 object-contain" />
+              <img
+                src={logoAsset.url}
+                alt="Logo SMP Negeri 99 Jakarta"
+                className="size-10 object-contain"
+              />
               <span className="leading-tight">
                 <span className="block font-extrabold">School Ecosystem</span>
                 <span className="label-xs block opacity-70">SMP Negeri 99 Jakarta</span>
