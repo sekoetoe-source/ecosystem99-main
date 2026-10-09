@@ -134,17 +134,18 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <Logout />
       </div>
       <main className="lg:ml-64">
-        !sidebarOpen &&{" "}
-        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-white px-4 py-3 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-lg p-2 hover:bg-muted"
-          >
-            <Menu className="size-5" />
-          </button>
-          <h1 className="font-semibold">Ecosystem99</h1>
-        </div>
+        {!sidebarOpen && (
+          <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-white px-4 py-3 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="rounded-lg p-2 hover:bg-muted"
+            >
+              <Menu className="size-5" />
+            </button>
+            <h1 className="font-semibold">Ecosystem99</h1>
+          </div>
+        )}
         <div className="p-4 lg:p-6">{children}</div>
       </main>
     </div>
