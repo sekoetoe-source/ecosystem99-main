@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminShell } from "@/routes/admin";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,12 +62,6 @@ function runtimeStatus(session: Session): RuntimeStatus {
   return "Selesai";
 }
 
-function periodStatusLabel(status: Period["status"]) {
-  if (status === "ACTIVE") return "Aktif";
-  if (status === "CLOSED") return "Ditutup";
-  return "Belum dibuka";
-}
-
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Jakarta",
@@ -84,11 +78,19 @@ function PeriodPage() {
   const [endTime, setEndTime] = useState("");
   const [lateStartDate, setLateStartDate] = useState("");
   const [lateEndDate, setLateEndDate] = useState("");
+  const currentMonthKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+  }).format(new Date());
   const currentMonthName = new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Jakarta",
     month: "long",
     year: "numeric",
   }).format(new Date());
+  const monthStart = `${currentMonthKey}-01`;
+  const [currentYear, currentMonth] = currentMonthKey.split("-").map(Number);
+  const monthEnd = new Date(Date.UTC(currentYear!, currentMonth!, 0)).toISOString().slice(0, 10);
   const periods = useQuery({
     queryKey: ["period-history"],
     queryFn: async () => {
@@ -96,38 +98,37 @@ function PeriodPage() {
         .from("periods")
         .select("id, name, status, start_date, end_date, late_scan_start_date, late_scan_end_date")
         .order("start_date", { ascending: false })
-        .limit(8);
+        .limit(12);
       if (error) throw error;
       return (data ?? []) as Period[];
     },
   });
+  const periodInCurrentMonth = periods.data?.find(
+    (period) => period.start_date <= monthEnd && period.end_date >= monthStart,
+  );
   const sessions = useQuery({
-    queryKey: [
-      "operational-sessions",
-      periods.data?.find((period) => period.status === "ACTIVE")?.id,
-    ],
-    enabled: Boolean(periods.data?.some((period) => period.status === "ACTIVE")),
+    queryKey: ["operational-sessions", periodInCurrentMonth?.id],
+    enabled: Boolean(periodInCurrentMonth),
     queryFn: async () => {
-      const period = periods.data?.find((candidate) => candidate.status === "ACTIVE");
-      if (!period) return [] as Session[];
+      if (!periodInCurrentMonth) return [] as Session[];
       const { data, error } = await supabase
         .from("operational_sessions")
         .select("id, period_id, session_number, name, start_time, end_time, enabled")
-        .eq("period_id", period.id)
+        .eq("period_id", periodInCurrentMonth.id)
         .in("session_number", [1, 2])
         .order("session_number");
       if (error) throw error;
       return (data ?? []) as Session[];
     },
   });
-  const active = periods.data?.find((period) => period.status === "ACTIVE");
+  const active = periodInCurrentMonth;
   useEffect(() => {
     setLateStartDate(active?.late_scan_start_date ?? "");
     setLateEndDate(active?.late_scan_end_date ?? "");
   }, [active?.id, active?.late_scan_start_date, active?.late_scan_end_date]);
   const saveLateDateRange = useMutation({
     mutationFn: async () => {
-      if (!active) throw new Error("Tidak ada periode aktif.");
+      if (!active) throw new Error("Tidak ada periode pada bulan berjalan.");
       if ((lateStartDate && !lateEndDate) || (!lateStartDate && lateEndDate))
         throw new Error(
           "Isi tanggal mulai dan tanggal akhir, atau kosongkan keduanya untuk menonaktifkan.",
@@ -135,15 +136,14 @@ function PeriodPage() {
       if (lateStartDate && lateEndDate && lateStartDate > lateEndDate)
         throw new Error("Tanggal mulai harus sebelum atau sama dengan tanggal akhir.");
       if (lateStartDate && (lateStartDate < active.start_date || lateEndDate > active.end_date))
-        throw new Error("Rentang tanggal harus berada di dalam periode aktif.");
+        throw new Error("Rentang tanggal harus berada di dalam periode bulan berjalan.");
       const { error } = await supabase
         .from("periods")
         .update({
           late_scan_start_date: lateStartDate || null,
           late_scan_end_date: lateEndDate || null,
         })
-        .eq("id", active.id)
-        .eq("status", "ACTIVE");
+        .eq("id", active.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -174,6 +174,7 @@ function PeriodPage() {
     }) => {
       if (!input.start_time || !input.end_time || input.start_time >= input.end_time)
         throw new Error("Jam mulai harus lebih awal dari jam selesai.");
+      if (!periodInCurrentMonth) throw new Error("Tidak ada periode pada bulan berjalan.");
       const { error } = await (supabase as any)
         .from("operational_sessions")
         .update({
@@ -183,7 +184,7 @@ function PeriodPage() {
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.id)
-        .eq("period_id", periods.data?.find((period) => period.status === "ACTIVE")?.id);
+        .eq("period_id", periodInCurrentMonth.id);
       if (error)
         throw new Error(
           error.code === "23P01" ? "Jam sesi bertumpuk dengan sesi lain." : error.message,
@@ -205,7 +206,7 @@ function PeriodPage() {
       : currentDate > active.end_date
         ? "Tanggal periode sudah berakhir"
         : "Periode berjalan"
-    : "Tidak ada periode berjalan";
+    : "Periode bulan berjalan belum dibuat";
   const visibleSessions = useMemo(() => sessions.data ?? [], [sessions.data]);
   const openEditor = (session: Session) => {
     setEditing(session);
@@ -246,18 +247,16 @@ function PeriodPage() {
                 <p className="mt-2 text-sm font-semibold text-foreground">
                   {activePeriodDateStatus}
                 </p>
-                <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                  Pemindaian biasa dan pemindaian susulan masuk ke periode ini selama periode
-                  berstatus aktif dan tanggalnya masih berlaku. Reset poin untuk uji coba
-                  mengosongkan nilai poin pada periode aktif, tetapi tidak menutup periode dan tidak
-                  menghapus catatan pemindaian. Periode ditutup hanya saat masa operasionalnya
-                  berakhir dan admin mengarsipkannya.
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Periode yang digunakan selalu mencakup bulan berjalan. Reset poin hanya
+                  mengosongkan poin tanpa mengubah periode atau riwayat pemindaian. Sesi mengatur
+                  waktu pemindaian biasa; semua jadwal menggunakan WIB.
                 </p>
               </>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
-                Tidak ada periode berstatus aktif. Pemindaian baru tidak dapat dicatat sampai admin
-                membuka periode berikutnya. Laporan periode yang sudah ditutup tetap dapat dilihat.
+                Periode untuk {currentMonthName} belum tersedia. Buat atau sinkronkan periode bulan
+                berjalan agar pemindaian dan pengaturan sesi aktif.
               </p>
             )}
           </div>
@@ -285,18 +284,6 @@ function PeriodPage() {
                       min={active.start_date}
                       max={active.end_date}
                       onChange={(event) => setLateStartDate(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="late-scan-end-date">Tanggal akhir</Label>
-                    <input
-                      id="late-scan-end-date"
-                      type="date"
-                      value={lateEndDate}
-                      min={lateStartDate || active.start_date}
-                      max={active.end_date}
-                      onChange={(event) => setLateEndDate(event.target.value)}
                       className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
                     />
                   </div>
@@ -431,7 +418,11 @@ function PeriodPage() {
                     </p>
                   </div>
                   <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">
-                    {periodStatusLabel(period.status)}
+                    {period.id === periodInCurrentMonth?.id
+                      ? "Dipakai bulan berjalan"
+                      : period.status === "DRAFT"
+                        ? "Draft"
+                        : "Arsip"}
                   </span>
                 </div>
               ))}
