@@ -35,7 +35,8 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         .from("period_student_scores")
         .select("student_id, full_name, nis, class_name, earned_points")
         .eq("period_id", activePeriodId)
-        .order("earned_points", { ascending: false });
+        .order("earned_points", { ascending: false })
+        .order("full_name", { ascending: true });
       if (error) throw error;
       return data ?? [];
     },

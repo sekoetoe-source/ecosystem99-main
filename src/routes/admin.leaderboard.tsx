@@ -59,15 +59,24 @@ export function JawaraTab({ periodId }: { periodId: string; periodName?: string 
   const dailyData = useQuery({
     queryKey: ["jawara-data", periodId, reportMonth],
     queryFn: async () => {
-      const [{ data: period, error: periodError }, { data: students, error: studentsError }] = await Promise.all([
-        supabase.from("periods").select("id, start_date, end_date").eq("id", periodId).maybeSingle(),
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+      const tomorrow = new Date(`${today}T00:00:00+07:00`);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const throughToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(tomorrow);
+      const { data: period, error: periodError } = await supabase.from("periods").select("id, start_date, end_date").eq("id", periodId).maybeSingle();
+      if (periodError) throw periodError;
+      if (!period) return { items: [] as JawaraItem[], students: [] as JawaraStudent[] };
+      const monthStart = reportRange.start > period.start_date ? reportRange.start : period.start_date;
+      const periodEndExclusive = new Date(`${period.end_date}T00:00:00+07:00`);
+      periodEndExclusive.setDate(periodEndExclusive.getDate() + 1);
+      const periodEndNext = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(periodEndExclusive);
+      const monthEnd = [reportRange.end, throughToday, periodEndNext].sort()[0]!;
+      const [{ data, error }, { data: students, error: studentsError }] = await Promise.all([
+        supabase.from("validation_items").select("student_id, points, item_code, day, validations!inner(period_id, status)").eq("validations.period_id", periodId).eq("validations.status", "approved").gte("day", monthStart).lt("day", monthEnd),
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
       ]);
-      if (periodError) throw periodError;
-      if (studentsError) throw studentsError;
-      if (!period) return { items: [] as JawaraItem[], students: [] as JawaraStudent[] };
-      const { data, error } = await supabase.from("validation_items").select("student_id, points, item_code, day, validations!inner(period_id, status)").eq("validations.period_id", periodId).eq("validations.status", "approved").gte("day", reportRange.start).lt("day", reportRange.end).gte("day", period.start_date).lte("day", period.end_date);
       if (error) throw error;
+      if (studentsError) throw studentsError;
       return { items: (data ?? []) as unknown as JawaraItem[], students: (students ?? []) as unknown as JawaraStudent[] };
     },
     enabled: !!periodId,
