@@ -78,19 +78,11 @@ function PeriodPage() {
   const [endTime, setEndTime] = useState("");
   const [lateStartDate, setLateStartDate] = useState("");
   const [lateEndDate, setLateEndDate] = useState("");
-  const currentMonthKey = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jakarta",
-    year: "numeric",
-    month: "2-digit",
-  }).format(new Date());
   const currentMonthName = new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Jakarta",
     month: "long",
     year: "numeric",
   }).format(new Date());
-  const monthStart = `${currentMonthKey}-01`;
-  const [currentYear, currentMonth] = currentMonthKey.split("-").map(Number);
-  const monthEnd = new Date(Date.UTC(currentYear!, currentMonth!, 0)).toISOString().slice(0, 10);
   const periods = useQuery({
     queryKey: ["period-history"],
     queryFn: async () => {
@@ -102,26 +94,25 @@ function PeriodPage() {
       if (error) throw error;
       return (data ?? []) as Period[];
     },
+    refetchInterval: 30_000,
   });
-  const periodInCurrentMonth = periods.data?.find(
-    (period) => period.start_date <= monthEnd && period.end_date >= monthStart,
-  );
+  const active = periods.data?.find((period) => period.status === "ACTIVE");
   const sessions = useQuery({
-    queryKey: ["operational-sessions", periodInCurrentMonth?.id],
-    enabled: Boolean(periodInCurrentMonth),
+    queryKey: ["operational-sessions", active?.id],
+    enabled: Boolean(active?.id),
     queryFn: async () => {
-      if (!periodInCurrentMonth) return [] as Session[];
+      if (!active) return [] as Session[];
       const { data, error } = await supabase
         .from("operational_sessions")
         .select("id, period_id, session_number, name, start_time, end_time, enabled")
-        .eq("period_id", periodInCurrentMonth.id)
+        .eq("period_id", active.id)
         .in("session_number", [1, 2])
         .order("session_number");
       if (error) throw error;
       return (data ?? []) as Session[];
     },
+    refetchInterval: 30_000,
   });
-  const active = periodInCurrentMonth;
   useEffect(() => {
     setLateStartDate(active?.late_scan_start_date ?? "");
     setLateEndDate(active?.late_scan_end_date ?? "");
@@ -168,23 +159,26 @@ function PeriodPage() {
   const update = useMutation({
     mutationFn: async (input: {
       id: string;
+      name: string;
       start_time: string;
       end_time: string;
       enabled: boolean;
     }) => {
+      if (!input.name.trim()) throw new Error("Nama sesi wajib diisi.");
       if (!input.start_time || !input.end_time || input.start_time >= input.end_time)
         throw new Error("Jam mulai harus lebih awal dari jam selesai.");
-      if (!periodInCurrentMonth) throw new Error("Tidak ada periode pada bulan berjalan.");
+      if (!active) throw new Error("Tidak ada Periode Aktif.");
       const { error } = await (supabase as any)
         .from("operational_sessions")
         .update({
+          name: input.name.trim(),
           start_time: input.start_time,
           end_time: input.end_time,
           enabled: input.enabled,
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.id)
-        .eq("period_id", periodInCurrentMonth.id);
+        .eq("period_id", active.id);
       if (error)
         throw new Error(
           error.code === "23P01" ? "Jam sesi bertumpuk dengan sesi lain." : error.message,
@@ -204,9 +198,9 @@ function PeriodPage() {
     ? currentDate < active.start_date
       ? "Periode belum dimulai"
       : currentDate > active.end_date
-        ? "Tanggal periode sudah berakhir"
-        : "Periode berjalan"
-    : "Periode bulan berjalan belum dibuat";
+        ? "Periode sudah berakhir"
+        : "Periode Aktif"
+    : "Tidak ada Periode Aktif";
   const visibleSessions = useMemo(() => sessions.data ?? [], [sessions.data]);
   const openEditor = (session: Session) => {
     setEditing(session);
@@ -216,7 +210,7 @@ function PeriodPage() {
 
   return (
     <AdminShell>
-      <div className="mx-auto w-full max-w-4xl min-w-0 space-y-5">
+      <div className="w-full max-w-5xl min-w-0 space-y-5">
         <header className="min-w-0">
           <div>
             <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">
@@ -232,15 +226,15 @@ function PeriodPage() {
           <div className="surface-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="label-xs text-muted-foreground">Periode berjalan</p>
-              {active && (
+              {active ? (
                 <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-700">
-                  {periodStatusLabel(active.status)}
+                  Periode Aktif
                 </span>
-              )}
+              ) : null}
             </div>
             {active ? (
               <>
-                <h2 className="mt-2 text-2xl font-bold">{currentMonthName}</h2>
+                <h2 className="mt-2 text-2xl font-bold">{active.name}</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {formatDate(active.start_date)} – {formatDate(active.end_date)}
                 </p>
@@ -248,15 +242,15 @@ function PeriodPage() {
                   {activePeriodDateStatus}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Periode yang digunakan selalu mencakup bulan berjalan. Reset poin hanya
-                  mengosongkan poin tanpa mengubah periode atau riwayat pemindaian. Sesi mengatur
-                  waktu pemindaian biasa; semua jadwal menggunakan WIB.
+                  Periode dengan status aktif menerima pemindaian. Reset poin hanya mengosongkan
+                  poin tanpa mengubah periode atau riwayat pemindaian. Sesi mengatur waktu pemindaian
+                  biasa; semua jadwal menggunakan WIB.
                 </p>
               </>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
-                Periode untuk {currentMonthName} belum tersedia. Buat atau sinkronkan periode bulan
-                berjalan agar pemindaian dan pengaturan sesi aktif.
+                Belum ada periode berstatus aktif. Aktifkan periode agar pemindaian dan pengaturan
+                sesi tersedia.
               </p>
             )}
           </div>
@@ -341,9 +335,9 @@ function PeriodPage() {
           <div className="surface-card overflow-hidden">
             <div className="border-b border-border p-5">
               <h2 className="font-bold">Pengaturan Sesi Operasional</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Jam tetap tersimpan untuk membuka sesi otomatis, tetapi tidak ditampilkan pada
-                kartu.
+              <p className="mt-1 text-sm text-muted-foreground">
+                Pemindaian susulan adalah pencatatan terlambat ke Sesi 1 atau Sesi 2, bukan sesi harian ketiga.
+                Rentang tanggalnya dapat diatur di atas; skor tetap mengikuti sesi asal.
               </p>
             </div>
             <div className="grid gap-4 p-5 md:grid-cols-2">
@@ -355,14 +349,15 @@ function PeriodPage() {
                     key={session.id}
                     className={`rounded-2xl border p-5 ${status === "Sedang berlangsung" ? "border-blue-500 bg-blue-500/10" : "border-border"}`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <Icon className="mt-0.5 size-5 text-primary" />
-                        <div>
-                          <p className="font-extrabold">Sesi {session.session_number}</p>
-                          <p className="text-sm text-muted-foreground">{session.name}</p>
-                        </div>
-                      </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-extrabold">Sesi {session.session_number}</p>
+                      <p className="text-sm text-muted-foreground">{session.name}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {session.enabled ? "Aktif" : "Nonaktif"}
+                      </span>
                       <Button
                         variant="outline"
                         size="sm"
@@ -370,9 +365,10 @@ function PeriodPage() {
                         onClick={() => openEditor(session)}
                       >
                         <Pencil className="size-3.5" />
-                        Atur Jadwal
+                        Atur Sesi
                       </Button>
                     </div>
+                  </div>
                     <p className="mt-6 text-sm text-muted-foreground">
                       Pemindaian biasa dibuka otomatis sesuai jadwal yang tersimpan.
                     </p>
@@ -406,26 +402,34 @@ function PeriodPage() {
               </p>
             </div>
             <div className="divide-y divide-border">
-              {periods.data?.map((period) => (
-                <div
-                  key={period.id}
-                  className="flex flex-wrap items-center justify-between gap-3 p-5"
-                >
-                  <div>
-                    <p className="font-semibold">{period.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDate(period.start_date)} – {formatDate(period.end_date)}
-                    </p>
+              {periods.isLoading ? (
+                <p className="p-5 text-sm text-muted-foreground">Memuat riwayat periode...</p>
+              ) : periods.isError ? (
+                <p className="p-5 text-sm text-destructive">Riwayat periode gagal dimuat.</p>
+              ) : (periods.data ?? []).length === 0 ? (
+                <p className="p-5 text-sm text-muted-foreground">Belum ada riwayat periode.</p>
+              ) : (
+                periods.data?.map((period) => (
+                  <div
+                    key={period.id}
+                    className="flex flex-wrap items-center justify-between gap-3 p-5"
+                  >
+                    <div>
+                      <p className="font-semibold">{period.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(period.start_date)} – {formatDate(period.end_date)}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">
+                      {period.id === active?.id
+                        ? "Periode Aktif"
+                        : period.status === "DRAFT"
+                          ? "Draft"
+                          : "Arsip"}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">
-                    {period.id === periodInCurrentMonth?.id
-                      ? "Dipakai bulan berjalan"
-                      : period.status === "DRAFT"
-                        ? "Draft"
-                        : "Arsip"}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
           <div className="surface-card overflow-hidden">
@@ -437,16 +441,24 @@ function PeriodPage() {
               </p>
             </div>
             <div className="divide-y divide-border">
-              {audits.data?.map((audit) => (
-                <div key={audit.id} className="p-5 text-sm">
-                  <p className="font-semibold">Poin periode {audit.period_name} dihapus</p>
-                  <p className="mt-1 text-muted-foreground">
-                    {new Date(audit.occurred_at).toLocaleString("id-ID")} ·{" "}
-                    {audit.before_total_points} poin dari {audit.before_students_with_points} siswa
-                    dihapus pada {audit.reset_validation_items} catatan.
-                  </p>
-                </div>
-              ))}
+              {audits.isLoading ? (
+                <p className="p-5 text-sm text-muted-foreground">Memuat riwayat reset poin...</p>
+              ) : audits.isError ? (
+                <p className="p-5 text-sm text-destructive">Riwayat reset poin gagal dimuat.</p>
+              ) : (audits.data ?? []).length === 0 ? (
+                <p className="p-5 text-sm text-muted-foreground">Belum ada riwayat reset poin.</p>
+              ) : (
+                audits.data.map((audit) => (
+                  <div key={audit.id} className="p-5 text-sm">
+                    <p className="font-semibold">Poin periode {audit.period_name} dihapus</p>
+                    <p className="mt-1 text-muted-foreground">
+                      {new Date(audit.occurred_at).toLocaleString("id-ID")} ·{" "}
+                      {audit.before_total_points} poin dari {audit.before_students_with_points} siswa
+                      dihapus pada {audit.reset_validation_items} catatan.
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
           <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
@@ -466,6 +478,7 @@ function PeriodPage() {
                     event.preventDefault();
                     update.mutate({
                       id: editing.id,
+                      name: editing.name,
                       start_time: startTime,
                       end_time: endTime,
                       enabled: editing.enabled,
@@ -473,8 +486,14 @@ function PeriodPage() {
                   }}
                 >
                   <div>
-                    <Label>Nama</Label>
-                    <p className="mt-1 rounded-lg bg-muted px-3 py-2 text-sm">{editing.name}</p>
+                    <Label htmlFor="session-name">Nama sesi</Label>
+                    <input
+                      id="session-name"
+                      value={editing.name}
+                      onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+                      required
+                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -499,6 +518,16 @@ function PeriodPage() {
                         className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
                       />
                     </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                    <Label htmlFor="session-enabled">Sesi aktif</Label>
+                    <input
+                      id="session-enabled"
+                      type="checkbox"
+                      checked={editing.enabled}
+                      onChange={(event) => setEditing({ ...editing, enabled: event.target.checked })}
+                      className="size-4 accent-primary"
+                    />
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setEditing(null)}>

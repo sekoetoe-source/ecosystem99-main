@@ -82,6 +82,7 @@ export function JawaraTab({ periodId, periodName }: { periodId: string; periodNa
       return data ?? [];
     },
     enabled: !!periodId,
+    refetchInterval: 30_000,
   });
 
   // Process weekly data
@@ -271,20 +272,6 @@ function AdminLeaderboardPage() {
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch all periods
-  const periods = useQuery({
-    queryKey: ["periods"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("periods")
-        .select("id, name, status, start_date, end_date")
-        .order("start_date", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  // Fetch active period
   const activePeriod = useQuery({
     queryKey: ["active-period"],
     queryFn: async () => {
@@ -296,12 +283,25 @@ function AdminLeaderboardPage() {
       if (error) throw error;
       return data;
     },
+    refetchInterval: 30_000,
   });
 
-  // Set selected period to active period by default
+  const periods = useQuery({
+    queryKey: ["periods", "leaderboard-selector"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("periods")
+        .select("id, name, start_date, end_date, status")
+        .order("start_date", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 30_000,
+  });
+
+  // Keep the current active period as the default; archived periods remain selectable for review.
   const effectivePeriodId = selectedPeriodId || activePeriod.data?.id || "";
 
-  // Fetch period student scores
   const studentScores = useQuery({
     queryKey: ["period-student-scores", effectivePeriodId],
     queryFn: async () => {
@@ -318,9 +318,9 @@ function AdminLeaderboardPage() {
       });
     },
     enabled: !!effectivePeriodId,
+    refetchInterval: 30_000,
   });
 
-  // Fetch period class scores
   const classScores = useQuery({
     queryKey: ["period-class-scores", effectivePeriodId],
     queryFn: async () => {
@@ -337,6 +337,7 @@ function AdminLeaderboardPage() {
       });
     },
     enabled: !!effectivePeriodId,
+    refetchInterval: 30_000,
   });
 
   // Get unique classes for filter
@@ -480,7 +481,11 @@ function AdminLeaderboardPage() {
       {/* Tab Content */}
       {tab === "siswa" && (
         <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
-          {studentRows.length > 0 ? (
+          {studentScores.isLoading ? (
+            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Memuat leaderboard siswa...</p>
+          ) : studentScores.isError ? (
+            <p className="px-6 py-12 text-center text-sm text-destructive">Leaderboard siswa gagal dimuat.</p>
+          ) : studentRows.length > 0 ? (
             <div className="divide-y divide-border">
               {/* Header */}
               <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 font-semibold text-sm text-muted-foreground">
@@ -512,14 +517,18 @@ function AdminLeaderboardPage() {
               ))}
             </div>
           ) : (
-            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Tidak ada data siswa.</p>
+            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Tidak ada data siswa untuk periode ini.</p>
           )}
         </div>
       )}
 
       {tab === "kelas" && (
         <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
-          {classRows.length > 0 ? (
+          {classScores.isLoading ? (
+            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Memuat leaderboard kelas...</p>
+          ) : classScores.isError ? (
+            <p className="px-6 py-12 text-center text-sm text-destructive">Leaderboard kelas gagal dimuat.</p>
+          ) : classRows.length > 0 ? (
             <div className="divide-y divide-border">
               {/* Header */}
               <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 font-semibold text-sm text-muted-foreground">
@@ -551,7 +560,7 @@ function AdminLeaderboardPage() {
               ))}
             </div>
           ) : (
-            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Tidak ada data kelas.</p>
+            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Tidak ada data kelas untuk periode ini.</p>
           )}
         </div>
       )}

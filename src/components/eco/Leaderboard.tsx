@@ -22,6 +22,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
       if (error) throw error;
       return data;
     },
+    refetchInterval: 30_000,
   });
 
   const activePeriodId = activePeriod.data?.id;
@@ -36,12 +37,10 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         .eq("period_id", activePeriodId)
         .order("earned_points", { ascending: false });
       if (error) throw error;
-      return (data ?? []).filter((s) => {
-        const c = (s.class_name ?? "").trim();
-        return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
-      });
+      return data ?? [];
     },
     enabled: !!activePeriodId,
+    refetchInterval: 30_000,
   });
 
   const classes = useQuery({
@@ -60,6 +59,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
       });
     },
     enabled: !!activePeriodId,
+    refetchInterval: 30_000,
   });
 
   // Aggregate real student scores by class for accurate class leaderboard
