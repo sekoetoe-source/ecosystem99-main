@@ -114,74 +114,83 @@ const useSchoolStats = () =>
   useQuery({
     queryKey: ["school-stats", monthKeyForJakarta(new Date())],
     queryFn: async () => {
-      const month = monthKeyForJakarta(new Date());
-      const [year, monthNumber] = month.split("-").map(Number);
-      const start = `${month}-01`;
-      const end = new Date(Date.UTC(year!, monthNumber!, 1)).toISOString().slice(0, 10);
-      const [{ data: students }, { data: items }] = await Promise.all([
-        supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
-        supabase
-          .from("validation_items")
-          .select("item_code, points, student_id, validations!inner(status)")
-          .gte("day", start)
-          .lt("day", end),
-      ]);
-      const validStudents = (students ?? []).filter((student) => {
-        const className = (student.classes as { name: string } | null)?.name?.trim();
-        return Boolean(
-          student.class_id &&
-          className &&
-          className !== "-" &&
-          className.toLowerCase() !== "tanpa kelas",
+      try {
+        const month = monthKeyForJakarta(new Date());
+        const [year, monthNumber] = month.split("-").map(Number);
+        const start = `${month}-01`;
+        const end = new Date(Date.UTC(year!, monthNumber!, 1)).toISOString().slice(0, 10);
+        const [{ data: students, error: studentsError }, { data: items, error: itemsError }] =
+          await Promise.all([
+            supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
+            supabase
+              .from("validation_items")
+              .select("item_code, points, student_id, validations!inner(status)")
+              .gte("day", start)
+              .lt("day", end),
+          ]);
+        if (studentsError) throw studentsError;
+        if (itemsError) throw itemsError;
+        const validStudents = (students ?? []).filter((student) => {
+          const className = (student.classes as { name: string } | null)?.name?.trim();
+          return Boolean(
+            student.class_id &&
+              className &&
+              className !== "-" &&
+              className.toLowerCase() !== "tanpa kelas",
+          );
+        });
+        const validStudentIds = new Set(validStudents.map((student) => student.id));
+        const approved = (items ?? []).filter(
+          (item) =>
+            (item.validations as { status: string } | null)?.status === "approved" &&
+            validStudentIds.has(item.student_id),
         );
-      });
-      const validStudentIds = new Set(validStudents.map((student) => student.id));
-      const approved = (items ?? []).filter(
-        (item) =>
-          (item.validations as { status: string } | null)?.status === "approved" &&
-          validStudentIds.has(item.student_id),
-      );
-      const totalPoints = approved.reduce((sum, item) => sum + Number(item.points ?? 0), 0);
-      const classes = new Map<
-        string,
-        { class_name: string; total_points: number; student_count: number }
-      >();
-      const studentClass = new Map(
-        validStudents.map((student) => [
-          student.id,
-          (student.classes as { name: string }).name.trim(),
-        ]),
-      );
-      for (const student of validStudents) {
-        const className = studentClass.get(student.id)!;
-        const current = classes.get(className) ?? {
-          class_name: className,
-          total_points: 0,
-          student_count: 0,
+        const totalPoints = approved.reduce((sum, item) => sum + Number(item.points ?? 0), 0);
+        const classes = new Map<
+          string,
+          { class_name: string; total_points: number; student_count: number }
+        >();
+        const studentClass = new Map(
+          validStudents.map((student) => [
+            student.id,
+            (student.classes as { name: string }).name.trim(),
+          ]),
+        );
+        for (const student of validStudents) {
+          const className = studentClass.get(student.id)!;
+          const current = classes.get(className) ?? {
+            class_name: className,
+            total_points: 0,
+            student_count: 0,
+          };
+          current.student_count += 1;
+          classes.set(className, current);
+        }
+        for (const item of approved) {
+          const className = studentClass.get(item.student_id);
+          if (!className) continue;
+          classes.get(className)!.total_points += Number(item.points ?? 0);
+        }
+        const computedClasses = [...classes.values()]
+          .map((row) => ({
+            ...row,
+            avg_points: row.student_count ? Math.round(row.total_points / row.student_count) : 0,
+          }))
+          .sort((a, b) => b.total_points - a.total_points);
+        return {
+          totalPoints,
+          totalItems: approved.length,
+          studentCount: validStudents.length,
+          co2Kg: Math.round((approved.length * 70) / 1000),
+          classes: computedClasses.slice(0, 5),
         };
-        current.student_count += 1;
-        classes.set(className, current);
+      } catch (error) {
+        console.error("Landing report stats unavailable:", error);
+        return { totalPoints: 0, totalItems: 0, studentCount: 0, co2Kg: 0, classes: [] };
       }
-      for (const item of approved) {
-        const className = studentClass.get(item.student_id);
-        if (!className) continue;
-        const current = classes.get(className)!;
-        current.total_points += Number(item.points ?? 0);
-      }
-      const computedClasses = [...classes.values()]
-        .map((row) => ({
-          ...row,
-          avg_points: row.student_count ? Math.round(row.total_points / row.student_count) : 0,
-        }))
-        .sort((a, b) => b.total_points - a.total_points);
-      return {
-        totalPoints,
-        totalItems: approved.length,
-        studentCount: validStudents.length,
-        co2Kg: Math.round((approved.length * 70) / 1000),
-        classes: computedClasses.slice(0, 5),
-      };
     },
+    retry: 1,
+    staleTime: 0,
     refetchInterval: 60_000,
   });
 
@@ -663,7 +672,14 @@ function MobileUserGuideSection() {
 }
 
 function Index() {
-  const { data } = useSchoolStats();
+  const { data: liveStats } = useSchoolStats();
+  const data = {
+    studentCount: liveStats?.studentCount ?? 0,
+    totalItems: liveStats?.totalItems ?? 0,
+    totalPoints: liveStats?.totalPoints ?? 0,
+    co2Kg: liveStats?.co2Kg ?? 0,
+    classes: liveStats?.classes ?? [],
+  };
   const { me } = useMe();
   const [menuOpen, setMenuOpen] = useState(false);
   const dashHref = me ? homeForRole[me.primaryRole] : "/auth";
