@@ -36,45 +36,60 @@ function NotFoundComponent() {
   );
 }
 
+function isChunkLoadError(error: Error) {
+  const message = (error?.message || String(error)).toLowerCase();
+  return (
+    message.includes("failed to fetch dynamically imported module") ||
+    message.includes("importing a module script failed") ||
+    message.includes("loading chunk") ||
+    message.includes("chunkloaderror") ||
+    message.includes("failed to load module script") ||
+    (message.includes("404") && message.includes("module"))
+  );
+}
+
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const isChunkError = isChunkLoadError(error);
 
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
 
-    // Deteksi jika error disebabkan oleh chunk JS 404 / gagal muat modul dinamis (akibat deployment baru)
-    const errStr = (error?.message || String(error)).toLowerCase();
-    const isChunkError =
-      errStr.includes("failed to fetch dynamically imported module") ||
-      errStr.includes("importing a module script failed") ||
-      errStr.includes("loading chunk") ||
-      errStr.includes("404");
-
     if (isChunkError) {
-      const storageKey = "chunk_reload_count";
-      const count = Number(sessionStorage.getItem(storageKey) || 0);
-      if (count < 2) {
-        sessionStorage.setItem(storageKey, String(count + 1));
-        window.location.reload();
+      try {
+        const storageKey = `chunk_reload_count:${import.meta.env.VITE_APP_VERSION || "current"}`;
+        const count = Number(sessionStorage.getItem(storageKey) || 0);
+        if (count < 1) {
+          sessionStorage.setItem(storageKey, String(count + 1));
+          window.location.replace(`${window.location.pathname}${window.location.search}${window.location.hash}`);
+        }
+      } catch {
+        // Keep the error boundary available when browser storage is disabled.
       }
     }
-  }, [error]);
+  }, [error, isChunkError]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          Tampilan perlu diperbarui
+          {isChunkError ? "Tampilan perlu diperbarui" : "Halaman gagal dimuat"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Versi baru aplikasi telah dirilis. Silakan muat ulang halaman untuk mendapatkan pembaruan terbaru.
+          {isChunkError
+            ? "Versi aplikasi berubah saat halaman ini terbuka. Muat ulang untuk membuka versi terbaru."
+            : "Terjadi kendala saat membuka halaman. Muat ulang untuk mencoba kembali."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
-              sessionStorage.removeItem("chunk_reload_count");
-              window.location.reload();
+              try {
+                sessionStorage.removeItem(`chunk_reload_count:${import.meta.env.VITE_APP_VERSION || "current"}`);
+              } catch {
+                // Reload remains available when storage is disabled.
+              }
+              window.location.assign(`${window.location.pathname}${window.location.search}${window.location.hash}`);
             }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
