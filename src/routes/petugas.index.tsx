@@ -117,6 +117,7 @@ function ScannerPage() {
   const [camera, setCamera] = useState(false);
   const [lateEntry, setLateEntry] = useState(false);
   const [lateReason, setLateReason] = useState("");
+  const [lateScanDate, setLateScanDate] = useState(todayJakarta());
 
   // Active session domain state (Default: entry)
   const [session, setSession] = useState<ScanSession>("entry");
@@ -165,19 +166,33 @@ function ScannerPage() {
     new Date(),
   );
   const currentPeriod = useQuery({
-    queryKey: ["current-period", currentDate],
+    queryKey: ["current-period", lateEntry ? lateScanDate : currentDate],
     queryFn: async () => {
+      const scanDate = lateEntry ? lateScanDate : currentDate;
       const { data, error } = await supabase
         .from("periods")
         .select("id, status, start_date, end_date")
-        .lte("start_date", currentDate)
-        .gte("end_date", currentDate)
+        .lte("start_date", scanDate)
+        .gte("end_date", scanDate)
         .eq("status", "ACTIVE")
         .order("start_date", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) throw error;
       return data;
+    },
+  });
+  const lateScanConfig = useQuery({
+    queryKey: ["late-scan-date-range", currentPeriod.data?.id],
+    enabled: Boolean(lateEntry && currentPeriod.data?.id),
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("periods")
+        .select("late_scan_start_date, late_scan_end_date")
+        .eq("id", currentPeriod.data!.id)
+        .single();
+      if (error) throw error;
+      return data as { late_scan_start_date: string | null; late_scan_end_date: string | null };
     },
   });
   const operationalSessions = useQuery({
