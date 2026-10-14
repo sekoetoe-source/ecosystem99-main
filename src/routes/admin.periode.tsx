@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AdminShell } from "@/routes/admin";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -137,8 +136,8 @@ function PeriodPage() {
         );
       if (lateStartDate && lateEndDate && lateStartDate > lateEndDate)
         throw new Error("Tanggal mulai harus sebelum atau sama dengan tanggal akhir.");
-      if (lateStartDate && (lateStartDate < active.start_date || lateEndDate > active.end_date))
-        throw new Error("Rentang tanggal harus berada di dalam periode bulan berjalan.");
+      if (lateStartDate && (lateStartDate < active.start_date || lateEndDate > currentDate))
+        throw new Error("Rentang tanggal harus berada di dalam periode aktif dan tidak melebihi hari ini.");
       const { error } = await supabase
         .from("periods")
         .update({
@@ -254,19 +253,18 @@ function PeriodPage() {
   };
 
   return (
-    <AdminShell>
-      <section className="mx-auto w-full max-w-6xl space-y-6">
-        <header>
+    <div id="periode-page" className="mx-auto w-full max-w-6xl space-y-6">
+      <header>
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight">
               Periode dan Sesi Operasional
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
               Periode menentukan siklus poin. Sesi menentukan kapan pemindaian biasa dibuka. Semua
               jadwal mengikuti waktu WIB.
             </p>
-          </div>
-        </header>
+        </div>
+      </header>
         <section className="space-y-6">
           {periods.isError && (
             <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
@@ -331,7 +329,7 @@ function PeriodPage() {
                       type="date"
                       value={lateStartDate}
                       min={active.start_date}
-                      max={active.end_date}
+                      max={currentDate < active.end_date ? currentDate : active.end_date}
                       onChange={(event) => setLateStartDate(event.target.value)}
                       className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
                     />
@@ -343,7 +341,7 @@ function PeriodPage() {
                       type="date"
                       value={lateEndDate}
                       min={lateStartDate || active.start_date}
-                      max={active.end_date}
+                      max={currentDate < active.end_date ? currentDate : active.end_date}
                       onChange={(event) => setLateEndDate(event.target.value)}
                       className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
                     />
@@ -591,7 +589,6 @@ function PeriodPage() {
             </DialogContent>
           </Dialog>
         </section>
-      </section>
-    </AdminShell>
+    </div>
   );
 }

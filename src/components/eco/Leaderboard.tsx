@@ -42,17 +42,17 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
 
   const rawData = useQuery({
     queryKey: ["leaderboard-real-data", activePeriodId, monthStart],
+    enabled: activePeriod.isSuccess,
     queryFn: async () => {
+      // Always filter by period — if no active period exists, return empty
+      if (!activePeriodId) return { studentRows: [], classRows: [] };
       let query = supabase
         .from("validation_items")
         .select("student_id, points, item_code, day, validations!inner(period_id, status)")
         .eq("validations.status", "approved")
+        .eq("validations.period_id", activePeriodId)
         .gte("day", reportRange.start)
         .lt("day", reportRange.end);
-
-      if (activePeriodId) {
-        query = query.eq("validations.period_id", activePeriodId);
-      }
 
       const [{ data: items, error: itemsError }, { data: students, error: studentsError }] = await Promise.all([
         query,
