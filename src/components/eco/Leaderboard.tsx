@@ -30,10 +30,29 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         .order("start_date", { ascending: false });
       if (error) throw error;
       const list = data ?? [];
-      const found = list.find((p) => p.start_date === monthStart)
-        ?? list.find((p) => p.start_date <= currentDate && p.end_date >= currentDate)
-        ?? list.find((p) => p.status === "ACTIVE");
-      return found ?? null;
+      const found = list.find((p) => p.start_date <= currentDate && p.end_date >= currentDate)
+        ?? list.find((p) => p.start_date < reportRange.end && p.end_date >= reportRange.start)
+        ?? list.find((p) => p.status === "ACTIVE")
+        ?? list[0];
+      if (found) return found;
+
+      // Fallback for public/unauthenticated visitors if periods table returns empty due to RLS
+      const { data: vData } = await supabase
+        .from("validations")
+        .select("period_id")
+        .eq("status", "approved")
+        .order("day", { ascending: false })
+        .limit(1);
+      if (vData?.[0]?.period_id) {
+        return {
+          id: vData[0].period_id,
+          name: "Periode Operasional",
+          status: "ACTIVE",
+          start_date: monthStart,
+          end_date: reportRange.end,
+        };
+      }
+      return null;
     },
     refetchInterval: 30_000,
   });

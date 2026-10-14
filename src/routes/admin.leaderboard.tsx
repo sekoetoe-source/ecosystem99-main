@@ -145,9 +145,13 @@ function AdminLeaderboardPage() {
     refetchInterval: 30_000,
   });
   const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
-  const currentPeriod = periods.data?.find((period) => period.start_date === `${currentDate.slice(0, 7)}-01`)
-    ?? periods.data?.find((period) => period.start_date <= currentDate && period.end_date >= currentDate)
-    ?? periods.data?.find((period) => period.status === "ACTIVE");
+  const reportMonth = currentDate.slice(0, 7);
+  const [year, month] = reportMonth.split("-").map(Number);
+  const reportRangeEnd = new Date(Date.UTC(year!, month!, 1)).toISOString().slice(0, 10);
+  const currentPeriod = periods.data?.find((period) => period.start_date <= currentDate && period.end_date >= currentDate)
+    ?? periods.data?.find((period) => period.start_date < reportRangeEnd && period.end_date >= `${reportMonth}-01`)
+    ?? periods.data?.find((period) => period.status === "ACTIVE")
+    ?? periods.data?.[0];
   const effectivePeriodId = selectedPeriodId || currentPeriod?.id || "";
 
   const studentScores = useQuery({

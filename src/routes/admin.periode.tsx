@@ -104,9 +104,12 @@ function PeriodPage() {
   });
   const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
   const monthStart = `${currentDate.slice(0, 7)}-01`;
-  const active = periods.data?.find((period) => period.start_date === monthStart)
-    ?? periods.data?.find((period) => period.start_date <= currentDate && period.end_date >= currentDate)
-    ?? periods.data?.find((period) => period.status === "ACTIVE");
+  const [currentYear, currentMonthNum] = currentDate.slice(0, 7).split("-").map(Number);
+  const currentMonthEnd = new Date(Date.UTC(currentYear!, currentMonthNum!, 1)).toISOString().slice(0, 10);
+  const active = periods.data?.find((period) => period.start_date <= currentDate && period.end_date >= currentDate)
+    ?? periods.data?.find((period) => period.start_date < currentMonthEnd && period.end_date >= monthStart)
+    ?? periods.data?.find((period) => period.status === "ACTIVE")
+    ?? periods.data?.[0];
   const sessions = useQuery({
     queryKey: ["operational-sessions", active?.id],
     enabled: Boolean(active?.id),

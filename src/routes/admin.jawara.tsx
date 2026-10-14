@@ -8,6 +8,13 @@ export const Route = createFileRoute("/admin/jawara")({ component: JawaraPage })
 function JawaraPage() {
   const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
   const monthStart = `${currentDate.slice(0, 7)}-01`;
+  const reportRange = (() => {
+    const [year, month] = currentDate.slice(0, 7).split("-").map(Number);
+    return {
+      start: monthStart,
+      end: new Date(Date.UTC(year!, month!, 1)).toISOString().slice(0, 10),
+    };
+  })();
   const activePeriod = useQuery({
     queryKey: ["active-period"],
     queryFn: async () => {
@@ -17,9 +24,10 @@ function JawaraPage() {
         .order("start_date", { ascending: false });
       if (error) throw error;
       const list = data ?? [];
-      const found = list.find((p) => p.start_date === monthStart)
-        ?? list.find((p) => p.start_date <= currentDate && p.end_date >= currentDate)
-        ?? list.find((p) => p.status === "ACTIVE");
+      const found = list.find((p) => p.start_date <= currentDate && p.end_date >= currentDate)
+        ?? list.find((p) => p.start_date < reportRange.end && p.end_date >= reportRange.start)
+        ?? list.find((p) => p.status === "ACTIVE")
+        ?? list[0];
       return found ?? null;
     },
     refetchInterval: 30_000,
