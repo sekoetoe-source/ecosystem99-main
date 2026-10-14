@@ -160,6 +160,7 @@ function ScannerPage() {
         .limit(10);
       return (data as any[]) ?? [];
     },
+    refetchInterval: 30_000,
   });
 
   const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
@@ -782,7 +783,7 @@ function ScannerPage() {
               >
                 {session === "entry"
                   ? entryTumbler && entryLunchbox
-                    ? "Total: +250 poin (Keduanya)"
+                    ? "Total: +150 poin (Tumbler + Kotak Makan)"
                     : entryTumbler
                       ? "Total: +100 poin (Tumbler saja)"
                       : entryLunchbox
@@ -797,7 +798,7 @@ function ScannerPage() {
             </div>
 
             {session === "entry" ? (
-              // SESI 1: Checkbox Independen (Tumbler +100, Kotak Makan +50, Keduanya +250)
+              // SESI 1: Checkbox independen, maksimal 150 poin (Tumbler 100 + Kotak Makan 50)
               <div className="space-y-2">
                 <div className="grid gap-2 grid-cols-2">
                   <label
@@ -866,9 +867,7 @@ function ScannerPage() {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                  * Checkbox independen: Tumbler (+100), Kotak Makan (+50). Pilih salah satu atau
-                  gunakan pilihan kombinasi untuk mendapatkan +250 poin atau keduanya (total +250
-                  poin).
+                  Sesi 1: Tumbler 100 poin dan Kotak Makan 50 poin. Jika membawa keduanya, totalnya 150 poin tanpa combo.
                 </p>
               </div>
             ) : (
@@ -958,10 +957,8 @@ function ScannerPage() {
                     );
                   })}
                 </div>
-
                 <p className="text-[11px] text-muted-foreground">
-                  * Pilihan saling eksklusif (radio): hanya satu opsi yang aktif. Combo bernilai
-                  utuh dan mendapatkan +250 poin.
+                  Pilihan saling eksklusif: hanya satu opsi yang aktif. Combo khusus Sesi 2 bernilai +250 poin.
                 </p>
               </div>
             )}

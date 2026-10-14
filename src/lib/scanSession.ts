@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Domain concepts and business rules for Multi-Session Eco Scan.
  */
 
@@ -49,16 +49,17 @@ export interface SessionCalculationResult {
 /**
  * Calculates point allocations based on the active session and selected items.
  *
- * Rules:
- * - ENTRY (Masuk):
- *   Tumbler: 100 pts
- *   Lunchbox: 50 pts
- *   Tumbler + Lunchbox: 150 pts
+ * - ENTRY (Sesi 1 / Masuk):
+ *   Tumbler: 100 poin
+ *   Kotak Makan: 50 poin
+ *   Tumbler + Kotak Makan: 150 poin maksimal, tanpa combo
  *
- * - BREAK (Istirahat):
- *   Tumbler saja: 100 pts
- *   Lunchbox saja: 50 pts
- *   break_combo: 250 pts (disimpan sebagai item tunggal code: "break_combo")
+ * - BREAK (Sesi 2 / Istirahat):
+ *   Tumbler saja: 100 poin
+ *   Kotak Makan saja: 50 poin
+ *   Combo Tumbler + Kotak Makan: 250 poin
+ *
+ * - Pemindaian susulan memilih Sesi 1 atau Sesi 2 dan mengikuti aturan sesi tersebut.
  */
 export function calculateSessionPoints(
   session: ScanSession,
@@ -73,7 +74,7 @@ export function calculateSessionPoints(
       return {
         allocations: [{ itemCode: "break_combo", points: 250 }],
         totalPoints: 250,
-        summaryLabel: "Combo Tumbler + Lunchbox",
+        summaryLabel: "Combo Tumbler + Kotak Makan",
       };
     }
     if (hasTumbler) {
@@ -93,26 +94,26 @@ export function calculateSessionPoints(
     return {
       allocations: [],
       totalPoints: 0,
-      summaryLabel: "Tidak ada item",
+      summaryLabel: "Tidak ada barang",
     };
   }
 
-  // Session: ENTRY
+  // Sesi 1: points are awarded per item; the maximum is 150 with no combo bonus.
   const hasTumbler = selectedItems.includes("tumbler");
   const hasLunchbox = selectedItems.includes("lunchbox");
   const allocations: PointAllocation[] = [];
   if (hasTumbler) allocations.push({ itemCode: "tumbler", points: 100 });
   if (hasLunchbox) allocations.push({ itemCode: "lunchbox", points: 50 });
 
-  const totalPoints = allocations.reduce((acc, a) => acc + a.points, 0);
+  const totalPoints = allocations.reduce((acc, allocation) => acc + allocation.points, 0);
   const summaryLabel =
     hasTumbler && hasLunchbox
-      ? "Tumbler + Kotak Makan"
+      ? "Tumbler + Kotak Makan (tanpa combo)"
       : hasTumbler
         ? "Tumbler"
         : hasLunchbox
           ? "Kotak Makan"
-          : "Tidak ada item";
+          : "Tidak ada barang";
 
   return {
     allocations,

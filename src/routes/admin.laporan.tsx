@@ -302,29 +302,48 @@ function LaporanPage() {
       if (error) throw error;
       return data ?? [];
     },
+    refetchInterval: 30_000,
   });
   const [selectedMonth, setSelectedMonth] = useState(() => monthKey(new Date()));
   const availableMonths = monthsInPeriods(periods.data ?? []);
   const report = useQuery({
-    queryKey: ["formal-report", selectedMonth],
+    queryKey: ["formal-report", selectedMonth, periods.dataUpdatedAt],
     queryFn: async () => {
       const currentRange = monthRange(selectedMonth);
       const [year, month] = selectedMonth.split("-").map(Number);
       const previousMonthDate = new Date(Date.UTC(year!, month! - 2, 1));
       const previousRange = monthRange(monthKey(previousMonthDate));
-      const [{ data: students }, { data: items }, prevItems] = await Promise.all([
+      const selectedPeriod = (periods.data ?? []).find((period) =>
+        period.start_date < currentRange.end && period.end_date >= currentRange.start,
+      );
+      const previousPeriod = (periods.data ?? []).find((period) =>
+        period.start_date < previousRange.end && period.end_date >= previousRange.start,
+      );
+      const [studentsRes, itemsRes, prevItemsRes] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
-        supabase
-          .from("validation_items")
-          .select("item_code, points, student_id, day, validations!inner(status, period_id)")
-          .gte("day", currentRange.start)
-          .lt("day", currentRange.end),
-        supabase
-          .from("validation_items")
-          .select("item_code, validations!inner(status, period_id)")
-          .gte("day", previousRange.start)
-          .lt("day", previousRange.end),
+        selectedPeriod
+          ? supabase
+              .from("validation_items")
+              .select("item_code, points, student_id, day, validations!inner(status, period_id)")
+              .eq("validations.period_id", selectedPeriod.id)
+              .gte("day", currentRange.start)
+              .lt("day", currentRange.end)
+          : Promise.resolve({ data: [] as Array<{ item_code: string; points: number; student_id: string; day: string; validations: unknown }>, error: null }),
+        previousPeriod
+          ? supabase
+              .from("validation_items")
+              .select("item_code, validations!inner(status, period_id)")
+              .eq("validations.period_id", previousPeriod.id)
+              .gte("day", previousRange.start)
+              .lt("day", previousRange.end)
+          : Promise.resolve({ data: [] as Array<{ item_code: string; validations: unknown }>, error: null }),
       ]);
+      if (studentsRes.error) throw studentsRes.error;
+      if (itemsRes.error) throw itemsRes.error;
+      if (prevItemsRes.error) throw prevItemsRes.error;
+      const students = studentsRes.data;
+      const items = itemsRes.data;
+      const prevItems = prevItemsRes;
       const validStudents = (students ?? []).filter((s) => {
         const className = (s.classes as { name: string } | null)?.name?.trim();
         return Boolean(
@@ -410,6 +429,7 @@ function LaporanPage() {
         topKelas: topClass && topClass.points > 0 ? topClass.name : "-",
       };
     },
+    refetchInterval: 30_000,
   });
   const d = report.data;
   function exportCsv() {

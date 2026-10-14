@@ -29,149 +29,140 @@ export const Route = createFileRoute("/admin/leaderboard")({
 
 type Tab = "siswa" | "kelas" | "jawara";
 
-type JawaraStudent = { id: string; full_name: string | null; nis: string | null; classes: { name: string } | null };
+type JawaraStudent = {
+  id: string;
+  full_name: string | null;
+  nis: string | null;
+  classes: { name: string | null } | null;
+};
+
 type JawaraValidation = {
   points: number | null;
-  validations: { day: string; students: JawaraStudent | null } | null;
+  validations: {
+    day: string;
+    students: JawaraStudent | null;
+  } | null;
 };
 type WeeklyData = {
   global: Record<string, { name: string; nis: string; points: number }>;
   byClass: Record<string, Record<string, { name: string; points: number }>>;
 };
+type JawaraWeek = { key: string; year: number; week: number };
 
-// Helper: Get ISO week number
-function getWeekNumber(date: Date): number {
+// Return a stable ISO week key including its ISO week-year.
+function getIsoWeek(date: Date): JawaraWeek {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-}
-
-// Helper: Format week display
-function formatWeek(startDate: string, endDate: string): string {
-  return `${startDate} – ${endDate}`;
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const year = d.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { key: `${year}-W${String(week).padStart(2, "0")}`, year, week };
 }
 
 export function JawaraTab({ periodId, periodName }: { periodId: string; periodName?: string }) {
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
 
   // Fetch validation items for the period
   const validationData = useQuery({
     queryKey: ["jawara-data", periodId],
     queryFn: async () => {
       if (!periodId) return [];
-      const { data: period } = await supabase
+      const { data: period, error: periodError } = await supabase
         .from("periods")
         .select("start_date, end_date")
         .eq("id", periodId)
         .maybeSingle();
-
+      if (periodError) throw periodError;
       if (!period) return [];
 
-      const { data, error } = await supabase
+      const { data: rows, error } = await supabase
         .from("validation_items")
-        .select(
-          "points, validations!inner(student_id, day, status, students(id, full_name, nis, class_id, classes(name)))"
-        )
+        .select("points, validations!inner(student_id, period_id, day, status, students(id, full_name, nis, class_id, classes(name)))")
+        .eq("validations.period_id", periodId)
         .eq("validations.status", "approved")
         .gte("validations.day", period.start_date)
         .lte("validations.day", period.end_date);
-
       if (error) throw error;
-      return data ?? [];
+      return rows ?? [];
     },
     enabled: !!periodId,
     refetchInterval: 30_000,
   });
 
-  // Process weekly data
   const weeklyChampions = (() => {
-    if (!validationData.data || validationData.data.length === 0) return { weeks: [], byWeek: {} as Record<number, WeeklyData> };
+    if (!validationData.data || validationData.data.length === 0) {
+      return { weeks: [] as JawaraWeek[], byWeek: {} as Record<string, WeeklyData> };
+    }
 
-    const weekMap: Record<number, WeeklyData> = {};
-
+    const weekMap: Record<string, WeeklyData> = {};
     (validationData.data as JawaraValidation[]).forEach((item) => {
       const validation = item.validations;
       if (!validation) return;
-
-      const date = new Date(validation.day);
-      const week = getWeekNumber(date);
+      const { key } = getIsoWeek(new Date(`${validation.day}T00:00:00Z`));
       const student = validation.students;
-      const className = student?.classes?.name || "-";
-
-      if (!weekMap[week]) {
-        weekMap[week] = { global: {}, byClass: {} };
+      const className = student?.classes?.name?.trim();
+      if (!student?.id || !className || className === "-" || className.toLowerCase() === "tanpa kelas") return;
+      if (!weekMap[key]) weekMap[key] = { global: {}, byClass: {} };
+      if (!weekMap[key].global[student.id]) {
+        weekMap[key].global[student.id] = { name: student.full_name || "-", nis: student.nis || "-", points: 0 };
       }
-
-      const studentId = student?.id;
-      if (!studentId) return;
-
-      // Global ranking
-      if (!weekMap[week].global[studentId]) {
-        weekMap[week].global[studentId] = {
-          name: student?.full_name || "-",
-          nis: student?.nis || "-",
-          points: 0,
-        };
+      weekMap[key].global[student.id].points += Number(item.points ?? 0);
+      if (!weekMap[key].byClass[className]) weekMap[key].byClass[className] = {};
+      if (!weekMap[key].byClass[className][student.id]) {
+        weekMap[key].byClass[className][student.id] = { name: student.full_name || "-", points: 0 };
       }
-      weekMap[week].global[studentId].points += item.points ?? 0;
-
-      // Per-class ranking
-      if (!weekMap[week].byClass[className]) {
-        weekMap[week].byClass[className] = {};
-      }
-      if (!weekMap[week].byClass[className][studentId]) {
-        weekMap[week].byClass[className][studentId] = {
-          name: student?.full_name || "-",
-          points: 0,
-        };
-      }
-      weekMap[week].byClass[className][studentId].points += item.points ?? 0;
+      weekMap[key].byClass[className][student.id].points += Number(item.points ?? 0);
     });
 
     const weeks = Object.keys(weekMap)
-      .map(Number)
-      .sort((a, b) => b - a);
-
+      .map((key) => {
+        const [year, week] = key.split("-W").map(Number);
+        return { key, year: year!, week: week! };
+      })
+      .sort((a, b) => b.key.localeCompare(a.key));
     return { weeks, byWeek: weekMap };
   })();
 
   const weeks = weeklyChampions.weeks;
   const byWeek = weeklyChampions.byWeek;
-  const activeWeek = selectedWeek !== null ? selectedWeek : weeks[0];
+  const activeWeek = selectedWeek !== null ? selectedWeek : weeks[0]?.key;
+  const currentWeekData = activeWeek ? byWeek[activeWeek] : null;
+  const globalRanking = currentWeekData
+    ? Object.entries(currentWeekData.global)
+        .map(([id, data]) => ({ id, ...data }))
+        .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, "id"))
+    : [];
 
+  if (validationData.isLoading) {
+    return <div className="surface-card p-8 text-center text-sm text-muted-foreground">Memuat data Jawara...</div>;
+  }
+  if (validationData.isError) {
+    return <div className="surface-card p-8 text-center text-sm text-destructive">Data Jawara gagal dimuat.</div>;
+  }
   if (weeks.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-white p-12 text-center">
         <Trophy className="size-16 mx-auto mb-4 text-gray-300" />
         <h3 className="text-lg font-semibold text-foreground mb-2">Belum ada data Jawara</h3>
-        <p className="text-sm text-muted-foreground">Data akan muncul setelah ada validasi yang disetujui dalam periode ini.</p>
+        <p className="text-sm text-muted-foreground">Data akan muncul setelah ada klaim disetujui pada periode ini.</p>
       </div>
     );
   }
 
-  const currentWeekData = activeWeek ? byWeek[activeWeek] : null;
-  const globalRanking = currentWeekData
-    ? Object.entries(currentWeekData.global)
-        .map(([id, data]) => ({ id, ...data }))
-        .sort((a, b) => b.points - a.points)
-    : [];
-
   return (
     <div className="space-y-6">
-      {/* Week Selector */}
       <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
         <label className="text-sm font-medium text-foreground mb-3 block">Pilih Minggu</label>
-        <Select value={activeWeek?.toString() || ""} onValueChange={(v) => setSelectedWeek(Number(v))}>
+        <Select value={activeWeek ?? ""} onValueChange={setSelectedWeek}>
           <SelectTrigger className="w-full sm:w-64">
             <Calendar className="size-4 mr-2" />
             <SelectValue placeholder="Pilih minggu" />
           </SelectTrigger>
           <SelectContent>
             {weeks.map((week) => (
-              <SelectItem key={week} value={week.toString()}>
-                Minggu {week}
+              <SelectItem key={week.key} value={week.key}>
+                Minggu {week.week}, {week.year}
               </SelectItem>
             ))}
           </SelectContent>
@@ -182,7 +173,7 @@ export function JawaraTab({ periodId, periodName }: { periodId: string; periodNa
       <div>
         <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <Star className="size-5 text-yellow-500" />
-          Jawara Global — Minggu {activeWeek}
+          Jawara Global — Minggu {weeks.find((week) => week.key === activeWeek)?.week}, {weeks.find((week) => week.key === activeWeek)?.year}
         </h3>
         <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
           {globalRanking.length > 0 ? (
@@ -225,7 +216,7 @@ export function JawaraTab({ periodId, periodName }: { periodId: string; periodNa
         <div className="space-y-4">
           <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
             <Trophy className="size-5 text-blue-600" />
-            Jawara per Kelas — Minggu {activeWeek}
+            Jawara per Kelas — Minggu {weeks.find((week) => week.key === activeWeek)?.week}, {weeks.find((week) => week.key === activeWeek)?.year}
           </h3>
           {Object.entries(currentWeekData.byClass).map(([className, classData]) => {
             const classRanking = Object.entries(classData as Record<string, { name: string; points: number }>)
@@ -294,7 +285,7 @@ function AdminLeaderboardPage() {
         .select("id, name, start_date, end_date, status")
         .order("start_date", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).filter((period) => period.status !== "DRAFT");
     },
     refetchInterval: 30_000,
   });
@@ -306,37 +297,70 @@ function AdminLeaderboardPage() {
     queryKey: ["period-student-scores", effectivePeriodId],
     queryFn: async () => {
       if (!effectivePeriodId) return [];
-      const { data, error } = await supabase
-        .from("period_student_scores")
-        .select("period_id, period_name, student_id, nis, full_name, class_id, class_name, earned_points, total_items")
-        .eq("period_id", effectivePeriodId)
-        .order("earned_points", { ascending: false });
+      const [{ data, error }, { data: students, error: studentsError }, { data: period, error: periodError }] = await Promise.all([
+        supabase
+          .from("validation_items")
+          .select("student_id, points, validations!inner(period_id, status)")
+          .eq("validations.period_id", effectivePeriodId)
+          .eq("validations.status", "approved"),
+        supabase.from("students").select("id, full_name, nis, class_id, classes(name)").eq("active", true),
+        supabase.from("periods").select("id, name").eq("id", effectivePeriodId).maybeSingle(),
+      ]);
       if (error) throw error;
-      return (data ?? []).filter((s) => {
-        const c = (s.class_name ?? "").trim();
-        return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
+      if (studentsError) throw studentsError;
+      if (periodError) throw periodError;
+      if (!period) return [];
+
+      const validStudents = (students ?? []).filter((student) => {
+        const className = (student.classes as { name: string } | null)?.name?.trim();
+        return Boolean(student.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas");
       });
+      const validStudentIds = new Set(validStudents.map((student) => student.id));
+      const pointTotals = new Map<string, number>();
+      for (const item of data ?? []) {
+        if (!validStudentIds.has(item.student_id)) continue;
+        pointTotals.set(item.student_id, (pointTotals.get(item.student_id) ?? 0) + Number(item.points ?? 0));
+      }
+      return validStudents.map((student) => ({
+        period_id: effectivePeriodId,
+        period_name: period.name,
+        student_id: student.id,
+        nis: student.nis,
+        full_name: student.full_name,
+        class_id: student.class_id,
+        class_name: (student.classes as { name: string }).name,
+        earned_points: pointTotals.get(student.id) ?? 0,
+        total_items: 0,
+      })).sort((a, b) => b.earned_points - a.earned_points || (a.full_name ?? "").localeCompare(b.full_name ?? "", "id"));
     },
     enabled: !!effectivePeriodId,
     refetchInterval: 30_000,
   });
 
   const classScores = useQuery({
-    queryKey: ["period-class-scores", effectivePeriodId],
+    queryKey: ["period-class-scores", effectivePeriodId, studentScores.dataUpdatedAt],
     queryFn: async () => {
       if (!effectivePeriodId) return [];
-      const { data, error } = await supabase
-        .from("period_class_scores")
-        .select("period_id, period_name, class_id, class_name, student_count, total_points, avg_points")
-        .eq("period_id", effectivePeriodId)
-        .order("total_points", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).filter((c) => {
-        const name = (c.class_name ?? "").trim();
-        return Boolean(name && name !== "-" && name.toLowerCase() !== "tanpa kelas");
-      });
+      const students = studentScores.data ?? [];
+      const classMap = new Map<string, { class_id: string; class_name: string; student_count: number; total_points: number; avg_points: number }>();
+      for (const student of students) {
+        if (!student.class_id || !student.class_name) continue;
+        const row = classMap.get(student.class_id) ?? {
+          class_id: student.class_id,
+          class_name: student.class_name,
+          student_count: 0,
+          total_points: 0,
+          avg_points: 0,
+        };
+        row.student_count += 1;
+        row.total_points += student.earned_points;
+        classMap.set(student.class_id, row);
+      }
+      return [...classMap.values()]
+        .map((row) => ({ ...row, avg_points: row.student_count ? Math.round(row.total_points / row.student_count) : 0 }))
+        .sort((a, b) => b.total_points - a.total_points || a.class_name.localeCompare(b.class_name, "id"));
     },
-    enabled: !!effectivePeriodId,
+    enabled: studentScores.isSuccess,
     refetchInterval: 30_000,
   });
 

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Pencil, School, UtensilsCrossed } from "lucide-react";
+import { AlertTriangle, Pencil, RotateCcw, School, UtensilsCrossed } from "lucide-react";
 
 export const Route = createFileRoute("/admin/periode")({ component: PeriodPage });
 
@@ -78,6 +78,7 @@ function PeriodPage() {
   const [endTime, setEndTime] = useState("");
   const [lateStartDate, setLateStartDate] = useState("");
   const [lateEndDate, setLateEndDate] = useState("");
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const currentMonthName = new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Jakarta",
     month: "long",
@@ -89,8 +90,7 @@ function PeriodPage() {
       const { data, error } = await supabase
         .from("periods")
         .select("id, name, status, start_date, end_date, late_scan_start_date, late_scan_end_date")
-        .order("start_date", { ascending: false })
-        .limit(12);
+        .order("start_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Period[];
     },
@@ -148,13 +148,37 @@ function PeriodPage() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("point_reset_audit_events")
-        .select(
-          "id, occurred_at, period_name, before_total_points, before_students_with_points, reset_validation_items, reason",
-        )
+        .select("id, occurred_at, period_name, before_total_points, before_students_with_points, reset_validation_items, reason, actor_id, actor_name")
         .order("occurred_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
+    refetchInterval: 30_000,
+  });
+  const resetPoint = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("reset_active_period_points_only" as never);
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: async (data) => {
+      setResetConfirmOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["period-history"] }),
+        queryClient.invalidateQueries({ queryKey: ["active-period"] }),
+        queryClient.invalidateQueries({ queryKey: ["period-student-scores"] }),
+        queryClient.invalidateQueries({ queryKey: ["period-class-scores"] }),
+        queryClient.invalidateQueries({ queryKey: ["leaderboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-kpi"] }),
+        queryClient.invalidateQueries({ queryKey: ["formal-report"] }),
+        queryClient.invalidateQueries({ queryKey: ["jawara-data"] }),
+        queryClient.invalidateQueries({ queryKey: ["point-reset-audit-events"] }),
+      ]);
+      if (data && typeof data === "object" && !Array.isArray(data) && typeof data["period_name"] === "string") {
+        toast.success(`Poin uji coba periode ${data["period_name"]} berhasil direset.`);
+      }
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Gagal mereset poin."),
   });
   const update = useMutation({
     mutationFn: async (input: {
@@ -210,7 +234,7 @@ function PeriodPage() {
 
   return (
     <AdminShell>
-      <div className="w-full max-w-5xl min-w-0 space-y-5">
+      <div className="min-w-0 space-y-5">
         <header className="min-w-0">
           <div>
             <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">
@@ -241,11 +265,16 @@ function PeriodPage() {
                 <p className="mt-2 text-sm font-semibold text-foreground">
                   {activePeriodDateStatus}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Periode dengan status aktif menerima pemindaian. Reset poin hanya mengosongkan
-                  poin tanpa mengubah periode atau riwayat pemindaian. Sesi mengatur waktu pemindaian
-                  biasa; semua jadwal menggunakan WIB.
-                </p>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-start gap-3 text-sm text-amber-950">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                    <p>Reset mengubah poin pada catatan periode aktif menjadi 0. Catatan dan periode tetap tersimpan.</p>
+                  </div>
+                  <Button variant="outline" className="gap-2 border-amber-300 bg-white" onClick={() => setResetConfirmOpen(true)} disabled={resetPoint.isPending}>
+                    <RotateCcw className="size-4" />
+                    {resetPoint.isPending ? "Memproses..." : "Reset Poin"}
+                  </Button>
+                </div>
               </>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
@@ -395,10 +424,9 @@ function PeriodPage() {
           </div>
           <div className="surface-card overflow-hidden">
             <div className="border-b border-border p-5">
-              <h2 className="font-bold">Riwayat periode</h2>
+              <h2 className="font-bold">Arsip periode</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Status menunjukkan siklus mana yang menerima pemindaian baru dan mana yang hanya
-                menjadi arsip laporan.
+                Periode yang sudah ditutup, dengan rentang tanggalnya. Periode aktif dan draft ditampilkan di bagian pengaturan masing-masing.
               </p>
             </div>
             <div className="divide-y divide-border">
@@ -406,10 +434,10 @@ function PeriodPage() {
                 <p className="p-5 text-sm text-muted-foreground">Memuat riwayat periode...</p>
               ) : periods.isError ? (
                 <p className="p-5 text-sm text-destructive">Riwayat periode gagal dimuat.</p>
-              ) : (periods.data ?? []).length === 0 ? (
-                <p className="p-5 text-sm text-muted-foreground">Belum ada riwayat periode.</p>
+              ) : (periods.data ?? []).filter((period) => period.status === "CLOSED").length === 0 ? (
+                <p className="p-5 text-sm text-muted-foreground">Belum ada periode yang ditutup. Periode aktif tidak ditampilkan sebagai arsip.</p>
               ) : (
-                periods.data?.map((period) => (
+                periods.data?.filter((period) => period.status === "CLOSED").map((period) => (
                   <div
                     key={period.id}
                     className="flex flex-wrap items-center justify-between gap-3 p-5"
@@ -420,13 +448,7 @@ function PeriodPage() {
                         {formatDate(period.start_date)} – {formatDate(period.end_date)}
                       </p>
                     </div>
-                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">
-                      {period.id === active?.id
-                        ? "Periode Aktif"
-                        : period.status === "DRAFT"
-                          ? "Draft"
-                          : "Arsip"}
-                    </span>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">Ditutup · Arsip</span>
                   </div>
                 ))
               )}
@@ -452,9 +474,10 @@ function PeriodPage() {
                   <div key={audit.id} className="p-5 text-sm">
                     <p className="font-semibold">Poin periode {audit.period_name} dihapus</p>
                     <p className="mt-1 text-muted-foreground">
-                      {new Date(audit.occurred_at).toLocaleString("id-ID")} ·{" "}
-                      {audit.before_total_points} poin dari {audit.before_students_with_points} siswa
-                      dihapus pada {audit.reset_validation_items} catatan.
+                      {new Date(audit.occurred_at).toLocaleString("id-ID")} · {audit.before_total_points} poin dari {audit.before_students_with_points} siswa diubah pada {audit.reset_validation_items} catatan.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Admin: {audit.actor_name || audit.actor_id || "Identitas tidak tersedia"}
                     </p>
                   </div>
                 ))
