@@ -3,7 +3,6 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
-  useRouter,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -48,9 +47,8 @@ function isChunkLoadError(error: Error) {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error }: { error: Error; reset: () => void }) {
   console.error(error);
-  const router = useRouter();
   const isChunkError = isChunkLoadError(error);
 
   useEffect(() => {
@@ -79,8 +77,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <p className="mt-2 text-sm text-muted-foreground">
           {isChunkError
             ? "Versi aplikasi berubah saat halaman ini terbuka. Muat ulang untuk membuka versi terbaru."
-            : "Terjadi kendala saat membuka halaman. Muat ulang untuk mencoba kembali."}
+            : "Terjadi kendala saat membuka halaman. Buka detail error untuk mengetahui penyebabnya."}
         </p>
+        {!isChunkError && (
+          <details className="mt-4 rounded-lg border border-border bg-white p-3 text-left text-xs text-muted-foreground">
+            <summary className="cursor-pointer font-semibold">Detail error</summary>
+            <pre className="mt-2 whitespace-pre-wrap break-words">{error.message || String(error)}</pre>
+          </details>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
