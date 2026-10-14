@@ -508,6 +508,30 @@ function PeriodPage() {
               )}
             </div>
           </div>
+          <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Konfirmasi Reset Poin</DialogTitle>
+                <DialogDescription>
+                  Reset akan mengosongkan semua perolehan poin periode aktif ({active?.name ?? ""}).
+                  Status periode, tanggal, dan riwayat pemindaian tidak berubah.
+                  Tindakan ini tidak dapat dibatalkan.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>
+                  Batal
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={resetPoint.isPending}
+                  onClick={() => resetPoint.mutate()}
+                >
+                  {resetPoint.isPending ? "Memproses..." : "Ya, Reset Poin"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
             <DialogContent>
               <DialogHeader>
