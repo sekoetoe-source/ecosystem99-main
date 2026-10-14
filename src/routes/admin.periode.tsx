@@ -89,10 +89,17 @@ function PeriodPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("periods")
-        .select("id, name, status, start_date, end_date, late_scan_start_date, late_scan_end_date")
+        .select("id, name, status, start_date, end_date")
         .order("start_date", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Period[];
+      // Optional columns must not prevent the core period controls from loading.
+      const basePeriods = (data ?? []) as Period[];
+      const { data: lateDates, error: lateDateError } = await supabase
+        .from("periods")
+        .select("id, late_scan_start_date, late_scan_end_date");
+      if (lateDateError) return basePeriods;
+      const lateDateById = new Map((lateDates ?? []).map((period) => [period.id, period]));
+      return basePeriods.map((period) => ({ ...period, ...lateDateById.get(period.id) }));
     },
     refetchInterval: 30_000,
   });
@@ -247,6 +254,11 @@ function PeriodPage() {
           </div>
         </header>
         <section className="space-y-6">
+          {periods.isError && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              Data periode gagal dimuat: {periods.error instanceof Error ? periods.error.message : "Kesalahan database"}
+            </div>
+          )}
           <div className="surface-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="label-xs text-muted-foreground">Periode berjalan</p>
@@ -256,19 +268,19 @@ function PeriodPage() {
                 </span>
               ) : null}
             </div>
-            {active ? (
+            {periods.isLoading ? (
+              <p className="mt-3 text-sm text-muted-foreground">Memuat periode aktif...</p>
+            ) : active ? (
               <>
                 <h2 className="mt-2 text-2xl font-bold">{active.name}</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {formatDate(active.start_date)} – {formatDate(active.end_date)}
                 </p>
-                <p className="mt-2 text-sm font-semibold text-foreground">
-                  {activePeriodDateStatus}
-                </p>
+                <p className="mt-2 text-sm font-semibold text-foreground">{activePeriodDateStatus}</p>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <div className="flex items-start gap-3 text-sm text-amber-950">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                    <p>Reset mengubah poin pada catatan periode aktif menjadi 0. Catatan dan periode tetap tersimpan.</p>
+                    <p>Reset mengubah poin di catatan periode aktif menjadi 0. Riwayat pemindaian dan periode tetap tersimpan.</p>
                   </div>
                   <Button variant="outline" className="gap-2 border-amber-300 bg-white" onClick={() => setResetConfirmOpen(true)} disabled={resetPoint.isPending}>
                     <RotateCcw className="size-4" />
@@ -277,10 +289,10 @@ function PeriodPage() {
                 </div>
               </>
             ) : (
-              <p className="mt-2 text-sm text-muted-foreground">
-                Belum ada periode berstatus aktif. Aktifkan periode agar pemindaian dan pengaturan
-                sesi tersedia.
-              </p>
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                <p className="font-semibold">Tidak ada periode dengan status ACTIVE di database.</p>
+                <p className="mt-1">Karena itu kartu hanya menampilkan petunjuk dan tombol reset tidak bisa dijalankan. Perlu mengaktifkan periode di database terlebih dahulu.</p>
+              </div>
             )}
           </div>
           <div className="surface-card p-5">

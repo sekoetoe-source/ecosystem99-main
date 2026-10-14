@@ -33,226 +33,73 @@ type JawaraStudent = {
   id: string;
   full_name: string | null;
   nis: string | null;
+  class_id: string | null;
   classes: { name: string | null } | null;
 };
-
-type JawaraValidation = {
+type JawaraItem = {
+  student_id: string;
   points: number | null;
-  validations: {
-    day: string;
-    students: JawaraStudent | null;
-  } | null;
+  validations: { students: JawaraStudent | null } | null;
 };
-type WeeklyData = {
-  global: Record<string, { name: string; nis: string; points: number }>;
-  byClass: Record<string, Record<string, { name: string; points: number }>>;
-};
-type JawaraWeek = { key: string; year: number; week: number };
 
-// Return a stable ISO week key including its ISO week-year.
-function getIsoWeek(date: Date): JawaraWeek {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - day);
-  const year = d.getUTCFullYear();
-  const yearStart = new Date(Date.UTC(year, 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return { key: `${year}-W${String(week).padStart(2, "0")}`, year, week };
-}
-
-export function JawaraTab({ periodId, periodName }: { periodId: string; periodName?: string }) {
-  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
-
-  // Fetch validation items for the period
-  const validationData = useQuery({
+export function JawaraTab({ periodId }: { periodId: string; periodName?: string }) {
+  const dailyData = useQuery({
     queryKey: ["jawara-data", periodId],
     queryFn: async () => {
       if (!periodId) return [];
-      const { data: period, error: periodError } = await supabase
-        .from("periods")
-        .select("start_date, end_date")
-        .eq("id", periodId)
-        .maybeSingle();
-      if (periodError) throw periodError;
-      if (!period) return [];
-
-      const { data: rows, error } = await supabase
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+      const { data, error } = await supabase
         .from("validation_items")
-        .select("points, validations!inner(student_id, period_id, day, status, students(id, full_name, nis, class_id, classes(name)))")
+        .select("student_id, points, validations!inner(period_id, day, status, students(id, full_name, nis, class_id, classes(name)))")
         .eq("validations.period_id", periodId)
         .eq("validations.status", "approved")
-        .gte("validations.day", period.start_date)
-        .lte("validations.day", period.end_date);
+        .eq("validations.day", today);
       if (error) throw error;
-      return rows ?? [];
+      return data ?? [];
     },
     enabled: !!periodId,
     refetchInterval: 30_000,
   });
 
-  const weeklyChampions = (() => {
-    if (!validationData.data || validationData.data.length === 0) {
-      return { weeks: [] as JawaraWeek[], byWeek: {} as Record<string, WeeklyData> };
-    }
-
-    const weekMap: Record<string, WeeklyData> = {};
-    (validationData.data as JawaraValidation[]).forEach((item) => {
-      const validation = item.validations;
-      if (!validation) return;
-      const { key } = getIsoWeek(new Date(`${validation.day}T00:00:00Z`));
-      const student = validation.students;
+  const rankings = (() => {
+    const global = new Map<string, { name: string; nis: string; className: string; points: number }>();
+    const byClass = new Map<string, { studentCount: number; totalPoints: number; students: Map<string, { name: string; points: number }> }>();
+    for (const item of (dailyData.data ?? []) as Array<{ student_id: string; points: number | null; validations: { students: JawaraStudent | null } | null }>) {
+      const student = item.validations?.students;
       const className = student?.classes?.name?.trim();
-      if (!student?.id || !className || className === "-" || className.toLowerCase() === "tanpa kelas") return;
-      if (!weekMap[key]) weekMap[key] = { global: {}, byClass: {} };
-      if (!weekMap[key].global[student.id]) {
-        weekMap[key].global[student.id] = { name: student.full_name || "-", nis: student.nis || "-", points: 0 };
-      }
-      weekMap[key].global[student.id].points += Number(item.points ?? 0);
-      if (!weekMap[key].byClass[className]) weekMap[key].byClass[className] = {};
-      if (!weekMap[key].byClass[className][student.id]) {
-        weekMap[key].byClass[className][student.id] = { name: student.full_name || "-", points: 0 };
-      }
-      weekMap[key].byClass[className][student.id].points += Number(item.points ?? 0);
-    });
-
-    const weeks = Object.keys(weekMap)
-      .map((key) => {
-        const [year, week] = key.split("-W").map(Number);
-        return { key, year: year!, week: week! };
-      })
-      .sort((a, b) => b.key.localeCompare(a.key));
-    return { weeks, byWeek: weekMap };
+      if (!student?.id || !className || className === "-" || className.toLowerCase() === "tanpa kelas") continue;
+      const points = Number(item.points ?? 0);
+      const current = global.get(student.id) ?? { name: student.full_name ?? "-", nis: student.nis ?? "-", className, points: 0 };
+      current.points += points;
+      global.set(student.id, current);
+      const classEntry = byClass.get(className) ?? { studentCount: 0, totalPoints: 0, students: new Map() };
+      const classStudent = classEntry.students.get(student.id) ?? { name: student.full_name ?? "-", points: 0 };
+      classStudent.points += points;
+      classEntry.students.set(student.id, classStudent);
+      classEntry.totalPoints += points;
+      byClass.set(className, classEntry);
+    }
+    return {
+      students: [...global.entries()].map(([id, row]) => ({ id, ...row })).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, "id")),
+      classes: [...byClass.entries()].map(([name, row]) => ({ name, totalPoints: row.totalPoints, studentCount: row.students.size, students: [...row.students.entries()].map(([id, student]) => ({ id, ...student })).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, "id")) })).sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name, "id")),
+    };
   })();
 
-  const weeks = weeklyChampions.weeks;
-  const byWeek = weeklyChampions.byWeek;
-  const activeWeek = selectedWeek !== null ? selectedWeek : weeks[0]?.key;
-  const currentWeekData = activeWeek ? byWeek[activeWeek] : null;
-  const globalRanking = currentWeekData
-    ? Object.entries(currentWeekData.global)
-        .map(([id, data]) => ({ id, ...data }))
-        .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, "id"))
-    : [];
-
-  if (validationData.isLoading) {
-    return <div className="surface-card p-8 text-center text-sm text-muted-foreground">Memuat data Jawara...</div>;
-  }
-  if (validationData.isError) {
-    return <div className="surface-card p-8 text-center text-sm text-destructive">Data Jawara gagal dimuat.</div>;
-  }
-  if (weeks.length === 0) {
-    return (
-      <div className="rounded-2xl border border-border bg-white p-12 text-center">
-        <Trophy className="size-16 mx-auto mb-4 text-gray-300" />
-        <h3 className="text-lg font-semibold text-foreground mb-2">Belum ada data Jawara</h3>
-        <p className="text-sm text-muted-foreground">Data akan muncul setelah ada klaim disetujui pada periode ini.</p>
-      </div>
-    );
-  }
+  if (dailyData.isLoading) return <div className="surface-card p-8 text-center text-sm text-muted-foreground">Memuat data Jawara hari ini...</div>;
+  if (dailyData.isError) return <div className="surface-card p-8 text-center text-sm text-destructive">Data Jawara gagal dimuat.</div>;
+  if (rankings.students.length === 0) return <div className="surface-card p-12 text-center"><Trophy className="mx-auto mb-4 size-12 text-muted-foreground/40" /><h3 className="font-semibold">Belum ada data Jawara hari ini</h3><p className="mt-1 text-sm text-muted-foreground">Peringkat memakai klaim yang disetujui hari ini, sesuai laporan.</p></div>;
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-        <label className="text-sm font-medium text-foreground mb-3 block">Pilih Minggu</label>
-        <Select value={activeWeek ?? ""} onValueChange={setSelectedWeek}>
-          <SelectTrigger className="w-full sm:w-64">
-            <Calendar className="size-4 mr-2" />
-            <SelectValue placeholder="Pilih minggu" />
-          </SelectTrigger>
-          <SelectContent>
-            {weeks.map((week) => (
-              <SelectItem key={week.key} value={week.key}>
-                Minggu {week.week}, {week.year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Global Jawara */}
-      <div>
-        <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-          <Star className="size-5 text-yellow-500" />
-          Jawara Global — Minggu {weeks.find((week) => week.key === activeWeek)?.week}, {weeks.find((week) => week.key === activeWeek)?.year}
-        </h3>
-        <div className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
-          {globalRanking.length > 0 ? (
-            <div className="divide-y divide-border">
-              {globalRanking.map((entry, idx) => (
-                <div
-                  key={entry.id}
-                  className={cn(
-                    "grid grid-cols-12 gap-4 px-6 py-4 items-center transition-colors",
-                    idx === 0 ? "bg-yellow-50" : "hover:bg-gray-50"
-                  )}
-                >
-                  <div className="col-span-1">
-                    {idx === 0 ? (
-                      <Trophy className="size-6 text-yellow-600" />
-                    ) : (
-                      <span className="font-bold text-lg text-muted-foreground">#{idx + 1}</span>
-                    )}
-                  </div>
-                  <div className="col-span-5">
-                    <p className="font-semibold text-foreground">{entry.name}</p>
-                    <p className="text-xs text-muted-foreground">{entry.nis}</p>
-                  </div>
-                  <div className="col-span-6 text-right">
-                    <p className={cn("text-2xl font-extrabold", idx === 0 ? "text-yellow-600" : "text-green-600")}>
-                      {entry.points.toLocaleString("id-ID")}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="px-6 py-12 text-center text-sm text-muted-foreground">Tidak ada data untuk minggu ini.</p>
-          )}
-        </div>
-      </div>
-
-      {/* Jawara per Kelas */}
-      {currentWeekData && Object.keys(currentWeekData.byClass).length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-            <Trophy className="size-5 text-blue-600" />
-            Jawara per Kelas — Minggu {weeks.find((week) => week.key === activeWeek)?.week}, {weeks.find((week) => week.key === activeWeek)?.year}
-          </h3>
-          {Object.entries(currentWeekData.byClass).map(([className, classData]) => {
-            const classRanking = Object.entries(classData as Record<string, { name: string; points: number }>)
-              .map(([id, data]) => ({ id, ...data }))
-              .sort((a, b) => b.points - a.points);
-
-            return (
-              <div key={className} className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm">
-                <div className="px-6 py-4 bg-blue-50 border-b border-border">
-                  <h4 className="font-semibold text-foreground">{className}</h4>
-                </div>
-                <div className="divide-y divide-border">
-                  {classRanking.map((entry, idx) => (
-                    <div
-                      key={entry.id}
-                      className={cn("grid grid-cols-12 gap-4 px-6 py-3 items-center transition-colors", idx === 0 ? "bg-blue-50" : "hover:bg-gray-50")}
-                    >
-                      <div className="col-span-1">
-                        <span className="font-bold text-sm text-muted-foreground">#{idx + 1}</span>
-                      </div>
-                      <div className="col-span-7">
-                        <p className="font-semibold text-foreground text-sm">{entry.name}</p>
-                      </div>
-                      <div className="col-span-4 text-right">
-                        <p className={cn("font-bold", idx === 0 ? "text-blue-600" : "text-green-600")}>
-                          {entry.points.toLocaleString("id-ID")}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <p className="text-sm text-muted-foreground">Data hari ini • diperbarui otomatis setiap 30 detik</p>
+      <section className="surface-card overflow-hidden">
+        <div className="border-b border-border px-5 py-4"><h3 className="font-bold">Jawara Individu Hari Ini</h3></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[36rem] text-sm"><thead><tr className="bg-surface-low text-left text-muted-foreground"><th className="px-4 py-3">Peringkat</th><th className="px-4 py-3">Nama</th><th className="px-4 py-3">NIS</th><th className="px-4 py-3">Kelas</th><th className="px-4 py-3 text-right">Poin</th></tr></thead><tbody className="divide-y divide-border">{rankings.students.map((row, index) => <tr key={row.id}><td className="px-4 py-3 font-bold">{index + 1}</td><td className="px-4 py-3 font-semibold">{row.name}</td><td className="px-4 py-3 text-muted-foreground">{row.nis}</td><td className="px-4 py-3 text-muted-foreground">{row.className}</td><td className="px-4 py-3 text-right font-bold">{row.points.toLocaleString("id-ID")}</td></tr>)}</tbody></table></div>
+      </section>
+      <section className="surface-card overflow-hidden">
+        <div className="border-b border-border px-5 py-4"><h3 className="font-bold">Jawara Kelas Hari Ini</h3></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[32rem] text-sm"><thead><tr className="bg-surface-low text-left text-muted-foreground"><th className="px-4 py-3">Peringkat</th><th className="px-4 py-3">Kelas</th><th className="px-4 py-3">Siswa berpartisipasi</th><th className="px-4 py-3 text-right">Total poin</th></tr></thead><tbody className="divide-y divide-border">{rankings.classes.map((row, index) => <tr key={row.name}><td className="px-4 py-3 font-bold">{index + 1}</td><td className="px-4 py-3 font-semibold">{row.name}</td><td className="px-4 py-3">{row.studentCount}</td><td className="px-4 py-3 text-right font-bold">{row.totalPoints.toLocaleString("id-ID")}</td></tr>)}</tbody></table></div>
+      </section>
     </div>
   );
 }
@@ -297,12 +144,14 @@ function AdminLeaderboardPage() {
     queryKey: ["period-student-scores", effectivePeriodId],
     queryFn: async () => {
       if (!effectivePeriodId) return [];
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
       const [{ data, error }, { data: students, error: studentsError }, { data: period, error: periodError }] = await Promise.all([
         supabase
           .from("validation_items")
-          .select("student_id, points, validations!inner(period_id, status)")
+          .select("student_id, points, validations!inner(period_id, day, status)")
           .eq("validations.period_id", effectivePeriodId)
-          .eq("validations.status", "approved"),
+          .eq("validations.status", "approved")
+          .eq("validations.day", today),
         supabase.from("students").select("id, full_name, nis, class_id, classes(name)").eq("active", true),
         supabase.from("periods").select("id, name").eq("id", effectivePeriodId).maybeSingle(),
       ]);
