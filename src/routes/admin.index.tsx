@@ -209,7 +209,7 @@ function AdminDashboard() {
             <h2 className="text-lg font-bold text-foreground">Periode Aktif</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               {activePeriod.data
-                ? `${activePeriod.data.name} · ${activePeriod.data.start_date} – ${activePeriod.data.end_date}`
+                ? `${new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", month: "long", year: "numeric" }).format(new Date())} · ${activePeriod.data.start_date} – ${activePeriod.data.end_date}`
                 : "Memuat periode aktif..."}
             </p>
             <p className="mt-2 text-xs font-medium text-blue-700">

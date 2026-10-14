@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   AlertTriangle,
   Camera,
@@ -171,7 +171,7 @@ function ScannerPage() {
       const scanDate = lateEntry ? lateScanDate : currentDate;
       const { data, error } = await supabase
         .from("periods")
-        .select("id, status, start_date, end_date")
+        .select("id, status, start_date, end_date, late_scan_start_date, late_scan_end_date")
         .lte("start_date", scanDate)
         .gte("end_date", scanDate)
         .eq("status", "ACTIVE")
@@ -182,19 +182,18 @@ function ScannerPage() {
       return data;
     },
   });
-  const lateScanConfig = useQuery({
-    queryKey: ["late-scan-date-range", currentPeriod.data?.id],
-    enabled: Boolean(lateEntry && currentPeriod.data?.id),
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("periods")
-        .select("late_scan_start_date, late_scan_end_date")
-        .eq("id", currentPeriod.data!.id)
-        .single();
-      if (error) throw error;
-      return data as { late_scan_start_date: string | null; late_scan_end_date: string | null };
-    },
-  });
+  const lateScanConfig = { data: currentPeriod.data };
+  useEffect(() => {
+    const startDate = lateScanConfig.data?.late_scan_start_date;
+    const endDate = lateScanConfig.data?.late_scan_end_date;
+    if (startDate && endDate && (lateScanDate < startDate || lateScanDate > endDate)) {
+      setLateScanDate(startDate);
+    }
+  }, [
+    lateScanConfig.data?.late_scan_start_date,
+    lateScanConfig.data?.late_scan_end_date,
+    lateScanDate,
+  ]);
   const operationalSessions = useQuery({
     queryKey: ["operational-sessions", currentPeriod.data?.id],
     enabled: Boolean(currentPeriod.data?.id),
@@ -217,12 +216,14 @@ function ScannerPage() {
       session: sessionParam,
       late: isLate,
       reason,
+      scanDate,
     }: {
       code: string;
       source: "scan" | "manual";
       session?: ScanSession;
       late: boolean;
       reason: string;
+      scanDate: string;
     }) => {
       const activeSession = sessionParam ?? session;
       const cleanCode = code.trim();
@@ -263,6 +264,7 @@ function ScannerPage() {
           p_reason: reason,
           p_source: source,
           p_station: me?.officer?.station || SCAN_SESSIONS[activeSession].defaultStation,
+          p_scan_day: scanDate,
         });
         if (error) throw error;
         const result = data as {
@@ -484,11 +486,18 @@ function ScannerPage() {
     unlockAudio();
     playScanDetectedSound();
 
-    submit.mutate({ code: codeText, source, session, late: lateEntry, reason: lateReason });
+    submit.mutate({
+      code: codeText,
+      source,
+      session,
+      late: lateEntry,
+      reason: lateReason,
+      scanDate: lateScanDate,
+    });
   };
 
   const currentSessionMeta = SCAN_SESSIONS[session];
-  const lateDeadlinePassed = getJakartaMinutes() > 17 * 60;
+  const lateDeadlinePassed = false;
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -715,10 +724,20 @@ function ScannerPage() {
             {lateEntry ? (
               <div className="space-y-2">
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Catatan masuk ke Sesi {session === "entry" ? "1" : "2"} yang dipilih. Gunakan
-                  untuk siswa yang terlewat atau barang yang belum tercatat. Batasnya pukul 17.00
-                  WIB pada hari yang sama.
+                  Catatan masuk ke Sesi {session === "entry" ? "1" : "2"} yang dipilih. Pilih
+                  tanggal dalam rentang susulan admin; jam tidak dibatasi.
                 </p>
+                <Label htmlFor="late-scan-date">Tanggal pemindaian susulan</Label>
+                <input
+                  id="late-scan-date"
+                  type="date"
+                  value={lateScanDate}
+                  min={lateScanConfig.data?.late_scan_start_date ?? undefined}
+                  max={lateScanConfig.data?.late_scan_end_date ?? undefined}
+                  onChange={(event) => setLateScanDate(event.target.value)}
+                  required
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
                 <Label htmlFor="late-entry-reason">Alasan pencatatan susulan</Label>
                 <textarea
                   id="late-entry-reason"

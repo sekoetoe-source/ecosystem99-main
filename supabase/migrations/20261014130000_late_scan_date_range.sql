@@ -1,4 +1,4 @@
-﻿ALTER TABLE public.periods ADD COLUMN IF NOT EXISTS late_scan_start_date date, ADD COLUMN IF NOT EXISTS late_scan_end_date date;
+ALTER TABLE public.periods ADD COLUMN IF NOT EXISTS late_scan_start_date date, ADD COLUMN IF NOT EXISTS late_scan_end_date date;
 ALTER TABLE public.periods ADD CONSTRAINT periods_late_scan_dates_valid CHECK ((late_scan_start_date IS NULL AND late_scan_end_date IS NULL) OR (late_scan_start_date IS NOT NULL AND late_scan_end_date IS NOT NULL AND late_scan_start_date <= late_scan_end_date AND late_scan_start_date >= start_date AND late_scan_end_date <= end_date));
 
 CREATE OR REPLACE FUNCTION public.record_late_validation(p_student_id uuid, p_session text, p_item_codes text[], p_reason text DEFAULT NULL, p_source public.validation_source DEFAULT 'manual', p_station text DEFAULT NULL, p_scan_day date DEFAULT NULL)
@@ -6,7 +6,6 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
  actor uuid := auth.uid(); actor_officer uuid := public.current_officer_id();
  requested_day date := coalesce(p_scan_day, (clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::date);
- current_day date := (clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::date;
  target_number integer; target_period public.periods%ROWTYPE; target_session public.operational_sessions%ROWTYPE;
  existing_validation public.validations%ROWTYPE; existing_codes text[] := '{}'; requested_codes text[]; missing_codes text[] := '{}';
  points_added integer := 0; points_before integer := 0; validation_id uuid; action_name text; note_text text;
@@ -14,7 +13,7 @@ DECLARE
 BEGIN
  IF actor IS NULL OR NOT (public.has_role(actor, 'admin') OR public.has_role(actor, 'officer')) THEN RAISE EXCEPTION 'Hanya petugas atau administrator yang dapat mencatat pemindaian susulan.'; END IF;
  IF public.has_role(actor, 'officer') AND actor_officer IS NULL THEN RAISE EXCEPTION 'Akun petugas tidak memiliki data pos yang aktif.'; END IF;
- IF requested_day > current_day THEN RAISE EXCEPTION 'Tanggal pemindaian susulan tidak boleh di masa depan.'; END IF;
+ IF requested_day > (clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::date THEN RAISE EXCEPTION 'Tanggal pemindaian susulan tidak boleh di masa depan.'; END IF;
  IF p_session NOT IN ('entry','break') THEN RAISE EXCEPTION 'Sesi yang dipilih tidak valid.'; END IF;
  IF length(coalesce(audit_reason,'')) > 300 THEN RAISE EXCEPTION 'Alasan pemindaian susulan maksimal 300 karakter.'; END IF;
  target_number := CASE p_session WHEN 'entry' THEN 1 ELSE 2 END;

@@ -101,105 +101,89 @@ const NAV = [
   { href: "#kopi", label: "Traktir Kopi" },
 ];
 
-const useSchoolStats = () => {
-  const activePeriod = useQuery({
-    queryKey: ["active-period"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("periods")
-        .select("id")
-        .eq("status", "ACTIVE")
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-  return useQuery({
-    queryKey: ["school-stats", activePeriod.data?.id],
-    enabled: !!activePeriod.data?.id,
-    queryFn: async () => {
-      try {
-        const periodId = activePeriod.data!.id;
-        const [
-          { count: totalStudentsCount },
-          { data: scores },
-          { data: items },
-          { count: valItemsCount },
-        ] = await Promise.all([
-          supabase.from("students").select("id", { count: "exact", head: true }),
-          supabase
-            .from("period_student_scores")
-            .select("earned_points, total_items, class_name")
-            .eq("period_id", periodId),
-          supabase.from("eco_items").select("code, co2_grams"),
-          supabase
-            .from("validation_items")
-            .select("id", { count: "exact", head: true })
-            .eq("period_id", periodId),
-        ]);
-        const validScores = (scores ?? []).filter((s) => {
-          const c = (s.class_name ?? "").trim();
-          return Boolean(
-            c && c !== "-" && c.toLowerCase() !== "tanpa kelas" && Number(s.earned_points ?? 0) > 0,
-          );
-        });
-        const realValItems = valItemsCount ?? 0;
-        const totalPoints = validScores.reduce((a, s) => a + Number(s.earned_points ?? 0), 0);
-        if (validScores.length === 0 || totalPoints === 0)
-          return {
-            totalPoints: 0,
-            totalItems: 0,
-            studentCount: totalStudentsCount ?? 0,
-            co2Kg: 0,
-            classes: [],
-          };
-        const calcTotalItems =
-          realValItems > 0
-            ? realValItems
-            : validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
-        const avgCo2 =
-          (items ?? []).length > 0
-            ? (items ?? []).reduce((a, i) => a + i.co2_grams, 0) / Math.max(1, (items ?? []).length)
-            : 68;
-        const classMap = new Map<
-          string,
-          { class_name: string; total_points: number; student_count: number }
-        >();
-        validScores.forEach((s) => {
-          const name = (s.class_name ?? "").trim();
-          const current = classMap.get(name) || {
-            class_name: name,
-            total_points: 0,
-            student_count: 0,
-          };
-          classMap.set(name, {
-            class_name: name,
-            total_points: current.total_points + Number(s.earned_points ?? 0),
-            student_count: current.student_count + 1,
-          });
-        });
-        const computedClasses = Array.from(classMap.values())
-          .map((c) => ({
-            class_name: c.class_name,
-            student_count: c.student_count,
-            total_points: c.total_points,
-            avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
-          }))
-          .sort((a, b) => b.total_points - a.total_points);
-        return {
-          totalPoints,
-          totalItems: calcTotalItems,
-          studentCount: totalStudentsCount ?? 0,
-          co2Kg: Math.round((calcTotalItems * avgCo2) / 1000),
-          classes: computedClasses.slice(0, 5),
-        };
-      } catch (err) {
-        console.error("Error fetching school stats:", err);
-        return { totalPoints: 0, totalItems: 0, studentCount: 0, co2Kg: 0, classes: [] };
-      }
-    },
-  });
+const monthKeyForJakarta = (date: Date) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(date);
+  return `${parts.find((part) => part.type === "year")?.value}-${parts.find((part) => part.type === "month")?.value}`;
 };
+
+const useSchoolStats = () =>
+  useQuery({
+    queryKey: ["school-stats", monthKeyForJakarta(new Date())],
+    queryFn: async () => {
+      const month = monthKeyForJakarta(new Date());
+      const [year, monthNumber] = month.split("-").map(Number);
+      const start = `${month}-01`;
+      const end = new Date(Date.UTC(year!, monthNumber!, 1)).toISOString().slice(0, 10);
+      const [{ data: students }, { data: items }] = await Promise.all([
+        supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
+        supabase
+          .from("validation_items")
+          .select("item_code, points, student_id, validations!inner(status)")
+          .gte("day", start)
+          .lt("day", end),
+      ]);
+      const validStudents = (students ?? []).filter((student) => {
+        const className = (student.classes as { name: string } | null)?.name?.trim();
+        return Boolean(
+          student.class_id &&
+          className &&
+          className !== "-" &&
+          className.toLowerCase() !== "tanpa kelas",
+        );
+      });
+      const validStudentIds = new Set(validStudents.map((student) => student.id));
+      const approved = (items ?? []).filter(
+        (item) =>
+          (item.validations as { status: string } | null)?.status === "approved" &&
+          validStudentIds.has(item.student_id),
+      );
+      const totalPoints = approved.reduce((sum, item) => sum + Number(item.points ?? 0), 0);
+      const classes = new Map<
+        string,
+        { class_name: string; total_points: number; student_count: number }
+      >();
+      const studentClass = new Map(
+        validStudents.map((student) => [
+          student.id,
+          (student.classes as { name: string }).name.trim(),
+        ]),
+      );
+      for (const student of validStudents) {
+        const className = studentClass.get(student.id)!;
+        const current = classes.get(className) ?? {
+          class_name: className,
+          total_points: 0,
+          student_count: 0,
+        };
+        current.student_count += 1;
+        classes.set(className, current);
+      }
+      for (const item of approved) {
+        const className = studentClass.get(item.student_id);
+        if (!className) continue;
+        const current = classes.get(className)!;
+        current.total_points += Number(item.points ?? 0);
+      }
+      const computedClasses = [...classes.values()]
+        .map((row) => ({
+          ...row,
+          avg_points: row.student_count ? Math.round(row.total_points / row.student_count) : 0,
+        }))
+        .sort((a, b) => b.total_points - a.total_points);
+      return {
+        totalPoints,
+        totalItems: approved.length,
+        studentCount: validStudents.length,
+        co2Kg: Math.round((approved.length * 70) / 1000),
+        classes: computedClasses.slice(0, 5),
+      };
+    },
+    refetchInterval: 60_000,
+  });
 
 function SectionHead({
   kicker,
@@ -876,15 +860,22 @@ function Index() {
   ];
 
   const stats = [
-    { label: "Siswa terdaftar", value: `${data?.studentCount ?? 0}`, icon: Users },
-    { label: "Sampah plastik dicegah", value: `${data?.totalItems ?? 0}x`, icon: Droplets },
-    { label: "Estimasi CO₂ dihemat", value: `${data?.co2Kg ?? 0} kg`, icon: Leaf },
     {
-      label: "Total Eco-Points",
-      value: `${(data?.totalPoints ?? 0).toLocaleString("id-ID")}`,
+      label: "Siswa aktif terdaftar",
+      value: `${data.studentCount.toLocaleString("id-ID")}`,
+      icon: Users,
+    },
+    {
+      label: "Aktivitas lingkungan tervalidasi",
+      value: `${data.totalItems.toLocaleString("id-ID")}`,
+      icon: Droplets,
+    },
+    { label: "Perkiraan Pengurangan Emisi Karbon Dioksida", value: `${data.co2Kg} kg`, icon: Leaf },
+    {
+      label: "Total Poin Lingkungan",
+      value: `${data.totalPoints.toLocaleString("id-ID")}`,
       icon: Trophy,
     },
-    { label: "Kelas aktif", value: `${data?.classes.length ?? 0}`, icon: ShieldCheck },
   ];
 
   const champion = data?.classes?.[0];

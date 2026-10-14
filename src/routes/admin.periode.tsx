@@ -33,6 +33,8 @@ type Period = {
   status: "DRAFT" | "ACTIVE" | "CLOSED";
   start_date: string;
   end_date: string;
+  late_scan_start_date?: string | null;
+  late_scan_end_date?: string | null;
 };
 
 type RuntimeStatus = "Belum dimulai" | "Sedang berlangsung" | "Selesai";
@@ -82,15 +84,17 @@ function PeriodPage() {
   const [endTime, setEndTime] = useState("");
   const [lateStartDate, setLateStartDate] = useState("");
   const [lateEndDate, setLateEndDate] = useState("");
-  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
-    new Date(),
-  );
+  const currentMonthName = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
   const periods = useQuery({
     queryKey: ["period-history"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("periods")
-        .select("id, name, status, start_date, end_date")
+        .select("id, name, status, start_date, end_date, late_scan_start_date, late_scan_end_date")
         .order("start_date", { ascending: false })
         .limit(8);
       if (error) throw error;
@@ -117,39 +121,33 @@ function PeriodPage() {
     },
   });
   const active = periods.data?.find((period) => period.status === "ACTIVE");
-  const lateDateRange = useQuery({
-    queryKey: ["late-scan-date-range", active?.id],
-    enabled: Boolean(active?.id),
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("periods")
-        .select("late_scan_start_date, late_scan_end_date")
-        .eq("id", active!.id)
-        .single();
-      if (error) throw error;
-      setLateStartDate(data.late_scan_start_date ?? "");
-      setLateEndDate(data.late_scan_end_date ?? "");
-      return data as { late_scan_start_date: string | null; late_scan_end_date: string | null };
-    },
-  });
+  useEffect(() => {
+    setLateStartDate(active?.late_scan_start_date ?? "");
+    setLateEndDate(active?.late_scan_end_date ?? "");
+  }, [active?.id, active?.late_scan_start_date, active?.late_scan_end_date]);
   const saveLateDateRange = useMutation({
     mutationFn: async () => {
       if (!active) throw new Error("Tidak ada periode aktif.");
       if ((lateStartDate && !lateEndDate) || (!lateStartDate && lateEndDate))
-        throw new Error("Isi tanggal mulai dan tanggal akhir, atau kosongkan keduanya untuk menonaktifkan.");
+        throw new Error(
+          "Isi tanggal mulai dan tanggal akhir, atau kosongkan keduanya untuk menonaktifkan.",
+        );
       if (lateStartDate && lateEndDate && lateStartDate > lateEndDate)
         throw new Error("Tanggal mulai harus sebelum atau sama dengan tanggal akhir.");
       if (lateStartDate && (lateStartDate < active.start_date || lateEndDate > active.end_date))
         throw new Error("Rentang tanggal harus berada di dalam periode aktif.");
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("periods")
-        .update({ late_scan_start_date: lateStartDate || null, late_scan_end_date: lateEndDate || null })
+        .update({
+          late_scan_start_date: lateStartDate || null,
+          late_scan_end_date: lateEndDate || null,
+        })
         .eq("id", active.id)
         .eq("status", "ACTIVE");
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["late-scan-date-range"] });
+      queryClient.invalidateQueries({ queryKey: ["period-history"] });
       toast.success("Rentang tanggal susulan disimpan");
     },
     onError: (error: Error) => toast.error(error.message),
@@ -198,9 +196,8 @@ function PeriodPage() {
     },
     onError: (error: Error) => toast.error(error.message),
   });
-  const active = periods.data?.find((period) => period.status === "ACTIVE");
-  const activePeriodContainsToday = Boolean(
-    active && active.start_date <= currentDate && active.end_date >= currentDate,
+  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
+    new Date(),
   );
   const activePeriodDateStatus = active
     ? currentDate < active.start_date
@@ -218,7 +215,7 @@ function PeriodPage() {
 
   return (
     <AdminShell>
-      <div className="mx-auto w-full max-w-5xl min-w-0 space-y-5">
+      <div className="mx-auto w-full max-w-4xl min-w-0 space-y-5">
         <header className="min-w-0">
           <div>
             <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">
@@ -242,7 +239,7 @@ function PeriodPage() {
             </div>
             {active ? (
               <>
-                <h2 className="mt-2 text-2xl font-bold">{active.name}</h2>
+                <h2 className="mt-2 text-2xl font-bold">{currentMonthName}</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {formatDate(active.start_date)} – {formatDate(active.end_date)}
                 </p>
@@ -266,16 +263,70 @@ function PeriodPage() {
           </div>
           <div className="surface-card p-5">
             <h2 className="font-bold">Tanggal Pemindaian Susulan</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Admin menetapkan rentang tanggal. Petugas memilih tanggal dalam rentang dan sesi saat mencatat susulan. Tidak ada batas jam.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Admin menetapkan rentang tanggal. Petugas memilih tanggal dalam rentang dan sesi saat
+              mencatat susulan. Tidak ada batas jam.
+            </p>
             {active ? (
-              <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); saveLateDateRange.mutate(); }}>
+              <form
+                className="mt-4 space-y-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  saveLateDateRange.mutate();
+                }}
+              >
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div><Label htmlFor="late-scan-start-date">Tanggal mulai</Label><input id="late-scan-start-date" type="date" value={lateStartDate} min={active.start_date} max={active.end_date} onChange={(event) => setLateStartDate(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2" /></div>
-                  <div><Label htmlFor="late-scan-end-date">Tanggal akhir</Label><input id="late-scan-end-date" type="date" value={lateEndDate} min={lateStartDate || active.start_date} max={active.end_date} onChange={(event) => setLateEndDate(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2" /></div>
+                  <div>
+                    <Label htmlFor="late-scan-start-date">Tanggal mulai</Label>
+                    <input
+                      id="late-scan-start-date"
+                      type="date"
+                      value={lateStartDate}
+                      min={active.start_date}
+                      max={active.end_date}
+                      onChange={(event) => setLateStartDate(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="late-scan-end-date">Tanggal akhir</Label>
+                    <input
+                      id="late-scan-end-date"
+                      type="date"
+                      value={lateEndDate}
+                      min={lateStartDate || active.start_date}
+                      max={active.end_date}
+                      onChange={(event) => setLateEndDate(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="late-scan-end-date">Tanggal akhir</Label>
+                    <input
+                      id="late-scan-end-date"
+                      type="date"
+                      value={lateEndDate}
+                      min={lateStartDate || active.start_date}
+                      max={active.end_date}
+                      onChange={(event) => setLateEndDate(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
+                    />
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-muted-foreground">Kosongkan kedua tanggal untuk menonaktifkan pemindaian susulan.</p><Button type="submit" disabled={saveLateDateRange.isPending || lateDateRange.isLoading}>Simpan Rentang Tanggal</Button></div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    Kosongkan kedua tanggal untuk menonaktifkan pemindaian susulan.
+                  </p>
+                  <Button type="submit" disabled={saveLateDateRange.isPending}>
+                    Simpan Rentang Tanggal
+                  </Button>
+                </div>
               </form>
-            ) : <p className="mt-3 text-sm text-muted-foreground">Pengaturan tersedia setelah periode diaktifkan.</p>}
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Pengaturan tersedia setelah periode diaktifkan.
+              </p>
+            )}
           </div>
           <div className="surface-card p-5">
             <h2 className="font-bold">Alur periode dan pemindaian</h2>
@@ -290,8 +341,8 @@ function PeriodPage() {
               </li>
               <li className="rounded-xl bg-surface-low p-4">
                 <strong className="text-foreground">3. Pemindaian susulan.</strong> Petugas dapat
-                mencatat sesi yang terlewat pada hari yang sama setelah sesi berakhir, paling lambat
-                pukul 17.00 WIB. Catatan tetap masuk ke sesi asal.
+                mencatat sesi yang terlewat pada tanggal yang ditetapkan admin, tanpa batas jam.
+                Catatan tetap masuk ke sesi dan tanggal asal.
               </li>
               <li className="rounded-xl bg-surface-low p-4">
                 <strong className="text-foreground">4. Periode ditutup.</strong> Periode yang sudah
@@ -310,11 +361,7 @@ function PeriodPage() {
             </div>
             <div className="grid gap-4 p-5 md:grid-cols-2">
               {visibleSessions.map((session) => {
-                const status = !session.enabled
-                  ? "Tidak digunakan"
-                  : activePeriodContainsToday
-                    ? runtimeStatus(session)
-                    : activePeriodDateStatus;
+                const status = !session.enabled ? "Tidak digunakan" : runtimeStatus(session);
                 const Icon = session.session_number === 1 ? School : UtensilsCrossed;
                 return (
                   <div
