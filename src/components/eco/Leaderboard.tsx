@@ -11,86 +11,118 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
   const [tab, setTab] = useState<Tab>("siswa");
   const [q, setQ] = useState("");
 
+  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+  const monthStart = `${currentDate.slice(0, 7)}-01`;
+  const reportRange = (() => {
+    const [year, month] = currentDate.slice(0, 7).split("-").map(Number);
+    return {
+      start: monthStart,
+      end: new Date(Date.UTC(year!, month!, 1)).toISOString().slice(0, 10),
+    };
+  })();
+
   const activePeriod = useQuery({
     queryKey: ["active-period"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("periods")
-        .select("id")
-        .eq("status", "ACTIVE")
-        .maybeSingle();
+        .select("id, name, status, start_date, end_date")
+        .order("start_date", { ascending: false });
       if (error) throw error;
-      return data;
+      const list = data ?? [];
+      const found = list.find((p) => p.start_date === monthStart)
+        ?? list.find((p) => p.start_date <= currentDate && p.end_date >= currentDate)
+        ?? list.find((p) => p.status === "ACTIVE");
+      return found ?? null;
     },
     refetchInterval: 30_000,
   });
 
   const activePeriodId = activePeriod.data?.id;
 
-  const students = useQuery({
-    queryKey: ["leaderboard", "siswa", activePeriodId],
+  const rawData = useQuery({
+    queryKey: ["leaderboard-real-data", activePeriodId, monthStart],
     queryFn: async () => {
-      if (!activePeriodId) return [];
-      const { data, error } = await supabase
-        .from("period_student_scores")
-        .select("student_id, full_name, nis, class_name, earned_points")
-        .eq("period_id", activePeriodId)
-        .order("earned_points", { ascending: false })
-        .order("full_name", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!activePeriodId,
-    refetchInterval: 30_000,
-  });
+      let query = supabase
+        .from("validation_items")
+        .select("student_id, points, item_code, day, validations!inner(period_id, status)")
+        .eq("validations.status", "approved")
+        .gte("day", reportRange.start)
+        .lt("day", reportRange.end);
 
-  const classes = useQuery({
-    queryKey: ["leaderboard", "kelas", activePeriodId],
-    queryFn: async () => {
-      if (!activePeriodId) return [];
-      const { data, error } = await supabase
-        .from("period_class_scores")
-        .select("class_id, class_name, student_count, total_points, avg_points")
-        .eq("period_id", activePeriodId)
-        .order("total_points", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).filter((c) => {
-        const name = (c.class_name ?? "").trim();
-        return Boolean(name && name !== "-" && name.toLowerCase() !== "tanpa kelas");
+      if (activePeriodId) {
+        query = query.eq("validations.period_id", activePeriodId);
+      }
+
+      const [{ data: items, error: itemsError }, { data: students, error: studentsError }] = await Promise.all([
+        query,
+        supabase.from("students").select("id, full_name, nis, class_id, classes(name)").eq("active", true),
+      ]);
+
+      if (itemsError) throw itemsError;
+      if (studentsError) throw studentsError;
+
+      const validStudents = (students ?? []).filter((s) => {
+        const className = (s.classes as { name: string } | null)?.name?.trim();
+        return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas");
       });
+
+      const validStudentMap = new Map(validStudents.map((s) => [s.id, s]));
+      const pointTotals = new Map<string, number>();
+
+      for (const item of items ?? []) {
+        if (!validStudentMap.has(item.student_id)) continue;
+        pointTotals.set(item.student_id, (pointTotals.get(item.student_id) ?? 0) + Number(item.points ?? 0));
+      }
+
+      // Student rows
+      const studentRows = validStudents
+        .map((s) => ({
+          student_id: s.id,
+          full_name: s.full_name,
+          nis: s.nis,
+          class_name: ((s.classes as { name: string }).name ?? "").trim(),
+          earned_points: pointTotals.get(s.id) ?? 0,
+        }))
+        .sort((a, b) => b.earned_points - a.earned_points || (a.full_name ?? "").localeCompare(b.full_name ?? "", "id"));
+
+      // Class rows aggregated from students
+      const classMap = new Map<string, { class_id: string; class_name: string; total_points: number; student_count: number }>();
+      for (const s of studentRows) {
+        const cName = s.class_name;
+        if (!cName) continue;
+        const existing = classMap.get(cName) ?? {
+          class_id: `class-${cName}`,
+          class_name: cName,
+          total_points: 0,
+          student_count: 0,
+        };
+        existing.student_count += 1;
+        existing.total_points += s.earned_points;
+        classMap.set(cName, existing);
+      }
+
+      const classRows = Array.from(classMap.values())
+        .map((c) => ({
+          class_id: c.class_id,
+          class_name: c.class_name,
+          student_count: c.student_count,
+          total_points: c.total_points,
+          avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
+        }))
+        .sort((a, b) => b.total_points - a.total_points || b.avg_points - a.avg_points || a.class_name.localeCompare(b.class_name, "id"));
+
+      return { studentRows, classRows };
     },
-    enabled: !!activePeriodId,
     refetchInterval: 30_000,
   });
 
-  // Aggregate real student scores by class for accurate class leaderboard
-  const classAggregatesMap = new Map<string, { class_name: string; total_points: number; student_count: number }>();
-  (students.data ?? []).forEach((s) => {
-    const cName = (s.class_name ?? "").trim();
-    if (!cName || cName === "-" || cName.toLowerCase() === "tanpa kelas") return;
-    const existing = classAggregatesMap.get(cName) || { class_name: cName, total_points: 0, student_count: 0 };
-    classAggregatesMap.set(cName, {
-      class_name: cName,
-      total_points: existing.total_points + Number(s.earned_points ?? 0),
-      student_count: existing.student_count + 1,
-    });
-  });
-
-  const realClassesFromStudents = Array.from(classAggregatesMap.values())
-    .map((c) => ({
-      class_id: `class-${c.class_name}`,
-      class_name: c.class_name,
-      student_count: c.student_count,
-      total_points: c.total_points,
-      avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
-    }))
-    .sort((a, b) => b.total_points - a.total_points || b.avg_points - a.avg_points);
-
-  const rawClasses = realClassesFromStudents.length > 0 ? realClassesFromStudents : (classes.data ?? []);
+  const studentsData = rawData.data?.studentRows ?? [];
+  const rawClasses = rawData.data?.classRows ?? [];
 
   const rows =
     tab === "siswa"
-      ? (students.data ?? [])
+      ? studentsData
           .filter((s) => (s.full_name ?? "").toLowerCase().includes(q.toLowerCase()))
           .map((s, i) => ({
             id: (s.student_id || `std-${i}`) as string,

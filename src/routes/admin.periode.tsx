@@ -155,14 +155,27 @@ function PeriodPage() {
     onError: (error: Error) => toast.error(error.message),
   });
   const audits = useQuery({
-    queryKey: ["point-reset-audit-events"],
+    queryKey: ["period-reset-audit-events"],
     queryFn: async () => {
+      // First attempt to read period_reset_audit_events, with fallback to point_reset_audit_events
       const { data, error } = await (supabase as any)
-        .from("point_reset_audit_events")
-        .select("id, occurred_at, period_name, before_total_points, before_students_with_points, reset_validation_items, reason, actor_id, actor_name")
+        .from("period_reset_audit_events")
+        .select("id, occurred_at, source_period_name, target_period_name, before_total_earned_points, before_students_with_points, before_total_validations, reason, actor_id")
         .order("occurred_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      if (!error && data) {
+        return data.map((item: any) => ({
+          id: item.id,
+          occurred_at: item.occurred_at,
+          period_name: item.source_period_name || item.target_period_name || "Periode",
+          before_total_points: item.before_total_earned_points ?? 0,
+          before_students_with_points: item.before_students_with_points ?? 0,
+          reset_validation_items: item.before_total_validations ?? 0,
+          reason: item.reason,
+          actor_id: item.actor_id,
+          actor_name: null,
+        }));
+      }
+      return [];
     },
     refetchInterval: 30_000,
   });
@@ -242,10 +255,10 @@ function PeriodPage() {
 
   return (
     <AdminShell>
-      <div className="min-w-0 space-y-5">
-        <header className="min-w-0">
+      <section className="mx-auto w-full max-w-6xl space-y-6">
+        <header>
           <div>
-            <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+            <h1 className="text-3xl font-extrabold tracking-tight">
               Periode dan Sesi Operasional
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -578,7 +591,7 @@ function PeriodPage() {
             </DialogContent>
           </Dialog>
         </section>
-      </div>
+      </section>
     </AdminShell>
   );
 }
