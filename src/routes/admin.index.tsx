@@ -47,6 +47,7 @@ function AdminDashboard() {
       if (error) throw error;
       return data;
     },
+    refetchInterval: 30_000,
   });
 
   const resetPoint = useMutation({
@@ -123,6 +124,7 @@ function AdminDashboard() {
         co2Kg: Math.round((totalItems * 70) / 1000),
       };
     },
+    refetchInterval: 30_000,
   });
 
   const queue = useQuery({
@@ -139,6 +141,7 @@ function AdminDashboard() {
       if (error) throw error;
       return data ?? [];
     },
+    refetchInterval: 30_000,
   });
 
   const review = useMutation({
@@ -161,7 +164,7 @@ function AdminDashboard() {
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Dasbor Admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pantau operasional ekosistem dan validasi klaim point
+          Pantau partisipasi dan poin hari ini, kelola persetujuan, serta tinjau aktivitas lingkungan sekolah.
         </p>
       </div>
 
@@ -172,34 +175,41 @@ function AdminDashboard() {
             value: `${participation}%`,
             icon: TrendingUp,
             color: "text-blue-600",
+            to: "/admin/laporan#partisipasi-hari-ini",
           },
           {
             label: "Siswa terdaftar",
             value: kpi.data?.studentCount ?? 0,
             icon: Users,
             color: "text-emerald-600",
+            to: "/admin/pengguna?tab=siswa#user-tab-panel-siswa",
           },
           {
             label: "Poin hari ini",
             value: (kpi.data?.pointsToday ?? 0).toLocaleString("id-ID"),
             icon: Leaf,
             color: "text-green-600",
+            to: "/admin/leaderboard#poin-periode",
           },
           {
             label: "Akun menunggu",
             value: kpi.data?.pendingCount ?? 0,
             icon: AlertCircle,
             color: "text-orange-600",
+            to: "/admin/pengguna?tab=persetujuan#user-tab-panel-persetujuan",
           },
         ].map((k) => (
-          <div
+          <Link
             key={k.label}
-            className="rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
+            to={k.to}
+            id={`dashboard-card-${k.label.toLowerCase().replaceAll(" ", "-")}`}
+            className="group rounded-2xl border border-border bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={`${k.label}: ${k.value}. Buka halaman terkait.`}
           >
-            <k.icon className={`size-6 ${k.color}`} />
+            <k.icon className={`size-6 ${k.color} transition-transform group-hover:scale-110`} />
             <p className="mt-4 text-3xl font-extrabold text-foreground">{k.value}</p>
             <p className="mt-1 text-sm font-medium text-muted-foreground">{k.label}</p>
-          </div>
+          </Link>
         ))}
       </div>
 

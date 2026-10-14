@@ -428,7 +428,7 @@ function LaporanPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div id="partisipasi-hari-ini" className="space-y-5 scroll-mt-5">
       <header className="no-print grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
         <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">
           Laporan Resmi

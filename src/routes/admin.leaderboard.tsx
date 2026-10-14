@@ -378,7 +378,7 @@ function AdminLeaderboardPage() {
   const currentPeriod = periods.data?.find((p) => p.id === effectivePeriodId) || activePeriod.data;
 
   return (
-    <div className="space-y-8">
+      <div id="poin-periode" className="space-y-8">
       {/* Header */}
       <div>
         <div className="flex items-start justify-between gap-4">
