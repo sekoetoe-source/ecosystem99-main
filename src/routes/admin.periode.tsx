@@ -103,7 +103,11 @@ function PeriodPage() {
     },
     refetchInterval: 30_000,
   });
-  const active = periods.data?.find((period) => period.status === "ACTIVE");
+  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+  const monthStart = `${currentDate.slice(0, 7)}-01`;
+  const active = periods.data?.find((period) => period.start_date === monthStart)
+    ?? periods.data?.find((period) => period.start_date <= currentDate && period.end_date >= currentDate)
+    ?? periods.data?.find((period) => period.status === "ACTIVE");
   const sessions = useQuery({
     queryKey: ["operational-sessions", active?.id],
     enabled: Boolean(active?.id),
@@ -182,7 +186,7 @@ function PeriodPage() {
         queryClient.invalidateQueries({ queryKey: ["point-reset-audit-events"] }),
       ]);
       if (data && typeof data === "object" && !Array.isArray(data) && typeof data["period_name"] === "string") {
-        toast.success(`Poin uji coba periode ${data["period_name"]} berhasil direset.`);
+        toast.success(`Perolehan poin periode ${data["period_name"]} berhasil direset. Periode dan tanggalnya tidak berubah.`);
       }
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Gagal mereset poin."),
@@ -222,16 +226,13 @@ function PeriodPage() {
     },
     onError: (error: Error) => toast.error(error.message),
   });
-  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
-    new Date(),
-  );
   const activePeriodDateStatus = active
     ? currentDate < active.start_date
       ? "Periode belum dimulai"
       : currentDate > active.end_date
         ? "Periode sudah berakhir"
-        : "Periode Aktif"
-    : "Tidak ada Periode Aktif";
+        : "Bulan berjalan"
+    : "Periode bulan berjalan belum tersedia";
   const visibleSessions = useMemo(() => sessions.data ?? [], [sessions.data]);
   const openEditor = (session: Session) => {
     setEditing(session);
@@ -264,12 +265,12 @@ function PeriodPage() {
               <p className="label-xs text-muted-foreground">Periode berjalan</p>
               {active ? (
                 <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-700">
-                  Periode Aktif
+                  Periode Bulan Berjalan
                 </span>
               ) : null}
             </div>
             {periods.isLoading ? (
-              <p className="mt-3 text-sm text-muted-foreground">Memuat periode aktif...</p>
+              <p className="mt-3 text-sm text-muted-foreground">Memuat periode bulan berjalan...</p>
             ) : active ? (
               <>
                 <h2 className="mt-2 text-2xl font-bold">{active.name}</h2>
@@ -280,7 +281,7 @@ function PeriodPage() {
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <div className="flex items-start gap-3 text-sm text-amber-950">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                    <p>Reset mengubah poin di catatan periode aktif menjadi 0. Riwayat pemindaian dan periode tetap tersimpan.</p>
+                    <p>Reset hanya mengubah perolehan poin periode ini menjadi 0. Status periode, tanggal mulai/akhir, dan riwayat pemindaian tidak berubah.</p>
                   </div>
                   <Button variant="outline" className="gap-2 border-amber-300 bg-white" onClick={() => setResetConfirmOpen(true)} disabled={resetPoint.isPending}>
                     <RotateCcw className="size-4" />
@@ -290,8 +291,8 @@ function PeriodPage() {
               </>
             ) : (
               <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                <p className="font-semibold">Tidak ada periode dengan status ACTIVE di database.</p>
-                <p className="mt-1">Karena itu kartu hanya menampilkan petunjuk dan tombol reset tidak bisa dijalankan. Perlu mengaktifkan periode di database terlebih dahulu.</p>
+                <p className="font-semibold">Periode bulan berjalan tidak ditemukan.</p>
+                <p className="mt-1">Tombol reset tidak tersedia sampai periode bulan kalender ini dibuat. Reset hanya akan mengubah perolehan poin, tanpa mengubah tanggal maupun status periode.</p>
               </div>
             )}
           </div>

@@ -39,90 +39,89 @@ type JawaraStudent = {
 type JawaraItem = {
   student_id: string;
   points: number | null;
+  item_code: string;
   validations: { students: JawaraStudent | null } | null;
+};
+type JawaraClassRow = {
+  name: string;
+  points: number;
+  students: number;
+  tumbler: number;
+  lunchbox: number;
 };
 
 export function JawaraTab({ periodId }: { periodId: string; periodName?: string }) {
+  const reportMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit" }).format(new Date());
+  const reportRange = (() => {
+    const [year, month] = reportMonth.split("-").map(Number);
+    return { start: `${reportMonth}-01`, end: new Date(Date.UTC(year!, month!, 1)).toISOString().slice(0, 10) };
+  })();
   const dailyData = useQuery({
-    queryKey: ["jawara-data", periodId],
+    queryKey: ["jawara-data", periodId, reportMonth],
     queryFn: async () => {
-      if (!periodId) return [];
-      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
-      const { data, error } = await supabase
-        .from("validation_items")
-        .select("student_id, points, validations!inner(period_id, day, status, students(id, full_name, nis, class_id, classes(name)))")
-        .eq("validations.period_id", periodId)
-        .eq("validations.status", "approved")
-        .eq("validations.day", today);
+      const [{ data: period, error: periodError }, { data: students, error: studentsError }] = await Promise.all([
+        supabase.from("periods").select("id, start_date, end_date").eq("id", periodId).maybeSingle(),
+        supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
+      ]);
+      if (periodError) throw periodError;
+      if (studentsError) throw studentsError;
+      if (!period) return { items: [] as JawaraItem[], students: [] as JawaraStudent[] };
+      const { data, error } = await supabase.from("validation_items").select("student_id, points, item_code, day, validations!inner(period_id, status)").eq("validations.period_id", periodId).eq("validations.status", "approved").gte("day", reportRange.start).lt("day", reportRange.end).gte("day", period.start_date).lte("day", period.end_date);
       if (error) throw error;
-      return data ?? [];
+      return { items: (data ?? []) as unknown as JawaraItem[], students: (students ?? []) as unknown as JawaraStudent[] };
     },
     enabled: !!periodId,
     refetchInterval: 30_000,
   });
 
-  const rankings = (() => {
-    const global = new Map<string, { name: string; nis: string; className: string; points: number }>();
-    const byClass = new Map<string, { studentCount: number; totalPoints: number; students: Map<string, { name: string; points: number }> }>();
-    for (const item of (dailyData.data ?? []) as Array<{ student_id: string; points: number | null; validations: { students: JawaraStudent | null } | null }>) {
-      const student = item.validations?.students;
-      const className = student?.classes?.name?.trim();
-      if (!student?.id || !className || className === "-" || className.toLowerCase() === "tanpa kelas") continue;
-      const points = Number(item.points ?? 0);
-      const current = global.get(student.id) ?? { name: student.full_name ?? "-", nis: student.nis ?? "-", className, points: 0 };
-      current.points += points;
-      global.set(student.id, current);
-      const classEntry = byClass.get(className) ?? { studentCount: 0, totalPoints: 0, students: new Map() };
-      const classStudent = classEntry.students.get(student.id) ?? { name: student.full_name ?? "-", points: 0 };
-      classStudent.points += points;
-      classEntry.students.set(student.id, classStudent);
-      classEntry.totalPoints += points;
-      byClass.set(className, classEntry);
+  const classRows = (() => {
+    const classes = new Map<string, JawaraClassRow>();
+    const classTumbler = new Map<string, Set<string>>();
+    const classLunchbox = new Map<string, Set<string>>();
+    const classOf = new Map<string, string>();
+    for (const student of dailyData.data?.students ?? []) {
+      const className = student.classes?.name?.trim();
+      if (!student.class_id || !className || className === "-" || className.toLowerCase() === "tanpa kelas") continue;
+      classOf.set(student.id, className);
+      if (!classes.has(className)) classes.set(className, { name: className, points: 0, students: 0, tumbler: 0, lunchbox: 0 });
+      classes.get(className)!.students += 1;
     }
-    return {
-      students: [...global.entries()].map(([id, row]) => ({ id, ...row })).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, "id")),
-      classes: [...byClass.entries()].map(([name, row]) => ({ name, totalPoints: row.totalPoints, studentCount: row.students.size, students: [...row.students.entries()].map(([id, student]) => ({ id, ...student })).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, "id")) })).sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name, "id")),
-    };
+    for (const item of dailyData.data?.items ?? []) {
+      const className = classOf.get(item.student_id);
+      if (!className) continue;
+      const row = classes.get(className)!;
+      row.points += Number(item.points ?? 0);
+      if (item.item_code === "tumbler" || item.item_code === "break_combo") {
+        if (!classTumbler.has(className)) classTumbler.set(className, new Set());
+        classTumbler.get(className)!.add(item.student_id);
+      }
+      if (item.item_code === "lunchbox" || item.item_code === "break_combo") {
+        if (!classLunchbox.has(className)) classLunchbox.set(className, new Set());
+        classLunchbox.get(className)!.add(item.student_id);
+      }
+    }
+    return [...classes.values()].map((row) => ({
+      ...row,
+      tumbler: Math.round(((classTumbler.get(row.name)?.size ?? 0) / Math.max(1, row.students)) * 100),
+      lunchbox: Math.round(((classLunchbox.get(row.name)?.size ?? 0) / Math.max(1, row.students)) * 100),
+    })).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, "id"));
   })();
 
-  if (dailyData.isLoading) return <div className="surface-card p-8 text-center text-sm text-muted-foreground">Memuat data Jawara hari ini...</div>;
+  if (dailyData.isLoading) return <div className="surface-card p-8 text-center text-sm text-muted-foreground">Memuat data Jawara...</div>;
   if (dailyData.isError) return <div className="surface-card p-8 text-center text-sm text-destructive">Data Jawara gagal dimuat.</div>;
-  if (rankings.students.length === 0) return <div className="surface-card p-12 text-center"><Trophy className="mx-auto mb-4 size-12 text-muted-foreground/40" /><h3 className="font-semibold">Belum ada data Jawara hari ini</h3><p className="mt-1 text-sm text-muted-foreground">Peringkat memakai klaim yang disetujui hari ini, sesuai laporan.</p></div>;
-
   return (
-    <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">Data hari ini • diperbarui otomatis setiap 30 detik</p>
-      <section className="surface-card overflow-hidden">
-        <div className="border-b border-border px-5 py-4"><h3 className="font-bold">Jawara Individu Hari Ini</h3></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[36rem] text-sm"><thead><tr className="bg-surface-low text-left text-muted-foreground"><th className="px-4 py-3">Peringkat</th><th className="px-4 py-3">Nama</th><th className="px-4 py-3">NIS</th><th className="px-4 py-3">Kelas</th><th className="px-4 py-3 text-right">Poin</th></tr></thead><tbody className="divide-y divide-border">{rankings.students.map((row, index) => <tr key={row.id}><td className="px-4 py-3 font-bold">{index + 1}</td><td className="px-4 py-3 font-semibold">{row.name}</td><td className="px-4 py-3 text-muted-foreground">{row.nis}</td><td className="px-4 py-3 text-muted-foreground">{row.className}</td><td className="px-4 py-3 text-right font-bold">{row.points.toLocaleString("id-ID")}</td></tr>)}</tbody></table></div>
-      </section>
-      <section className="surface-card overflow-hidden">
-        <div className="border-b border-border px-5 py-4"><h3 className="font-bold">Jawara Kelas Hari Ini</h3></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[32rem] text-sm"><thead><tr className="bg-surface-low text-left text-muted-foreground"><th className="px-4 py-3">Peringkat</th><th className="px-4 py-3">Kelas</th><th className="px-4 py-3">Siswa berpartisipasi</th><th className="px-4 py-3 text-right">Total poin</th></tr></thead><tbody className="divide-y divide-border">{rankings.classes.map((row, index) => <tr key={row.name}><td className="px-4 py-3 font-bold">{index + 1}</td><td className="px-4 py-3 font-semibold">{row.name}</td><td className="px-4 py-3">{row.studentCount}</td><td className="px-4 py-3 text-right font-bold">{row.totalPoints.toLocaleString("id-ID")}</td></tr>)}</tbody></table></div>
-      </section>
-    </div>
+    <section className="surface-card overflow-hidden">
+      <div className="border-b border-border px-5 py-4"><h3 className="font-bold">Peringkat Jawara Lingkungan — {new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", month: "long", year: "numeric" }).format(new Date(`${reportRange.start}T00:00:00+07:00`))}</h3><p className="mt-1 text-xs text-muted-foreground">Data dan perhitungan mengikuti laporan bulanan • diperbarui otomatis setiap 30 detik</p></div>
+      {classRows.length > 0 ? <div className="overflow-x-auto"><table className="w-full min-w-[42rem] text-sm"><thead><tr className="bg-surface-low text-left text-muted-foreground"><th className="px-4 py-3">Peringkat</th><th className="px-4 py-3">Kelas</th><th className="px-4 py-3 text-right">Poin</th><th className="px-4 py-3 text-right">Persentase penggunaan tumbler</th><th className="px-4 py-3 text-right">Persentase penggunaan kotak makan</th></tr></thead><tbody className="divide-y divide-border">{classRows.map((row, index) => <tr key={row.name}><td className="px-4 py-3 font-bold">{index + 1}</td><td className="px-4 py-3 font-semibold">{row.name}</td><td className="px-4 py-3 text-right font-mono">{row.points.toLocaleString("id-ID")}</td><td className="px-4 py-3 text-right">{row.tumbler}%</td><td className="px-4 py-3 text-right">{row.lunchbox}%</td></tr>)}</tbody></table></div> : <p className="px-6 py-12 text-center text-sm text-muted-foreground">Belum ada data kelas untuk bulan ini.</p>}
+    </section>
   );
 }
 
 function AdminLeaderboardPage() {
   const [tab, setTab] = useState<Tab>("siswa");
-  const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
-  const [selectedClass, setSelectedClass] = useState<string>("");
+  const [selectedPeriodId, setSelectedPeriodId] = useState("");
+  const [selectedClass, setSelectedClass] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-
-  const activePeriod = useQuery({
-    queryKey: ["active-period"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("periods")
-        .select("id, name, start_date, end_date, status")
-        .eq("status", "ACTIVE")
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    refetchInterval: 30_000,
-  });
 
   const periods = useQuery({
     queryKey: ["periods", "leaderboard-selector"],
@@ -132,33 +131,42 @@ function AdminLeaderboardPage() {
         .select("id, name, start_date, end_date, status")
         .order("start_date", { ascending: false });
       if (error) throw error;
-      return (data ?? []).filter((period) => period.status !== "DRAFT");
+      return data ?? [];
     },
     refetchInterval: 30_000,
   });
-
-  // Keep the current active period as the default; archived periods remain selectable for review.
-  const effectivePeriodId = selectedPeriodId || activePeriod.data?.id || "";
+  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+  const currentPeriod = periods.data?.find((period) => period.start_date === `${currentDate.slice(0, 7)}-01`)
+    ?? periods.data?.find((period) => period.start_date <= currentDate && period.end_date >= currentDate)
+    ?? periods.data?.find((period) => period.status === "ACTIVE");
+  const effectivePeriodId = selectedPeriodId || currentPeriod?.id || "";
 
   const studentScores = useQuery({
     queryKey: ["period-student-scores", effectivePeriodId],
     queryFn: async () => {
       if (!effectivePeriodId) return [];
-      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
-      const [{ data, error }, { data: students, error: studentsError }, { data: period, error: periodError }] = await Promise.all([
+      const { data: period, error: periodError } = await supabase
+        .from("periods")
+        .select("id, name, start_date, end_date")
+        .eq("id", effectivePeriodId)
+        .maybeSingle();
+      if (periodError) throw periodError;
+      if (!period) return [];
+      const [periodYear, periodMonth] = period.start_date.slice(0, 7).split("-").map(Number);
+      const periodMonthStart = `${period.start_date.slice(0, 7)}-01`;
+      const periodMonthEnd = new Date(Date.UTC(periodYear!, periodMonth!, 1)).toISOString().slice(0, 10);
+      const [{ data, error }, { data: students, error: studentsError }] = await Promise.all([
         supabase
           .from("validation_items")
           .select("student_id, points, validations!inner(period_id, day, status)")
           .eq("validations.period_id", effectivePeriodId)
           .eq("validations.status", "approved")
-          .eq("validations.day", today),
+          .gte("day", period.start_date > periodMonthStart ? period.start_date : periodMonthStart)
+          .lte("day", period.end_date < new Date(Date.UTC(periodYear!, periodMonth!, 0)).toISOString().slice(0, 10) ? period.end_date : new Date(Date.UTC(periodYear!, periodMonth!, 0)).toISOString().slice(0, 10)),
         supabase.from("students").select("id, full_name, nis, class_id, classes(name)").eq("active", true),
-        supabase.from("periods").select("id, name").eq("id", effectivePeriodId).maybeSingle(),
       ]);
       if (error) throw error;
       if (studentsError) throw studentsError;
-      if (periodError) throw periodError;
-      if (!period) return [];
 
       const validStudents = (students ?? []).filter((student) => {
         const className = (student.classes as { name: string } | null)?.name?.trim();
@@ -248,7 +256,6 @@ function AdminLeaderboardPage() {
     avgPoints: c.avg_points,
   }));
 
-  const currentPeriod = periods.data?.find((p) => p.id === effectivePeriodId) || activePeriod.data;
 
   return (
       <div id="poin-periode" className="space-y-8">
@@ -274,22 +281,17 @@ function AdminLeaderboardPage() {
           {/* Period Selector */}
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block">Periode</label>
-            <Select value={selectedPeriodId} onValueChange={setSelectedPeriodId}>
+            <Select value={effectivePeriodId} onValueChange={setSelectedPeriodId}>
               <SelectTrigger className="w-full">
                 <Calendar className="size-4 mr-2" />
                 <SelectValue placeholder="Pilih periode" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">
-                  {activePeriod.data?.name || "Periode Aktif"}
-                </SelectItem>
-                {(periods.data ?? [])
-                  .filter((p) => p.id !== activePeriod.data?.id)
-                  .map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
+                {(periods.data ?? []).map((period) => (
+                  <SelectItem key={period.id} value={period.id}>
+                    {period.name}{period.id === currentPeriod?.id ? " (Bulan berjalan)" : ""}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
