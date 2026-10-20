@@ -26,6 +26,7 @@ export function CameraScanner({
     let cancelled = false;
 
     (async () => {
+      let started = false;
       try {
         const { Html5Qrcode } = await import("html5-qrcode");
         const instance = new Html5Qrcode(containerId);
@@ -36,30 +37,38 @@ export function CameraScanner({
           { fps: 10, qrbox: { width: 240, height: 240 } },
           (rawText) => {
             const text = rawText.trim();
-            if (!text) return;
-            if (isLockedRef.current) return;
-
+            if (!text || isLockedRef.current) return;
             const now = Date.now();
-            // Prevent same QR code from firing across consecutive camera frames within 2500ms
-            if (lastScannedCodeRef.current === text && now - lastScannedTimeRef.current < 2500) {
+            if (lastScannedCodeRef.current === text && now - lastScannedTimeRef.current < 2500)
               return;
-            }
-
             lastScannedCodeRef.current = text;
             lastScannedTimeRef.current = now;
             onResultRef.current(text);
           },
           () => {},
         );
+        started = true;
         if (cancelled) await instance.stop();
       } catch {
         if (!cancelled) setError("Kamera tidak dapat diakses. Gunakan input NIS manual.");
+      } finally {
+        if (cancelled && started) {
+          try {
+            await scanner?.stop();
+          } catch {
+            // Scanner may already be stopped by the library during teardown.
+          }
+          try {
+            scanner?.clear();
+          } catch {
+            // The container may already have been removed.
+          }
+        }
       }
     })();
 
     return () => {
       cancelled = true;
-      scanner?.stop().then(() => scanner?.clear()).catch(() => {});
     };
   }, [active]);
 

@@ -255,6 +255,30 @@ function ScannerPage() {
       const today = todayJakarta();
 
       if (isLate) {
+        const todayDate = new Date(`${today}T00:00:00+07:00`);
+        const oldestAllowed = new Date(todayDate);
+        oldestAllowed.setDate(oldestAllowed.getDate() - 7);
+        const oldestAllowedDate = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Asia/Jakarta",
+        }).format(oldestAllowed);
+        if (scanDate > today || scanDate < oldestAllowedDate) {
+          throw new Error(
+            "Tanggal susulan harus hari ini atau maksimal tujuh hari kalender ke belakang.",
+          );
+        }
+        const configuredStart = activePeriod.late_scan_start_date;
+        const configuredEnd = activePeriod.late_scan_end_date;
+        if (
+          !configuredStart ||
+          !configuredEnd ||
+          scanDate < configuredStart ||
+          scanDate > configuredEnd
+        ) {
+          throw new Error("Tanggal yang dipilih tidak termasuk rentang pemindaian susulan admin.");
+        }
+      }
+
+      if (isLate) {
         const { data, error } = await (supabase as any).rpc("record_late_validation", {
           p_student_id: student.id,
           p_session: activeSession,

@@ -4,6 +4,8 @@ export type OperationalPeriod = {
   status: string;
   start_date: string;
   end_date: string;
+  late_scan_start_date?: string | null;
+  late_scan_end_date?: string | null;
 };
 
 export function todayJakartaDate(): string {

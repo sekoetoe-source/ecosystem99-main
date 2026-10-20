@@ -257,25 +257,20 @@ function AdminLeaderboardPage() {
         .maybeSingle();
       if (periodError) throw periodError;
       if (!period) return [];
-      const [periodYear, periodMonth] = period.start_date.slice(0, 7).split("-").map(Number);
-      const periodMonthStart = `${period.start_date.slice(0, 7)}-01`;
-      const periodMonthEnd = new Date(Date.UTC(periodYear!, periodMonth!, 1))
-        .toISOString()
-        .slice(0, 10);
+      const periodStart = period.start_date;
+      const periodEndExclusive = new Date(`${period.end_date}T00:00:00+07:00`);
+      periodEndExclusive.setDate(periodEndExclusive.getDate() + 1);
+      const periodEnd = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
+        periodEndExclusive,
+      );
       const [{ data, error }, { data: students, error: studentsError }] = await Promise.all([
         supabase
           .from("validation_items")
           .select("student_id, points, validations!inner(period_id, day, status)")
           .eq("validations.period_id", effectivePeriodId)
           .eq("validations.status", "approved")
-          .gte("day", period.start_date > periodMonthStart ? period.start_date : periodMonthStart)
-          .lte(
-            "day",
-            period.end_date <
-              new Date(Date.UTC(periodYear!, periodMonth!, 0)).toISOString().slice(0, 10)
-              ? period.end_date
-              : new Date(Date.UTC(periodYear!, periodMonth!, 0)).toISOString().slice(0, 10),
-          ),
+          .gte("day", periodStart)
+          .lt("day", periodEnd),
         supabase
           .from("students")
           .select("id, full_name, nis, class_id, classes(name)")
