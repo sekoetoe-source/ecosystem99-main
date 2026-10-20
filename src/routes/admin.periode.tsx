@@ -13,6 +13,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { AlertTriangle, Pencil, RotateCcw, School, UtensilsCrossed } from "lucide-react";
+import { resolveOperationalPeriod, todayJakartaDate } from "@/lib/operationalPeriod";
 
 export const Route = createFileRoute("/admin/periode")({ component: PeriodPage });
 
@@ -102,14 +103,8 @@ function PeriodPage() {
     },
     refetchInterval: 30_000,
   });
-  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
-  const monthStart = `${currentDate.slice(0, 7)}-01`;
-  const [currentYear, currentMonthNum] = currentDate.slice(0, 7).split("-").map(Number);
-  const currentMonthEnd = new Date(Date.UTC(currentYear!, currentMonthNum!, 1)).toISOString().slice(0, 10);
-  const active = periods.data?.find((period) => period.start_date <= currentDate && period.end_date >= currentDate)
-    ?? periods.data?.find((period) => period.start_date < currentMonthEnd && period.end_date >= monthStart)
-    ?? periods.data?.find((period) => period.status === "ACTIVE")
-    ?? periods.data?.[0];
+  const currentDate = todayJakartaDate();
+  const active = resolveOperationalPeriod(periods.data ?? [], currentDate);
   const sessions = useQuery({
     queryKey: ["operational-sessions", active?.id],
     enabled: Boolean(active?.id),
@@ -140,7 +135,9 @@ function PeriodPage() {
       if (lateStartDate && lateEndDate && lateStartDate > lateEndDate)
         throw new Error("Tanggal mulai harus sebelum atau sama dengan tanggal akhir.");
       if (lateStartDate && (lateStartDate < active.start_date || lateEndDate > currentDate))
-        throw new Error("Rentang tanggal harus berada di dalam periode aktif dan tidak melebihi hari ini.");
+        throw new Error(
+          "Rentang tanggal harus berada di dalam periode aktif dan tidak melebihi hari ini.",
+        );
       const { error } = await supabase
         .from("periods")
         .update({
@@ -162,7 +159,9 @@ function PeriodPage() {
       // First attempt to read period_reset_audit_events, with fallback to point_reset_audit_events
       const { data, error } = await (supabase as any)
         .from("period_reset_audit_events")
-        .select("id, occurred_at, source_period_name, target_period_name, before_total_earned_points, before_students_with_points, before_total_validations, reason, actor_id")
+        .select(
+          "id, occurred_at, source_period_name, target_period_name, before_total_earned_points, before_students_with_points, before_total_validations, reason, actor_id",
+        )
         .order("occurred_at", { ascending: false });
       if (!error && data) {
         return data.map((item: any) => ({
@@ -200,8 +199,15 @@ function PeriodPage() {
         queryClient.invalidateQueries({ queryKey: ["jawara-data"] }),
         queryClient.invalidateQueries({ queryKey: ["point-reset-audit-events"] }),
       ]);
-      if (data && typeof data === "object" && !Array.isArray(data) && typeof data["period_name"] === "string") {
-        toast.success(`Perolehan poin periode ${data["period_name"]} berhasil direset. Periode dan tanggalnya tidak berubah.`);
+      if (
+        data &&
+        typeof data === "object" &&
+        !Array.isArray(data) &&
+        typeof data["period_name"] === "string"
+      ) {
+        toast.success(
+          `Perolehan poin periode ${data["period_name"]} berhasil direset. Periode dan tanggalnya tidak berubah.`,
+        );
       }
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Gagal mereset poin."),
@@ -258,153 +264,164 @@ function PeriodPage() {
   return (
     <div id="periode-page" className="mx-auto w-full max-w-6xl space-y-6">
       <header>
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight">
-              Periode dan Sesi Operasional
-            </h1>
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Periode dan Sesi Operasional</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-              Periode menentukan siklus poin. Sesi menentukan kapan pemindaian biasa dibuka. Semua
-              jadwal mengikuti waktu WIB.
-            </p>
+            Periode menentukan siklus poin. Sesi menentukan kapan pemindaian biasa dibuka. Semua
+            jadwal mengikuti waktu WIB.
+          </p>
         </div>
       </header>
-        <section className="space-y-6">
-          {periods.isError && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              Data periode gagal dimuat: {periods.error instanceof Error ? periods.error.message : "Kesalahan database"}
+      <section className="space-y-6">
+        {periods.isError && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            Data periode gagal dimuat:{" "}
+            {periods.error instanceof Error ? periods.error.message : "Kesalahan database"}
+          </div>
+        )}
+        <div className="surface-card p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="label-xs text-muted-foreground">Periode berjalan</p>
+            {active ? (
+              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-700">
+                Periode Bulan Berjalan
+              </span>
+            ) : null}
+          </div>
+          {periods.isLoading ? (
+            <p className="mt-3 text-sm text-muted-foreground">Memuat periode bulan berjalan...</p>
+          ) : active ? (
+            <>
+              <h2 className="mt-2 text-2xl font-bold">{active.name}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {formatDate(active.start_date)} – {formatDate(active.end_date)}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-foreground">{activePeriodDateStatus}</p>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start gap-3 text-sm text-amber-950">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <p>
+                    Reset hanya mengubah perolehan poin periode ini menjadi 0. Status periode,
+                    tanggal mulai/akhir, dan riwayat pemindaian tidak berubah.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="gap-2 border-amber-300 bg-white"
+                  onClick={() => setResetConfirmOpen(true)}
+                  disabled={resetPoint.isPending}
+                >
+                  <RotateCcw className="size-4" />
+                  {resetPoint.isPending ? "Memproses..." : "Reset Poin"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Periode bulan berjalan tidak ditemukan.</p>
+              <p className="mt-1">
+                Tombol reset tidak tersedia sampai periode bulan kalender ini dibuat. Reset hanya
+                akan mengubah perolehan poin, tanpa mengubah tanggal maupun status periode.
+              </p>
             </div>
           )}
-          <div className="surface-card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="label-xs text-muted-foreground">Periode berjalan</p>
-              {active ? (
-                <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-700">
-                  Periode Bulan Berjalan
-                </span>
-              ) : null}
-            </div>
-            {periods.isLoading ? (
-              <p className="mt-3 text-sm text-muted-foreground">Memuat periode bulan berjalan...</p>
-            ) : active ? (
-              <>
-                <h2 className="mt-2 text-2xl font-bold">{active.name}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {formatDate(active.start_date)} – {formatDate(active.end_date)}
-                </p>
-                <p className="mt-2 text-sm font-semibold text-foreground">{activePeriodDateStatus}</p>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                  <div className="flex items-start gap-3 text-sm text-amber-950">
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                    <p>Reset hanya mengubah perolehan poin periode ini menjadi 0. Status periode, tanggal mulai/akhir, dan riwayat pemindaian tidak berubah.</p>
-                  </div>
-                  <Button variant="outline" className="gap-2 border-amber-300 bg-white" onClick={() => setResetConfirmOpen(true)} disabled={resetPoint.isPending}>
-                    <RotateCcw className="size-4" />
-                    {resetPoint.isPending ? "Memproses..." : "Reset Poin"}
-                  </Button>
+        </div>
+        <div className="surface-card p-5">
+          <h2 className="font-bold">Tanggal Pemindaian Susulan</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Admin menetapkan rentang tanggal. Petugas memilih tanggal dalam rentang dan sesi saat
+            mencatat susulan. Tidak ada batas jam.
+          </p>
+          {active ? (
+            <form
+              className="mt-4 space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveLateDateRange.mutate();
+              }}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="late-scan-start-date">Tanggal mulai</Label>
+                  <input
+                    id="late-scan-start-date"
+                    type="date"
+                    value={lateStartDate}
+                    min={active.start_date}
+                    max={currentDate < active.end_date ? currentDate : active.end_date}
+                    onChange={(event) => setLateStartDate(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
+                  />
                 </div>
-              </>
-            ) : (
-              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                <p className="font-semibold">Periode bulan berjalan tidak ditemukan.</p>
-                <p className="mt-1">Tombol reset tidak tersedia sampai periode bulan kalender ini dibuat. Reset hanya akan mengubah perolehan poin, tanpa mengubah tanggal maupun status periode.</p>
+                <div>
+                  <Label htmlFor="late-scan-end-date">Tanggal akhir</Label>
+                  <input
+                    id="late-scan-end-date"
+                    type="date"
+                    value={lateEndDate}
+                    min={lateStartDate || active.start_date}
+                    max={currentDate < active.end_date ? currentDate : active.end_date}
+                    onChange={(event) => setLateEndDate(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
+                  />
+                </div>
               </div>
-            )}
-          </div>
-          <div className="surface-card p-5">
-            <h2 className="font-bold">Tanggal Pemindaian Susulan</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Admin menetapkan rentang tanggal. Petugas memilih tanggal dalam rentang dan sesi saat
-              mencatat susulan. Tidak ada batas jam.
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  Kosongkan kedua tanggal untuk menonaktifkan pemindaian susulan.
+                </p>
+                <Button type="submit" disabled={saveLateDateRange.isPending}>
+                  Simpan Rentang Tanggal
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Pengaturan tersedia setelah periode diaktifkan.
             </p>
-            {active ? (
-              <form
-                className="mt-4 space-y-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  saveLateDateRange.mutate();
-                }}
-              >
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="late-scan-start-date">Tanggal mulai</Label>
-                    <input
-                      id="late-scan-start-date"
-                      type="date"
-                      value={lateStartDate}
-                      min={active.start_date}
-                      max={currentDate < active.end_date ? currentDate : active.end_date}
-                      onChange={(event) => setLateStartDate(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="late-scan-end-date">Tanggal akhir</Label>
-                    <input
-                      id="late-scan-end-date"
-                      type="date"
-                      value={lateEndDate}
-                      min={lateStartDate || active.start_date}
-                      max={currentDate < active.end_date ? currentDate : active.end_date}
-                      onChange={(event) => setLateEndDate(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-muted-foreground">
-                    Kosongkan kedua tanggal untuk menonaktifkan pemindaian susulan.
-                  </p>
-                  <Button type="submit" disabled={saveLateDateRange.isPending}>
-                    Simpan Rentang Tanggal
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Pengaturan tersedia setelah periode diaktifkan.
-              </p>
-            )}
+          )}
+        </div>
+        <div className="surface-card p-5">
+          <h2 className="font-bold">Alur periode dan pemindaian</h2>
+          <ol className="mt-3 grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
+            <li className="rounded-xl bg-surface-low p-4">
+              <strong className="text-foreground">1. Periode aktif.</strong> Poin hasil pemindaian
+              dicatat pada periode yang sedang berjalan.
+            </li>
+            <li className="rounded-xl bg-surface-low p-4">
+              <strong className="text-foreground">2. Dua sesi harian.</strong> Setiap siswa dapat
+              tercatat satu kali pada Sesi 1 dan satu kali pada Sesi 2 dalam satu hari.
+            </li>
+            <li className="rounded-xl bg-surface-low p-4">
+              <strong className="text-foreground">3. Pemindaian susulan.</strong> Petugas dapat
+              mencatat sesi yang terlewat pada tanggal yang ditetapkan admin, tanpa batas jam.
+              Catatan tetap masuk ke sesi dan tanggal asal.
+            </li>
+            <li className="rounded-xl bg-surface-low p-4">
+              <strong className="text-foreground">4. Periode ditutup.</strong> Periode yang sudah
+              diarsipkan tidak menerima pemindaian atau poin baru. Reset poin uji coba tidak menutup
+              periode dan hanya mengosongkan nilai poin yang ada.
+            </li>
+          </ol>
+        </div>
+        <div className="surface-card overflow-hidden">
+          <div className="border-b border-border p-5">
+            <h2 className="font-bold">Pengaturan Sesi Operasional</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pemindaian susulan adalah pencatatan terlambat ke Sesi 1 atau Sesi 2, bukan sesi
+              harian ketiga. Rentang tanggalnya dapat diatur di atas; skor tetap mengikuti sesi
+              asal.
+            </p>
           </div>
-          <div className="surface-card p-5">
-            <h2 className="font-bold">Alur periode dan pemindaian</h2>
-            <ol className="mt-3 grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
-              <li className="rounded-xl bg-surface-low p-4">
-                <strong className="text-foreground">1. Periode aktif.</strong> Poin hasil pemindaian
-                dicatat pada periode yang sedang berjalan.
-              </li>
-              <li className="rounded-xl bg-surface-low p-4">
-                <strong className="text-foreground">2. Dua sesi harian.</strong> Setiap siswa dapat
-                tercatat satu kali pada Sesi 1 dan satu kali pada Sesi 2 dalam satu hari.
-              </li>
-              <li className="rounded-xl bg-surface-low p-4">
-                <strong className="text-foreground">3. Pemindaian susulan.</strong> Petugas dapat
-                mencatat sesi yang terlewat pada tanggal yang ditetapkan admin, tanpa batas jam.
-                Catatan tetap masuk ke sesi dan tanggal asal.
-              </li>
-              <li className="rounded-xl bg-surface-low p-4">
-                <strong className="text-foreground">4. Periode ditutup.</strong> Periode yang sudah
-                diarsipkan tidak menerima pemindaian atau poin baru. Reset poin uji coba tidak
-                menutup periode dan hanya mengosongkan nilai poin yang ada.
-              </li>
-            </ol>
-          </div>
-          <div className="surface-card overflow-hidden">
-            <div className="border-b border-border p-5">
-              <h2 className="font-bold">Pengaturan Sesi Operasional</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Pemindaian susulan adalah pencatatan terlambat ke Sesi 1 atau Sesi 2, bukan sesi harian ketiga.
-                Rentang tanggalnya dapat diatur di atas; skor tetap mengikuti sesi asal.
-              </p>
-            </div>
-            <div className="grid gap-4 p-5 md:grid-cols-2">
-              {visibleSessions.map((session) => {
-                const status = !session.enabled ? "Tidak digunakan" : runtimeStatus(session);
-                const Icon = session.session_number === 1 ? School : UtensilsCrossed;
-                return (
-                  <div
-                    key={session.id}
-                    className={`rounded-2xl border p-5 ${status === "Sedang berlangsung" ? "border-blue-500 bg-blue-500/10" : "border-border"}`}
-                  >
+          <div className="grid gap-4 p-5 md:grid-cols-2">
+            {visibleSessions.map((session) => {
+              const status = !session.enabled ? "Tidak digunakan" : runtimeStatus(session);
+              const Icon = session.session_number === 1 ? School : UtensilsCrossed;
+              return (
+                <div
+                  key={session.id}
+                  className={`rounded-2xl border p-5 ${status === "Sedang berlangsung" ? "border-blue-500 bg-blue-500/10" : "border-border"}`}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-extrabold">Sesi {session.session_number}</p>
@@ -425,197 +442,174 @@ function PeriodPage() {
                       </Button>
                     </div>
                   </div>
-                    <p className="mt-6 text-sm text-muted-foreground">
-                      Pemindaian biasa dibuka otomatis sesuai jadwal yang tersimpan.
-                    </p>
-                    <div className="mt-3 flex items-center justify-between text-sm">
-                      <span
-                        className={session.enabled ? "text-emerald-600" : "text-muted-foreground"}
-                      >
-                        ● {session.enabled ? "Digunakan" : "Tidak digunakan"}
-                      </span>
-                      <span
-                        className={
-                          status === "Sedang berlangsung"
-                            ? "font-bold text-blue-600"
-                            : "text-muted-foreground"
-                        }
-                      >
-                        {status}
-                      </span>
-                    </div>
+                  <p className="mt-6 text-sm text-muted-foreground">
+                    Pemindaian biasa dibuka otomatis sesuai jadwal yang tersimpan.
+                  </p>
+                  <div className="mt-3 flex items-center justify-between text-sm">
+                    <span
+                      className={session.enabled ? "text-emerald-600" : "text-muted-foreground"}
+                    >
+                      ● {session.enabled ? "Digunakan" : "Tidak digunakan"}
+                    </span>
+                    <span
+                      className={
+                        status === "Sedang berlangsung"
+                          ? "font-bold text-blue-600"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {status}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
-          <div className="surface-card overflow-hidden">
-            <div className="border-b border-border p-5">
-              <h2 className="font-bold">Arsip periode</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Periode yang sudah ditutup, dengan rentang tanggalnya. Periode aktif dan draft ditampilkan di bagian pengaturan masing-masing.
-              </p>
-            </div>
-            <div className="divide-y divide-border">
-              {periods.isLoading ? (
-                <p className="p-5 text-sm text-muted-foreground">Memuat riwayat periode...</p>
-              ) : periods.isError ? (
-                <p className="p-5 text-sm text-destructive">Riwayat periode gagal dimuat.</p>
-              ) : (periods.data ?? []).filter((period) => period.status === "CLOSED").length === 0 ? (
-                <p className="p-5 text-sm text-muted-foreground">Belum ada periode yang ditutup. Periode aktif tidak ditampilkan sebagai arsip.</p>
-              ) : (
-                periods.data?.filter((period) => period.status === "CLOSED").map((period) => (
-                  <div
-                    key={period.id}
-                    className="flex flex-wrap items-center justify-between gap-3 p-5"
-                  >
-                    <div>
-                      <p className="font-semibold">{period.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(period.start_date)} – {formatDate(period.end_date)}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">Ditutup · Arsip</span>
-                  </div>
-                ))
-              )}
-            </div>
+        </div>
+        <div className="surface-card overflow-hidden">
+          <div className="border-b border-border p-5">
+            <h2 className="font-bold">Periode operasional</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Halaman ini hanya menampilkan periode operasional yang sedang berjalan. Riwayat
+              periode tetap tersimpan untuk audit dan tidak ditampilkan di UI operasional.
+            </p>
           </div>
-          <div className="surface-card overflow-hidden">
-            <div className="border-b border-border p-5">
-              <h2 className="font-bold">Riwayat reset poin</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Setiap reset mengosongkan poin periode aktif untuk keperluan uji coba. Riwayat
-                pemindaian tetap tersimpan.
-              </p>
-            </div>
-            <div className="divide-y divide-border">
-              {audits.isLoading ? (
-                <p className="p-5 text-sm text-muted-foreground">Memuat riwayat reset poin...</p>
-              ) : audits.isError ? (
-                <p className="p-5 text-sm text-destructive">Riwayat reset poin gagal dimuat.</p>
-              ) : (audits.data ?? []).length === 0 ? (
-                <p className="p-5 text-sm text-muted-foreground">Belum ada riwayat reset poin.</p>
-              ) : (
-                audits.data.map((audit) => (
-                  <div key={audit.id} className="p-5 text-sm">
-                    <p className="font-semibold">Poin periode {audit.period_name} dihapus</p>
-                    <p className="mt-1 text-muted-foreground">
-                      {new Date(audit.occurred_at).toLocaleString("id-ID")} · {audit.before_total_points} poin dari {audit.before_students_with_points} siswa diubah pada {audit.reset_validation_items} catatan.
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Admin: {audit.actor_name || audit.actor_id || "Identitas tidak tersedia"}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
+        </div>
+        <div className="surface-card overflow-hidden">
+          <div className="border-b border-border p-5">
+            <h2 className="font-bold">Riwayat reset poin</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Setiap reset mengosongkan poin periode aktif untuk keperluan uji coba. Riwayat
+              pemindaian tetap tersimpan.
+            </p>
           </div>
-          <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Konfirmasi Reset Poin</DialogTitle>
-                <DialogDescription>
-                  Reset akan mengosongkan semua perolehan poin periode aktif ({active?.name ?? ""}).
-                  Status periode, tanggal, dan riwayat pemindaian tidak berubah.
-                  Tindakan ini tidak dapat dibatalkan.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>
-                  Batal
-                </Button>
-                <Button
-                  variant="destructive"
-                  disabled={resetPoint.isPending}
-                  onClick={() => resetPoint.mutate()}
-                >
-                  {resetPoint.isPending ? "Memproses..." : "Ya, Reset Poin"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  Edit {editing ? `Sesi ${editing.session_number}` : "Sesi"}
-                </DialogTitle>
-                <DialogDescription>
-                  Perubahan waktu memakai zona waktu Asia/Jakarta.
-                </DialogDescription>
-              </DialogHeader>
-              {editing && (
-                <form
-                  className="space-y-4"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    update.mutate({
-                      id: editing.id,
-                      name: editing.name,
-                      start_time: startTime,
-                      end_time: endTime,
-                      enabled: editing.enabled,
-                    });
-                  }}
-                >
+          <div className="divide-y divide-border">
+            {audits.isLoading ? (
+              <p className="p-5 text-sm text-muted-foreground">Memuat riwayat reset poin...</p>
+            ) : audits.isError ? (
+              <p className="p-5 text-sm text-destructive">Riwayat reset poin gagal dimuat.</p>
+            ) : (audits.data ?? []).length === 0 ? (
+              <p className="p-5 text-sm text-muted-foreground">Belum ada riwayat reset poin.</p>
+            ) : (
+              audits.data.map((audit) => (
+                <div key={audit.id} className="p-5 text-sm">
+                  <p className="font-semibold">Poin periode {audit.period_name} dihapus</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {new Date(audit.occurred_at).toLocaleString("id-ID")} ·{" "}
+                    {audit.before_total_points} poin dari {audit.before_students_with_points} siswa
+                    diubah pada {audit.reset_validation_items} catatan.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Admin: {audit.actor_name || audit.actor_id || "Identitas tidak tersedia"}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Konfirmasi Reset Poin</DialogTitle>
+              <DialogDescription>
+                Reset akan mengosongkan semua perolehan poin periode aktif ({active?.name ?? ""}).
+                Status periode, tanggal, dan riwayat pemindaian tidak berubah. Tindakan ini tidak
+                dapat dibatalkan.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>
+                Batal
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={resetPoint.isPending}
+                onClick={() => resetPoint.mutate()}
+              >
+                {resetPoint.isPending ? "Memproses..." : "Ya, Reset Poin"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit {editing ? `Sesi ${editing.session_number}` : "Sesi"}</DialogTitle>
+              <DialogDescription>
+                Perubahan waktu memakai zona waktu Asia/Jakarta.
+              </DialogDescription>
+            </DialogHeader>
+            {editing && (
+              <form
+                className="space-y-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  update.mutate({
+                    id: editing.id,
+                    name: editing.name,
+                    start_time: startTime,
+                    end_time: endTime,
+                    enabled: editing.enabled,
+                  });
+                }}
+              >
+                <div>
+                  <Label htmlFor="session-name">Nama sesi</Label>
+                  <input
+                    id="session-name"
+                    value={editing.name}
+                    onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+                    required
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="session-name">Nama sesi</Label>
+                    <Label htmlFor="session-start-time">Jam mulai</Label>
                     <input
-                      id="session-name"
-                      value={editing.name}
-                      onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+                      id="session-start-time"
+                      type="time"
+                      value={startTime}
+                      onChange={(event) => setStartTime(event.target.value)}
                       required
                       className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="session-start-time">Jam mulai</Label>
-                      <input
-                        id="session-start-time"
-                        type="time"
-                        value={startTime}
-                        onChange={(event) => setStartTime(event.target.value)}
-                        required
-                        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="session-end-time">Jam selesai</Label>
-                      <input
-                        id="session-end-time"
-                        type="time"
-                        value={endTime}
-                        onChange={(event) => setEndTime(event.target.value)}
-                        required
-                        className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                    <Label htmlFor="session-enabled">Sesi aktif</Label>
+                  <div>
+                    <Label htmlFor="session-end-time">Jam selesai</Label>
                     <input
-                      id="session-enabled"
-                      type="checkbox"
-                      checked={editing.enabled}
-                      onChange={(event) => setEditing({ ...editing, enabled: event.target.checked })}
-                      className="size-4 accent-primary"
+                      id="session-end-time"
+                      type="time"
+                      value={endTime}
+                      onChange={(event) => setEndTime(event.target.value)}
+                      required
+                      className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2"
                     />
                   </div>
-                  <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setEditing(null)}>
-                      Batal
-                    </Button>
-                    <Button type="submit" disabled={update.isPending}>
-                      Simpan Perubahan
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </DialogContent>
-          </Dialog>
-        </section>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <Label htmlFor="session-enabled">Sesi aktif</Label>
+                  <input
+                    id="session-enabled"
+                    type="checkbox"
+                    checked={editing.enabled}
+                    onChange={(event) => setEditing({ ...editing, enabled: event.target.checked })}
+                    className="size-4 accent-primary"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+                    Batal
+                  </Button>
+                  <Button type="submit" disabled={update.isPending}>
+                    Simpan Perubahan
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+      </section>
     </div>
   );
 }

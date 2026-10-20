@@ -4,6 +4,7 @@ import { Crown, Medal, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { resolveOperationalPeriod, todayJakartaDate } from "@/lib/operationalPeriod";
 
 type Tab = "siswa" | "kelas";
 
@@ -32,29 +33,10 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         .order("start_date", { ascending: false });
       if (error) throw error;
       const list = data ?? [];
-      const found =
-        list.find((p) => p.start_date <= currentDate && p.end_date >= currentDate) ??
-        list.find((p) => p.start_date < reportRange.end && p.end_date >= reportRange.start) ??
-        list.find((p) => p.status === "ACTIVE") ??
-        list[0];
+      const found = resolveOperationalPeriod(list, todayJakartaDate());
       if (found) return found;
 
-      // Fallback for public/unauthenticated visitors if periods table returns empty due to RLS
-      const { data: vData } = await supabase
-        .from("validations")
-        .select("period_id")
-        .eq("status", "approved")
-        .order("day", { ascending: false })
-        .limit(1);
-      if (vData?.[0]?.period_id) {
-        return {
-          id: vData[0].period_id,
-          name: "Periode Operasional",
-          status: "ACTIVE",
-          start_date: monthStart,
-          end_date: reportRange.end,
-        };
-      }
+      // No current operational period means no operational leaderboard data.
       return null;
     },
     refetchInterval: 30_000,

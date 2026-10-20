@@ -2,11 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { JawaraTab } from "@/routes/admin.leaderboard";
+import { resolveOperationalPeriod } from "@/lib/operationalPeriod";
 
 export const Route = createFileRoute("/admin/jawara")({ component: JawaraPage });
 
 function JawaraPage() {
-  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
+    new Date(),
+  );
   const monthStart = `${currentDate.slice(0, 7)}-01`;
   const reportRange = (() => {
     const [year, month] = currentDate.slice(0, 7).split("-").map(Number);
@@ -21,14 +24,9 @@ function JawaraPage() {
       const { data, error } = await supabase
         .from("periods")
         .select("id, name, status, start_date, end_date")
-        .order("start_date", { ascending: false });
+        .order("start_date", { ascending: true });
       if (error) throw error;
-      const list = data ?? [];
-      const found = list.find((p) => p.start_date <= currentDate && p.end_date >= currentDate)
-        ?? list.find((p) => p.start_date < reportRange.end && p.end_date >= reportRange.start)
-        ?? list.find((p) => p.status === "ACTIVE")
-        ?? list[0];
-      return found ?? null;
+      return resolveOperationalPeriod(data ?? [], currentDate);
     },
     refetchInterval: 30_000,
   });

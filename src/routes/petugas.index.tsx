@@ -40,6 +40,7 @@ import {
   playDuplicateSound,
   playErrorSound,
 } from "@/lib/scannerAudio";
+import { resolveOperationalPeriod, todayJakartaDate } from "@/lib/operationalPeriod";
 
 function getJakartaMinutes() {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -163,24 +164,16 @@ function ScannerPage() {
     refetchInterval: 30_000,
   });
 
-  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
-    new Date(),
-  );
+  const currentDate = todayJakartaDate();
   const currentPeriod = useQuery({
-    queryKey: ["current-period", lateEntry ? lateScanDate : currentDate],
+    queryKey: ["current-period"],
     queryFn: async () => {
-      const scanDate = lateEntry ? lateScanDate : currentDate;
       const { data, error } = await supabase
         .from("periods")
-        .select("id, status, start_date, end_date, late_scan_start_date, late_scan_end_date")
-        .lte("start_date", scanDate)
-        .gte("end_date", scanDate)
-        .eq("status", "ACTIVE")
-        .order("start_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .select("id, status, name, start_date, end_date, late_scan_start_date, late_scan_end_date")
+        .order("start_date", { ascending: true });
       if (error) throw error;
-      return data;
+      return resolveOperationalPeriod(data ?? [], currentDate);
     },
   });
   const lateScanConfig = { data: currentPeriod.data };
@@ -229,6 +222,10 @@ function ScannerPage() {
       const activeSession = sessionParam ?? session;
       const cleanCode = code.trim();
       if (!cleanCode) throw new Error("NIS siswa tidak boleh kosong");
+
+      const activePeriod = currentPeriod.data;
+      if (!activePeriod)
+        throw new Error("Tidak ada periode operasional berjalan. Pemindaian dinonaktifkan.");
 
       const itemsToValidate = getItemsForSession(activeSession);
       if (itemsToValidate.length === 0) {
@@ -867,7 +864,8 @@ function ScannerPage() {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                  Sesi 1: Tumbler 100 poin dan Kotak Makan 50 poin. Jika membawa keduanya, totalnya 150 poin tanpa combo.
+                  Sesi 1: Tumbler 100 poin dan Kotak Makan 50 poin. Jika membawa keduanya, totalnya
+                  150 poin tanpa combo.
                 </p>
               </div>
             ) : (
@@ -958,7 +956,8 @@ function ScannerPage() {
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Pilihan saling eksklusif: hanya satu opsi yang aktif. Combo khusus Sesi 2 bernilai +250 poin.
+                  Pilihan saling eksklusif: hanya satu opsi yang aktif. Combo khusus Sesi 2 bernilai
+                  +250 poin.
                 </p>
               </div>
             )}
@@ -980,7 +979,13 @@ function ScannerPage() {
               required
               disabled={submit.isPending}
             />
-            <Button type="submit" disabled={submit.isPending || isProcessing} className="gap-2">
+            <Button
+              type="submit"
+              disabled={
+                submit.isPending || isProcessing || currentPeriod.isLoading || !currentPeriod.data
+              }
+              className="gap-2"
+            >
               {submit.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (

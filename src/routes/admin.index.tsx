@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/routes/siswa.index";
 import { EcoNewsTicker } from "@/components/eco/EcoNewsTicker";
 import { useMe } from "@/lib/auth";
+import { resolveOperationalPeriod, todayJakartaDate } from "@/lib/operationalPeriod";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({
@@ -38,10 +39,9 @@ function AdminDashboard() {
       const { data, error } = await supabase
         .from("periods")
         .select("id, name, start_date, end_date, status")
-        .eq("status", "ACTIVE")
-        .maybeSingle();
+        .order("start_date", { ascending: true });
       if (error) throw error;
-      return data;
+      return resolveOperationalPeriod(data ?? [], todayJakartaDate());
     },
     refetchInterval: 30_000,
   });
@@ -131,7 +131,8 @@ function AdminDashboard() {
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Dasbor Admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pantau partisipasi dan poin hari ini, kelola persetujuan, serta tinjau aktivitas lingkungan sekolah.
+          Pantau partisipasi dan poin hari ini, kelola persetujuan, serta tinjau aktivitas
+          lingkungan sekolah.
         </p>
       </div>
 

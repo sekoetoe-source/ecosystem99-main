@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import logoAsset from "@/assets/logo-smpn99.png.asset.json";
+import { resolveOperationalPeriod, todayJakartaDate } from "@/lib/operationalPeriod";
 
 export const Route = createFileRoute("/admin/laporan")({
   head: () => ({
@@ -57,21 +58,6 @@ function monthLabel(key: string) {
   return new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(
     new Date(y!, (m ?? 1) - 1, 1),
   );
-}
-
-function monthsInPeriods(periods: { start_date: string; end_date: string }[]) {
-  const months = new Set<string>([monthKey(new Date())]);
-  for (const period of periods) {
-    const cursor = new Date(`${period.start_date}T00:00:00Z`);
-    const last = new Date(`${period.end_date}T00:00:00Z`);
-    cursor.setUTCDate(1);
-    last.setUTCDate(1);
-    while (cursor <= last) {
-      months.add(cursor.toISOString().slice(0, 7));
-      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-    }
-  }
-  return [...months].sort((a, b) => b.localeCompare(a));
 }
 
 function monthRange(key: string) {
@@ -304,8 +290,8 @@ function LaporanPage() {
     },
     refetchInterval: 30_000,
   });
-  const [selectedMonth, setSelectedMonth] = useState(() => monthKey(new Date()));
-  const availableMonths = monthsInPeriods(periods.data ?? []);
+  const operationalPeriod = resolveOperationalPeriod(periods.data ?? [], todayJakartaDate());
+  const selectedMonth = operationalPeriod?.start_date.slice(0, 7) ?? "";
   const report = useQuery({
     queryKey: ["formal-report", selectedMonth, periods.dataUpdatedAt],
     queryFn: async () => {
@@ -313,12 +299,7 @@ function LaporanPage() {
       const [year, month] = selectedMonth.split("-").map(Number);
       const previousMonthDate = new Date(Date.UTC(year!, month! - 2, 1));
       const previousRange = monthRange(monthKey(previousMonthDate));
-      const selectedPeriod = (periods.data ?? []).find((period) =>
-        period.start_date < currentRange.end && period.end_date >= currentRange.start,
-      );
-      const previousPeriod = (periods.data ?? []).find((period) =>
-        period.start_date < previousRange.end && period.end_date >= previousRange.start,
-      );
+      const selectedPeriod = operationalPeriod;
       const [studentsRes, itemsRes, prevItemsRes] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
         selectedPeriod
@@ -328,15 +309,20 @@ function LaporanPage() {
               .eq("validations.period_id", selectedPeriod.id)
               .gte("day", currentRange.start)
               .lt("day", currentRange.end)
-          : Promise.resolve({ data: [] as Array<{ item_code: string; points: number; student_id: string; day: string; validations: unknown }>, error: null }),
-        previousPeriod
-          ? supabase
-              .from("validation_items")
-              .select("item_code, validations!inner(status, period_id)")
-              .eq("validations.period_id", previousPeriod.id)
-              .gte("day", previousRange.start)
-              .lt("day", previousRange.end)
-          : Promise.resolve({ data: [] as Array<{ item_code: string; validations: unknown }>, error: null }),
+          : Promise.resolve({
+              data: [] as Array<{
+                item_code: string;
+                points: number;
+                student_id: string;
+                day: string;
+                validations: unknown;
+              }>,
+              error: null,
+            }),
+        Promise.resolve({
+          data: [] as Array<{ item_code: string; validations: unknown }>,
+          error: null,
+        }),
       ]);
       if (studentsRes.error) throw studentsRes.error;
       if (itemsRes.error) throw itemsRes.error;
@@ -454,24 +440,21 @@ function LaporanPage() {
           Laporan Resmi
         </h1>
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="h-9 rounded-xl border border-input bg-background px-3 text-sm font-semibold"
-            aria-label="Pilih bulan laporan"
+          <span className="rounded-xl border border-input bg-background px-3 py-2 text-sm font-semibold">
+            {operationalPeriod ? operationalPeriod.name : "Tidak ada periode berjalan"}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportCsv}
+            disabled={!operationalPeriod || report.isLoading}
           >
-            {availableMonths.map((month) => (
-              <option key={month} value={month}>
-                {monthLabel(month)}
-              </option>
-            ))}
-          </select>
-          <Button variant="outline" size="sm" onClick={exportCsv}>
             <Download className="size-4" /> Ekspor CSV
           </Button>
           <Button
             size="sm"
             onClick={() => setPreviewOpen(true)}
+            disabled={!operationalPeriod || report.isLoading}
             className="font-bold gap-1.5 shadow-sm"
           >
             <Printer className="size-4" /> Cetak / PDF
