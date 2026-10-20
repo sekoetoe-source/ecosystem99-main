@@ -191,57 +191,73 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex rounded-2xl bg-muted p-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full rounded-2xl bg-muted p-1 sm:w-auto">
           {(["siswa", "kelas"] as Tab[]).map((t) => (
             <button
               key={t}
+              type="button"
+              aria-pressed={tab === t}
               onClick={() => setTab(t)}
               className={cn(
-                "rounded-xl px-4 py-2 text-sm font-semibold capitalize transition-colors",
-                tab === t ? "bg-card shadow-soft text-foreground" : "text-muted-foreground",
+                "flex-1 rounded-xl px-4 py-2 text-sm font-semibold capitalize transition-colors sm:flex-none",
+                tab === t
+                  ? "bg-card shadow-soft text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {t === "siswa" ? "Individu" : "Kelas"}
             </button>
           ))}
         </div>
-        <div className="relative ml-auto w-full sm:w-64">
+        <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Cari nama atau kelas"
-            className="pl-9"
+            placeholder={tab === "siswa" ? "Cari nama siswa" : "Cari kelas"}
+            aria-label={tab === "siswa" ? "Cari nama siswa" : "Cari kelas"}
+            className="h-10 pl-9"
           />
         </div>
       </div>
 
       {podium.length === 3 && (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-3 items-end gap-2 sm:gap-3">
           {[podium[1]!, podium[0]!, podium[2]!].map((p) => (
             <div
               key={p.id}
               className={cn(
-                "surface-card flex flex-col items-center p-6 text-center",
-                p.rank === 1 && "gradient-hero text-primary-foreground border-transparent",
+                "surface-card flex min-w-0 flex-col items-center rounded-2xl p-3 text-center sm:p-5",
+                p.rank === 1 &&
+                  "gradient-hero text-primary-foreground border-transparent sm:-translate-y-2",
               )}
             >
               {p.rank === 1 ? (
-                <Crown className="size-6" />
+                <Crown className="size-5 sm:size-6" aria-hidden="true" />
               ) : (
-                <Medal className="size-6 text-muted-foreground" />
+                <Medal className="size-5 text-muted-foreground sm:size-6" aria-hidden="true" />
               )}
-              <p className="mt-3 text-lg font-bold">{p.title}</p>
+              <span
+                className={cn(
+                  "mt-1 text-[10px] font-bold uppercase tracking-wider sm:text-xs",
+                  p.rank === 1 ? "text-primary-foreground/80" : "text-muted-foreground",
+                )}
+              >
+                Peringkat {p.rank}
+              </span>
+              <p className="mt-2 w-full truncate text-xs font-bold sm:text-base">{p.title}</p>
               <p
                 className={cn(
-                  "label-xs",
+                  "mt-1 w-full truncate text-[10px] sm:text-xs",
                   p.rank === 1 ? "text-primary-foreground/80" : "text-muted-foreground",
                 )}
               >
                 {p.sub}
               </p>
-              <p className="mt-3 text-2xl font-extrabold">{p.points.toLocaleString("id-ID")}</p>
+              <p className="mt-2 text-base font-extrabold sm:text-xl">
+                {p.points.toLocaleString("id-ID")}
+              </p>
             </div>
           ))}
         </div>
@@ -252,16 +268,20 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
           <div
             key={r.id}
             className={cn(
-              "flex items-center gap-4 px-5 py-3",
+              "flex min-w-0 items-center gap-3 px-3 py-3 sm:gap-4 sm:px-5",
               highlightStudentId && r.id === highlightStudentId && "bg-accent",
             )}
           >
-            <span className="w-8 text-sm font-bold text-muted-foreground">{r.rank}</span>
+            <span className="w-7 shrink-0 text-center text-sm font-bold text-muted-foreground sm:w-8">
+              {r.rank}
+            </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold">{r.title}</p>
+              <p className="truncate text-sm font-semibold sm:text-base">{r.title}</p>
               <p className="truncate text-xs text-muted-foreground">{r.sub}</p>
             </div>
-            <span className="font-bold text-primary">{r.points.toLocaleString("id-ID")}</span>
+            <span className="shrink-0 text-sm font-bold text-primary sm:text-base">
+              {r.points.toLocaleString("id-ID")}
+            </span>
           </div>
         ))}
         {visibleRows.length === 0 && (
