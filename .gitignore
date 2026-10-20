@@ -33,3 +33,5 @@ supabase/.temp/cli-latest
 *.njsproj
 *.sln
 *.sw?
+
+.vercel
