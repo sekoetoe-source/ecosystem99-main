@@ -11,7 +11,9 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
   const [tab, setTab] = useState<Tab>("siswa");
   const [q, setQ] = useState("");
 
-  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+  const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
+    new Date(),
+  );
   const monthStart = `${currentDate.slice(0, 7)}-01`;
   const reportRange = (() => {
     const [year, month] = currentDate.slice(0, 7).split("-").map(Number);
@@ -30,10 +32,11 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         .order("start_date", { ascending: false });
       if (error) throw error;
       const list = data ?? [];
-      const found = list.find((p) => p.start_date <= currentDate && p.end_date >= currentDate)
-        ?? list.find((p) => p.start_date < reportRange.end && p.end_date >= reportRange.start)
-        ?? list.find((p) => p.status === "ACTIVE")
-        ?? list[0];
+      const found =
+        list.find((p) => p.start_date <= currentDate && p.end_date >= currentDate) ??
+        list.find((p) => p.start_date < reportRange.end && p.end_date >= reportRange.start) ??
+        list.find((p) => p.status === "ACTIVE") ??
+        list[0];
       if (found) return found;
 
       // Fallback for public/unauthenticated visitors if periods table returns empty due to RLS
@@ -65,7 +68,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
     queryFn: async () => {
       // Always filter by period — if no active period exists, return empty
       if (!activePeriodId) return { studentRows: [], classRows: [] };
-      let query = supabase
+      const query = supabase
         .from("validation_items")
         .select("student_id, points, item_code, day, validations!inner(period_id, status)")
         .eq("validations.status", "approved")
@@ -73,17 +76,23 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         .gte("day", reportRange.start)
         .lt("day", reportRange.end);
 
-      const [{ data: items, error: itemsError }, { data: students, error: studentsError }] = await Promise.all([
-        query,
-        supabase.from("students").select("id, full_name, nis, class_id, classes(name)").eq("active", true),
-      ]);
+      const [{ data: items, error: itemsError }, { data: students, error: studentsError }] =
+        await Promise.all([
+          query,
+          supabase
+            .from("students")
+            .select("id, full_name, nis, class_id, classes(name)")
+            .eq("active", true),
+        ]);
 
       if (itemsError) throw itemsError;
       if (studentsError) throw studentsError;
 
       const validStudents = (students ?? []).filter((s) => {
         const className = (s.classes as { name: string } | null)?.name?.trim();
-        return Boolean(s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas");
+        return Boolean(
+          s.class_id && className && className !== "-" && className.toLowerCase() !== "tanpa kelas",
+        );
       });
 
       const validStudentMap = new Map(validStudents.map((s) => [s.id, s]));
@@ -91,7 +100,10 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
 
       for (const item of items ?? []) {
         if (!validStudentMap.has(item.student_id)) continue;
-        pointTotals.set(item.student_id, (pointTotals.get(item.student_id) ?? 0) + Number(item.points ?? 0));
+        pointTotals.set(
+          item.student_id,
+          (pointTotals.get(item.student_id) ?? 0) + Number(item.points ?? 0),
+        );
       }
 
       // Student rows
@@ -103,10 +115,17 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
           class_name: ((s.classes as { name: string }).name ?? "").trim(),
           earned_points: pointTotals.get(s.id) ?? 0,
         }))
-        .sort((a, b) => b.earned_points - a.earned_points || (a.full_name ?? "").localeCompare(b.full_name ?? "", "id"));
+        .sort(
+          (a, b) =>
+            b.earned_points - a.earned_points ||
+            (a.full_name ?? "").localeCompare(b.full_name ?? "", "id"),
+        );
 
       // Class rows aggregated from students
-      const classMap = new Map<string, { class_id: string; class_name: string; total_points: number; student_count: number }>();
+      const classMap = new Map<
+        string,
+        { class_id: string; class_name: string; total_points: number; student_count: number }
+      >();
       for (const s of studentRows) {
         const cName = s.class_name;
         if (!cName) continue;
@@ -129,7 +148,12 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
           total_points: c.total_points,
           avg_points: c.student_count > 0 ? Math.round(c.total_points / c.student_count) : 0,
         }))
-        .sort((a, b) => b.total_points - a.total_points || b.avg_points - a.avg_points || a.class_name.localeCompare(b.class_name, "id"));
+        .sort(
+          (a, b) =>
+            b.total_points - a.total_points ||
+            b.avg_points - a.avg_points ||
+            a.class_name.localeCompare(b.class_name, "id"),
+        );
 
       return { studentRows, classRows };
     },
@@ -141,32 +165,29 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
 
   const rows =
     tab === "siswa"
-      ? studentsData
-          .filter((s) => (s.full_name ?? "").toLowerCase().includes(q.toLowerCase()))
-          .map((s, i) => ({
-            id: (s.student_id || `std-${i}`) as string,
+      ? studentsData.map((s, i) => ({
+          id: (s.student_id || `std-${i}`) as string,
+          rank: i + 1,
+          title: s.full_name as string,
+          sub: s.class_name as string,
+          points: Number(s.earned_points ?? 0),
+        }))
+      : rawClasses.map((c, i) => {
+          const studentCount = Number(c.student_count ?? 0);
+          const avgPoints = Number(c.avg_points ?? 0);
+          const totalPoints = Number(c.total_points ?? 0);
+
+          return {
+            id: (c.class_id || `cls-${i}`) as string,
             rank: i + 1,
-            title: s.full_name as string,
-            sub: s.class_name as string,
-            points: Number(s.earned_points ?? 0),
-          }))
-      : rawClasses
-          .filter((c) => (c.class_name ?? "").toLowerCase().includes(q.toLowerCase()))
-          .map((c, i) => {
-            const studentCount = Number(c.student_count ?? 0);
-            const avgPoints = Number(c.avg_points ?? 0);
-            const totalPoints = Number(c.total_points ?? 0);
+            title: c.class_name as string,
+            sub: `${studentCount} siswa · rata-rata ${avgPoints} poin`,
+            points: totalPoints,
+          };
+        });
 
-            return {
-              id: (c.class_id || `cls-${i}`) as string,
-              rank: i + 1,
-              title: c.class_name as string,
-              sub: `${studentCount} siswa · rata-rata ${avgPoints} poin`,
-              points: totalPoints,
-            };
-          });
-
-  const podium = rows.slice(0, 3);
+  const visibleRows = rows.filter((row) => row.title.toLowerCase().includes(q.toLowerCase()));
+  const podium = visibleRows.slice(0, 3);
 
   return (
     <div className="space-y-6">
@@ -227,7 +248,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
       )}
 
       <div className="surface-card divide-y divide-border overflow-hidden">
-        {rows.map((r) => (
+        {visibleRows.map((r) => (
           <div
             key={r.id}
             className={cn(
@@ -243,7 +264,7 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
             <span className="font-bold text-primary">{r.points.toLocaleString("id-ID")}</span>
           </div>
         ))}
-        {rows.length === 0 && (
+        {visibleRows.length === 0 && (
           <p className="px-5 py-8 text-center text-sm text-muted-foreground">Belum ada data.</p>
         )}
       </div>
