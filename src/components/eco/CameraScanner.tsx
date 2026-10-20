@@ -24,11 +24,28 @@ export function CameraScanner({
     if (!active) return;
     let scanner: { stop: () => Promise<void>; clear: () => void } | null = null;
     let cancelled = false;
+    let started = false;
+    let stopped = false;
+
+    const stopScanner = async () => {
+      if (!scanner || stopped || !started) return;
+      stopped = true;
+      try {
+        await scanner.stop();
+      } catch {
+        // html5-qrcode can report an already-stopped instance during teardown.
+      }
+      try {
+        scanner.clear();
+      } catch {
+        // The container may already have been removed.
+      }
+    };
 
     (async () => {
-      let started = false;
       try {
         const { Html5Qrcode } = await import("html5-qrcode");
+        if (cancelled) return;
         const instance = new Html5Qrcode(containerId);
         scanner = instance as unknown as { stop: () => Promise<void>; clear: () => void };
 
@@ -48,27 +65,21 @@ export function CameraScanner({
           () => {},
         );
         started = true;
-        if (cancelled) await instance.stop();
-      } catch {
-        if (!cancelled) setError("Kamera tidak dapat diakses. Gunakan input NIS manual.");
-      } finally {
-        if (cancelled && started) {
-          try {
-            await scanner?.stop();
-          } catch {
-            // Scanner may already be stopped by the library during teardown.
-          }
-          try {
-            scanner?.clear();
-          } catch {
-            // The container may already have been removed.
-          }
+        if (cancelled) await stopScanner();
+      } catch (reason) {
+        if (!cancelled) {
+          const message = reason instanceof Error ? reason.message.toLowerCase() : "";
+          const detail = message.includes("permission")
+            ? "Izin kamera ditolak. Izinkan kamera atau gunakan input NIS manual."
+            : "Kamera tidak tersedia atau gagal dimulai. Gunakan input NIS manual.";
+          setError(detail);
         }
       }
     })();
 
     return () => {
       cancelled = true;
+      void stopScanner();
     };
   }, [active]);
 
