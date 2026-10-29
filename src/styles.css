@@ -210,13 +210,18 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 5mm;
+    margin: 12mm 15mm;
   }
+
   .no-print,
-  header,
+  header:not(.report-header),
   nav,
+  aside,
   sidebar,
   [role="navigation"],
+  [role="dialog"],
+  [data-radix-portal],
+  .dialog-overlay,
   form,
   input,
   button,
@@ -224,14 +229,17 @@
   .no-print-area {
     display: none !important;
   }
+
   body,
   html {
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #0f172a !important;
     overflow: visible !important;
     height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
+    font-size: 10pt !important;
+    line-height: 1.35 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -241,16 +249,48 @@
   .print-report-sheet * {
     visibility: visible !important;
   }
+
   .print-report-sheet {
     display: block !important;
     position: static !important;
     width: 100% !important;
+    max-width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #0f172a !important;
     box-shadow: none !important;
     border: none !important;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-report-sheet table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  .print-report-sheet thead {
+    display: table-header-group !important;
+  }
+
+  .print-report-sheet tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-report-sheet th,
+  .print-report-sheet td {
+    padding: 4px 6px !important;
+    font-size: 8.5pt !important;
+  }
+
+  .print-report-sheet .overflow-x-auto {
+    overflow: visible !important;
   }
 
   /* ID Cards Print Area */
@@ -302,24 +342,5 @@
   .print-card img {
     margin: 0 auto !important;
     display: block !important;
-  }
-}
-
-@media print {
-  .print-report-sheet {
-    break-inside: auto;
-  }
-  .print-report-sheet table {
-    page-break-inside: auto;
-  }
-  .print-report-sheet tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  .print-report-sheet thead {
-    display: table-header-group;
-  }
-  .print-report-sheet .overflow-x-auto {
-    overflow: visible !important;
   }
 }

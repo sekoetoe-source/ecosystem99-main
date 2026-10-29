@@ -1,4 +1,4 @@
-CREATE TABLE public.point_reset_audit_events (
+CREATE TABLE IF NOT EXISTS public.point_reset_audit_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_id uuid NOT NULL REFERENCES public.profiles(id),
   period_id uuid NOT NULL REFERENCES public.periods(id),
@@ -11,6 +11,7 @@ CREATE TABLE public.point_reset_audit_events (
 );
 
 ALTER TABLE public.point_reset_audit_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS point_reset_audit_select_admin ON public.point_reset_audit_events;
 CREATE POLICY point_reset_audit_select_admin
   ON public.point_reset_audit_events
   FOR SELECT TO authenticated
@@ -25,6 +26,7 @@ BEGIN
   RAISE EXCEPTION 'Point reset audit events are immutable';
 END;
 $$;
+DROP TRIGGER IF EXISTS point_reset_audit_immutable ON public.point_reset_audit_events;
 CREATE TRIGGER point_reset_audit_immutable
   BEFORE UPDATE OR DELETE ON public.point_reset_audit_events
   FOR EACH ROW EXECUTE FUNCTION public.prevent_point_reset_audit_mutation();

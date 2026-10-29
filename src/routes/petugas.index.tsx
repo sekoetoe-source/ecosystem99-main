@@ -253,18 +253,16 @@ function ScannerPage() {
       }
 
       const today = todayJakarta();
+      const jakartaMin = getJakartaMinutes();
 
       if (isLate) {
-        const todayDate = new Date(`${today}T00:00:00+07:00`);
-        const oldestAllowed = new Date(todayDate);
-        oldestAllowed.setDate(oldestAllowed.getDate() - 7);
-        const oldestAllowedDate = new Intl.DateTimeFormat("en-CA", {
-          timeZone: "Asia/Jakarta",
-        }).format(oldestAllowed);
-        if (scanDate > today || scanDate < oldestAllowedDate) {
-          throw new Error(
-            "Tanggal susulan harus hari ini atau maksimal tujuh hari kalender ke belakang.",
-          );
+        const lateStartMin = 15 * 60; // 15:00
+        const lateEndMin = 17 * 60; // 17:00
+        if (jakartaMin < lateStartMin || jakartaMin > lateEndMin) {
+          throw new Error("Pemindaian susulan hanya dapat dilakukan pada jendela waktu 15.00–17.00 WIB.");
+        }
+        if (scanDate > today) {
+          throw new Error("Tanggal pemindaian susulan tidak boleh di masa depan.");
         }
         const configuredStart = activePeriod.late_scan_start_date;
         const configuredEnd = activePeriod.late_scan_end_date;
@@ -276,9 +274,7 @@ function ScannerPage() {
         ) {
           throw new Error("Tanggal yang dipilih tidak termasuk rentang pemindaian susulan admin.");
         }
-      }
 
-      if (isLate) {
         const { data, error } = await (supabase as any).rpc("record_late_validation", {
           p_student_id: student.id,
           p_session: activeSession,
@@ -314,115 +310,48 @@ function ScannerPage() {
         };
       }
 
-      // 2. Validate Duplicate: student + date + session
-      const { data: existingValidation } = await supabase
-        .from("validations")
-        .select("id, created_at, session, station")
-        .eq("student_id", student.id)
-        .eq("session", activeSession)
-        .eq("day", today)
-        .neq("status", "rejected")
-        .maybeSingle();
+      // Validasi Pemindaian Biasa berdasarkan jadwal sesi aktif
+      if (activeSession === "entry") {
+        const s1Start = 6 * 60 + 30; // 06:30
+        const s1End = 12 * 60 + 59; // 12:59
+        if (jakartaMin < s1Start || jakartaMin > s1End) {
+          throw new Error("Sesi 1 hanya dapat dipilih pada jadwal Sesi 1 (06.30–12.59 WIB).");
+        }
+      } else if (activeSession === "break") {
+        const s2Start = 13 * 60; // 13:00
+        const s2End = 14 * 60 + 59; // 14:59
+        if (jakartaMin < s2Start || jakartaMin > s2End) {
+          throw new Error("Sesi 2 hanya dapat dipilih pada jadwal Sesi 2 (13.00–14.59 WIB).");
+        }
+      }
 
-      if (existingValidation) {
-        const timeStr = formatJakartaTime(existingValidation.created_at);
-        const sessionName = SCAN_SESSIONS[activeSession].shortLabel;
-        const msg = timeStr
-          ? `${student.full_name} sudah tercatat pada sesi ${sessionName} hari ini pukul ${timeStr}.`
-          : `${student.full_name} sudah tercatat pada sesi ${sessionName} hari ini.`;
+      // 2. Kirim validasi operasional biasa via RPC (Server-Side Business Rules)
+      const { data, error: vError } = await (supabase as any).rpc("record_operational_validation", {
+        p_student_id: student.id,
+        p_session: activeSession,
+        p_item_codes: allocations.map((a) => a.itemCode),
+        p_source: source,
+        p_station: me?.officer?.station || SCAN_SESSIONS[activeSession].defaultStation,
+      });
 
+      if (vError) throw vError;
+
+      const result = data as {
+        kind: "success" | "duplicate";
+        message: string;
+        points_added?: number;
+        created_at?: string;
+      };
+
+      if (result.kind === "duplicate") {
+        const timeStr = result.created_at ? formatJakartaTime(result.created_at) : "";
         return {
           kind: "duplicate" as const,
           student,
           session: activeSession,
           timeStr,
-          message: msg,
+          message: result.message,
         };
-      }
-
-      // 3. Resolve the scheduled operational session server-side.
-      // The RPC evaluates the Jakarta date/time and enabled session windows.
-      const { data: activeSessionRows, error: sessionError } = await (supabase as any).rpc(
-        "get_active_operational_session",
-        { p_at: new Date().toISOString() },
-      );
-      if (sessionError) throw sessionError;
-      const activeSessionConfig = (
-        activeSessionRows as Array<{
-          id: string;
-          period_id: string;
-          session_number: number;
-          name: string;
-          start_time: string;
-          end_time: string;
-        }> | null
-      )?.[0];
-      const targetSessionNumber = activeSession === "entry" ? 1 : 2;
-      if (!activeSessionConfig) {
-        throw new Error("Tidak ada sesi operasional aktif saat ini.");
-      }
-      if (activeSessionConfig.session_number !== targetSessionNumber) {
-        throw new Error("Sesi yang dipilih bukan sesi yang sedang berlangsung.");
-      }
-
-      // 4. Insert validation row
-      const stationName = me?.officer?.station || SCAN_SESSIONS[activeSession].defaultStation;
-      const { data: validation, error: vError } = await (supabase as any)
-        .from("validations")
-        .insert({
-          student_id: student.id,
-          officer_id: me?.officer?.id ?? null,
-          period_id: activeSessionConfig.period_id,
-          operational_session_id: activeSessionConfig.id,
-          status: "approved",
-          source,
-          session: activeSession,
-          day: today,
-          station: stationName,
-          reviewed_at: new Date().toISOString(),
-        })
-        .select("id")
-        .single();
-
-      if (vError) {
-        // Catch DB unique index duplicate if race condition occurred
-        if (vError.code === "23505") {
-          const sessionName = SCAN_SESSIONS[activeSession].shortLabel;
-          return {
-            kind: "duplicate" as const,
-            student,
-            session: activeSession,
-            timeStr: "",
-            message: `${student.full_name} sudah tercatat pada sesi ${sessionName} hari ini.`,
-          };
-        }
-        throw vError;
-      }
-
-      // 4. Insert validation items with calculated points
-      const rows = allocations.map((a) => ({
-        validation_id: validation.id,
-        item_code: a.itemCode,
-        student_id: student.id,
-        points: a.points,
-        day: today,
-      }));
-
-      const { error: iError } = await supabase.from("validation_items").insert(rows);
-      if (iError) {
-        // Rollback validation if item insertion fails
-        await supabase.from("validations").delete().eq("id", validation.id);
-        if (iError.code === "23505") {
-          const sessionName = SCAN_SESSIONS[activeSession].shortLabel;
-          return {
-            kind: "duplicate" as const,
-            student,
-            session: activeSession,
-            timeStr: "",
-            message: `${student.full_name} sudah tercatat pada sesi ${sessionName} hari ini.`,
-          };
-        }
-        throw iError;
       }
 
       return {
@@ -430,9 +359,9 @@ function ScannerPage() {
         student,
         session: activeSession,
         summaryLabel,
-        totalPointsAdded: totalPoints,
+        totalPointsAdded: Number(result.points_added ?? totalPoints),
         isLate: false,
-        resultMessage: "Pemindaian berhasil dicatat.",
+        resultMessage: result.message || "Pemindaian berhasil dicatat.",
       };
     },
     onSuccess: (res) => {
@@ -745,11 +674,15 @@ function ScannerPage() {
             </div>
             {lateEntry ? (
               <div className="space-y-2">
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Catatan masuk ke Sesi {session === "entry" ? "1" : "2"} yang dipilih. Pilih
-                  tanggal dalam rentang susulan admin; jam tidak dibatasi.
-                </p>
-                <Label htmlFor="late-scan-date">Tanggal pemindaian susulan</Label>
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
+                  <p className="font-bold">Ketentuan Pemindaian Susulan:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-0.5 text-[11px]">
+                    <li>Jendela input petugas: <strong>15.00–17.00 WIB</strong>.</li>
+                    <li>Tanggal aktivitas: wajib dalam rentang susulan yang ditetapkan admin.</li>
+                    <li>Pilih Sesi 1 atau Sesi 2 sesuai kegiatan siswa yang terlewat.</li>
+                  </ul>
+                </div>
+                <Label htmlFor="late-scan-date">Tanggal aktivitas siswa (susulan)</Label>
                 <input
                   id="late-scan-date"
                   type="date"
@@ -771,13 +704,12 @@ function ScannerPage() {
                   className="min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Jika catatan sesi ini sudah ada, pilih hanya barang yang belum tercatat. Poin
-                  dihitung otomatis dan alasan disimpan untuk pemeriksaan.
+                  Poin dihitung otomatis berdasarkan item yang dipilih dan audit disimpan server-side.
                 </p>
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Pemindaian biasa hanya tersedia saat sesi yang dipilih sedang berlangsung.
+                Pemindaian biasa: Sesi 1 (06.30–12.59 WIB) dan Sesi 2 (13.00–14.59 WIB).
               </p>
             )}
           </div>

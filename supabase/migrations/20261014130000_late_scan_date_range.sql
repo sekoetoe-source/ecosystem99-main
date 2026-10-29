@@ -1,5 +1,8 @@
 ALTER TABLE public.periods ADD COLUMN IF NOT EXISTS late_scan_start_date date, ADD COLUMN IF NOT EXISTS late_scan_end_date date;
-ALTER TABLE public.periods ADD CONSTRAINT periods_late_scan_dates_valid CHECK ((late_scan_start_date IS NULL AND late_scan_end_date IS NULL) OR (late_scan_start_date IS NOT NULL AND late_scan_end_date IS NOT NULL AND late_scan_start_date <= late_scan_end_date AND late_scan_start_date >= start_date AND late_scan_end_date <= end_date));
+DO $$ BEGIN
+  ALTER TABLE public.periods ADD CONSTRAINT periods_late_scan_dates_valid CHECK ((late_scan_start_date IS NULL AND late_scan_end_date IS NULL) OR (late_scan_start_date IS NOT NULL AND late_scan_end_date IS NOT NULL AND late_scan_start_date <= late_scan_end_date AND late_scan_start_date >= start_date AND late_scan_end_date <= end_date));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.record_late_validation(p_student_id uuid, p_session text, p_item_codes text[], p_reason text DEFAULT NULL, p_source public.validation_source DEFAULT 'manual', p_station text DEFAULT NULL, p_scan_day date DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$

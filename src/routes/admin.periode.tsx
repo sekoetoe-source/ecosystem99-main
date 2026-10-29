@@ -138,13 +138,11 @@ function PeriodPage() {
         throw new Error(
           "Rentang tanggal harus berada di dalam periode aktif dan tidak melebihi hari ini.",
         );
-      const { error } = await supabase
-        .from("periods")
-        .update({
-          late_scan_start_date: lateStartDate || null,
-          late_scan_end_date: lateEndDate || null,
-        })
-        .eq("id", active.id);
+      const { error } = await (supabase as any).rpc("admin_set_late_scan_dates", {
+        p_period_id: active.id,
+        p_start_date: lateStartDate || null,
+        p_end_date: lateEndDate || null,
+      });
       if (error) throw error;
     },
     onSuccess: () => {

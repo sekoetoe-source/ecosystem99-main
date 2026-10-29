@@ -7,6 +7,7 @@ import { StatusBadge } from "@/routes/siswa.index";
 import { EcoNewsTicker } from "@/components/eco/EcoNewsTicker";
 import { useMe } from "@/lib/auth";
 import { resolveOperationalPeriod, todayJakartaDate } from "@/lib/operationalPeriod";
+import { calculateEnvironmentalImpact, formatWasteWeight } from "@/lib/environmentalImpact";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({
@@ -55,7 +56,7 @@ function AdminDashboard() {
         supabase.from("students").select("id, class_id, classes(name)").not("class_id", "is", null),
         supabase
           .from("validation_items")
-          .select("student_id, points, validations!inner(status, period_id)")
+          .select("validation_id, item_code, student_id, points, day, validations!inner(status, period_id)")
           .eq("day", todayJakarta())
           .eq("validations.period_id", period.id),
         supabase
@@ -83,12 +84,20 @@ function AdminDashboard() {
       );
       const participants = new Set(approvedToday.map((i) => i.student_id)).size;
       const totalItems = validScores.reduce((a, s) => a + Number(s.total_items ?? 0), 0);
+      const approvedTodayValidations = new Set(
+        approvedToday.map((i) => i.validation_id ?? `${i.student_id}-${i.day}`),
+      );
+      const impactToday = calculateEnvironmentalImpact(
+        approvedTodayValidations.size,
+        approvedToday,
+      );
       return {
         studentCount: validStudents.length,
         participants,
         pointsToday: approvedToday.reduce((a, i) => a + i.points, 0),
         pendingCount: pendingAccountsRes.count ?? 0,
-        co2Kg: Math.round((totalItems * 70) / 1000),
+        totalItems,
+        impactToday,
       };
     },
     refetchInterval: 30_000,
@@ -180,6 +189,36 @@ function AdminDashboard() {
           </Link>
         ))}
       </div>
+
+      {kpi.data?.impactToday && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+              <Leaf className="size-5" />
+            </div>
+            <div>
+              <p className="font-extrabold text-sm text-emerald-950">
+                Estimasi Sampah Sekali Pakai Dicegah Hari Ini
+              </p>
+              <p className="text-xs text-emerald-800">
+                {kpi.data.impactToday.validatedTumblerUses} tumbler ({formatWasteWeight(kpi.data.impactToday.bottleWasteAvoidedG)}) •{" "}
+                {kpi.data.impactToday.validatedLunchboxUses} kotak makan ({formatWasteWeight(kpi.data.impactToday.foodLinerWasteAvoidedG)})
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-xl sm:text-2xl font-black text-emerald-900">
+              {formatWasteWeight(kpi.data.impactToday.totalWasteAvoidedG)}
+            </span>
+            <Link
+              to="/admin/laporan"
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline whitespace-nowrap"
+            >
+              Laporan Lengkap →
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
         <div className="flex items-start gap-3 mb-4">

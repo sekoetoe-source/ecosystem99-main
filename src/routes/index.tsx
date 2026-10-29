@@ -31,11 +31,17 @@ import {
   Sparkles,
   Trophy,
   Users,
+  UtensilsCrossed,
   Wallet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  calculateEnvironmentalImpact,
+  formatWasteWeight,
+  ENVIRONMENTAL_IMPACT_CONFIG,
+} from "@/lib/environmentalImpact";
 import {
   Dialog,
   DialogContent,
@@ -124,7 +130,7 @@ const useSchoolStats = () =>
             supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
             supabase
               .from("validation_items")
-              .select("item_code, points, student_id, validations!inner(status)")
+              .select("validation_id, item_code, points, student_id, day, validations!inner(status)")
               .gte("day", start)
               .lt("day", end),
           ]);
@@ -146,6 +152,10 @@ const useSchoolStats = () =>
             validStudentIds.has(item.student_id),
         );
         const totalPoints = approved.reduce((sum, item) => sum + Number(item.points ?? 0), 0);
+        const distinctValidationIds = new Set(
+          approved.map((item) => item.validation_id ?? `${item.student_id}-${item.day}`),
+        );
+        const impact = calculateEnvironmentalImpact(distinctValidationIds.size, approved);
         const classes = new Map<
           string,
           { class_name: string; total_points: number; student_count: number }
@@ -181,12 +191,18 @@ const useSchoolStats = () =>
           totalPoints,
           totalItems: approved.length,
           studentCount: validStudents.length,
-          co2Kg: Math.round((approved.length * 70) / 1000),
+          impact,
           classes: computedClasses.slice(0, 5),
         };
       } catch (error) {
         console.error("Landing report stats unavailable:", error);
-        return { totalPoints: 0, totalItems: 0, studentCount: 0, co2Kg: 0, classes: [] };
+        return {
+          totalPoints: 0,
+          totalItems: 0,
+          studentCount: 0,
+          impact: calculateEnvironmentalImpact(0, []),
+          classes: [],
+        };
       }
     },
     retry: 1,
@@ -677,7 +693,7 @@ function Index() {
     studentCount: liveStats?.studentCount ?? 0,
     totalItems: liveStats?.totalItems ?? 0,
     totalPoints: liveStats?.totalPoints ?? 0,
-    co2Kg: liveStats?.co2Kg ?? 0,
+    impact: liveStats?.impact ?? calculateEnvironmentalImpact(0, []),
     classes: liveStats?.classes ?? [],
   };
   const { me } = useMe();
@@ -877,20 +893,34 @@ function Index() {
 
   const stats = [
     {
-      label: "Siswa aktif terdaftar",
-      value: `${data.studentCount.toLocaleString("id-ID")}`,
-      icon: Users,
-    },
-    {
       label: "Aktivitas lingkungan tervalidasi",
-      value: `${data.totalItems.toLocaleString("id-ID")}`,
-      icon: Droplets,
+      value: (data.impact.validatedActivities || data.totalItems).toLocaleString("id-ID"),
+      icon: CheckCircle2,
+      sub: "Pencatatan harian disetujui",
     },
-    { label: "Perkiraan Pengurangan Emisi Karbon Dioksida", value: `${data.co2Kg} kg`, icon: Leaf },
     {
-      label: "Total Poin Lingkungan",
-      value: `${data.totalPoints.toLocaleString("id-ID")}`,
+      label: "Penggunaan tumbler",
+      value: data.impact.validatedTumblerUses.toLocaleString("id-ID"),
+      icon: Coffee,
+      sub: `Cegah ${formatWasteWeight(data.impact.bottleWasteAvoidedG)} sampah botol`,
+    },
+    {
+      label: "Penggunaan kotak makan",
+      value: data.impact.validatedLunchboxUses.toLocaleString("id-ID"),
+      icon: UtensilsCrossed,
+      sub: `Cegah ${formatWasteWeight(data.impact.foodLinerWasteAvoidedG)} alas kantin`,
+    },
+    {
+      label: "Estimasi sampah dicegah",
+      value: formatWasteWeight(data.impact.totalWasteAvoidedG),
+      icon: Leaf,
+      sub: "15,5g/tumbler · 3,9g/kotak makan",
+    },
+    {
+      label: "Total poin lingkungan",
+      value: data.totalPoints.toLocaleString("id-ID"),
       icon: Trophy,
+      sub: "Poin partisipasi aktif siswa",
     },
   ];
 
@@ -1027,16 +1057,21 @@ function Index() {
       <section id="statistik" className="mx-auto max-w-6xl px-4 py-14">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {stats.map((s) => (
-            <div key={s.label} className="surface-card p-5">
-              <s.icon className="size-5 text-eco" />
-              <p className="mt-4 text-2xl font-extrabold tracking-tight">{s.value}</p>
-              <p className="label-xs mt-1 text-muted-foreground">{s.label}</p>
+            <div key={s.label} className="surface-card p-5 flex flex-col justify-between">
+              <div>
+                <s.icon className="size-5 text-eco" />
+                <p className="mt-4 text-2xl font-extrabold tracking-tight">{s.value}</p>
+                <p className="label-xs mt-1 text-muted-foreground">{s.label}</p>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground font-medium border-t border-border/50 pt-2">
+                {s.sub}
+              </p>
             </div>
           ))}
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Statistik ditarik langsung dari data operasional sistem.
-        </p>
+        <div className="mt-4 rounded-xl border border-border bg-surface-low p-4 text-xs text-muted-foreground leading-relaxed">
+          <strong className="text-foreground">Keterangan Metodologi:</strong> Estimasi sampah sekali pakai yang dicegah dihitung berdasarkan bobot standar rata-rata: 1 botol plastik sekali pakai (15,5 gram) per penggunaan tumbler dan 1 lembar alas makan kantin sekali pakai (3,9 gram) per penggunaan kotak makan. Angka ini merupakan estimasi sampah yang berhasil dicegah dari kebiasaan ramah lingkungan siswa dan bukan hasil penimbangan fisik sampah secara langsung.
+        </div>
       </section>
 
       {/* PROBLEM */}
