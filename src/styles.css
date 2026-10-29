@@ -213,41 +213,73 @@
     margin: 12mm 15mm;
   }
 
+  /* 1. Global Page Background & Colors */
+  html,
+  body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 10pt !important;
+    line-height: 1.35 !important;
+    opacity: 1 !important;
+    filter: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 2. Hide ALL overlays, backdrops, fixed layers, dialogs, and non-report UI */
   .no-print,
+  .print\:hidden,
+  [data-state="open"].fixed,
+  [data-state="closed"].fixed,
+  [class*="fixed inset-0"],
+  .fixed.inset-0,
+  div[class*="bg-black/"],
+  div[class*="bg-black"],
+  [class*="backdrop"],
+  [class*="overlay"],
+  [role="dialog"],
+  [role="alertdialog"],
+  [data-radix-portal],
+  [data-radix-focus-guard],
+  [data-radix-dialog-overlay],
+  .dialog-overlay,
   header:not(.report-header),
   nav,
   aside,
   sidebar,
   [role="navigation"],
-  [role="dialog"],
-  [data-radix-portal],
-  .dialog-overlay,
   form,
   input,
   button,
   select,
   .no-print-area {
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    pointer-events: none !important;
   }
 
-  body,
-  html {
-    background: #ffffff !important;
-    color: #0f172a !important;
-    overflow: visible !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    font-size: 10pt !important;
-    line-height: 1.35 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  /* Ensure root container does not carry dark opacity or filter */
+  #root,
+  body > div {
+    opacity: 1 !important;
+    filter: none !important;
   }
 
-  /* Print Report Document */
+  /* 3. Print Report Document */
   .print-report-sheet,
   .print-report-sheet * {
     visibility: visible !important;
+    opacity: 1 !important;
+    filter: none !important;
   }
 
   .print-report-sheet {
@@ -258,11 +290,14 @@
     padding: 0 !important;
     margin: 0 !important;
     background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #0f172a !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
   }
 
+  /* 4. Page Break Controls */
   .print-avoid-break {
     break-inside: avoid !important;
     page-break-inside: avoid !important;

@@ -137,10 +137,10 @@ function FormalReportDocument({
 
   return (
     <article
-      className={`print-report-sheet ${className} ${
+      className={`${!isModal ? "print-report-sheet" : "no-print"} ${className} ${
         isModal
           ? "bg-white text-slate-900 shadow-xl rounded-sm p-6 sm:p-10 max-w-4xl mx-auto border border-slate-200"
-          : "surface-card px-4 py-6 sm:px-10 sm:py-10 max-w-5xl mx-auto"
+          : "surface-card print:bg-white print:border-none print:shadow-none print:p-0 px-4 py-6 sm:px-10 sm:py-10 max-w-5xl mx-auto"
       }`}
     >
       {/* 1. KOP SURAT RESMI SEKOLAH */}
@@ -603,7 +603,15 @@ function LaporanPage() {
   }
 
   function handlePrintDirect() {
-    window.print();
+    setPreviewOpen(false);
+    setTimeout(() => {
+      const handleAfterPrint = () => {
+        window.removeEventListener("afterprint", handleAfterPrint);
+        setPreviewOpen(true);
+      };
+      window.addEventListener("afterprint", handleAfterPrint);
+      window.print();
+    }, 120);
   }
 
   return (
