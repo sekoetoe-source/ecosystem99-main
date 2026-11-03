@@ -21,8 +21,7 @@ export function isOperationalPeriod(
     period.status === "ACTIVE" &&
     !name.includes("testing") &&
     !name.includes("uji coba") &&
-    period.start_date <= today &&
-    period.end_date >= today
+    period.start_date <= today
   );
 }
 
@@ -30,5 +29,16 @@ export function resolveOperationalPeriod<T extends OperationalPeriod>(
   periods: T[],
   today = todayJakartaDate(),
 ): T | null {
-  return periods.find((period) => isOperationalPeriod(period, today)) ?? null;
+  const operational = periods.filter((period) => isOperationalPeriod(period, today));
+  if (operational.length === 0) return null;
+
+  // 1. Prefer period currently encompassing today
+  const currentWindow = operational.find((period) => period.end_date >= today);
+  if (currentWindow) return currentWindow;
+
+  // 2. If calendar passed end_date but period remains ACTIVE (not yet closed by admin),
+  // fallback to the latest active operational period that started
+  return (
+    operational.slice().sort((a, b) => b.start_date.localeCompare(a.start_date))[0] ?? null
+  );
 }

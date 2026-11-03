@@ -6,6 +6,10 @@ import {
   ENVIRONMENTAL_IMPACT_CONFIG,
   formatWasteWeight,
 } from "../src/lib/environmentalImpact.ts";
+import {
+  isOperationalPeriod,
+  resolveOperationalPeriod,
+} from "../src/lib/operationalPeriod.ts";
 
 describe("Ecosystem99 Hotfix Test Suite", () => {
   describe("F. Student Streak — Weekends Are Non-Breaking Days", () => {
@@ -137,6 +141,87 @@ describe("Ecosystem99 Hotfix Test Suite", () => {
     test("Format berat sampah menghasilkan teks yang mudah dibaca", () => {
       assert.strictEqual(formatWasteWeight(500), "500 g");
       assert.strictEqual(formatWasteWeight(15500), "15,5 kg");
+    });
+  });
+
+  describe("P0 Hotfix — Operational Period Resolution Across Month Rollover", () => {
+    const samplePeriods = [
+      {
+        id: "p-des-closed",
+        name: "Desember 2026",
+        status: "CLOSED",
+        start_date: "2026-12-01",
+        end_date: "2026-12-31",
+      },
+      {
+        id: "p-nov-closed",
+        name: "November 2026",
+        status: "CLOSED",
+        start_date: "2026-11-01",
+        end_date: "2026-11-30",
+      },
+      {
+        id: "p-okt-active",
+        name: "Oktober 2026 — Operasional",
+        status: "ACTIVE",
+        start_date: "2026-10-08",
+        end_date: "2026-10-31",
+      },
+      {
+        id: "p-okt-testing",
+        name: "Oktober 2026 — Testing",
+        status: "CLOSED",
+        start_date: "2026-10-01",
+        end_date: "2026-10-07",
+      },
+      {
+        id: "p-sep-closed",
+        name: "September 2026",
+        status: "CLOSED",
+        start_date: "2026-09-01",
+        end_date: "2026-09-30",
+      },
+    ];
+
+    test("Pada tanggal 3 November 2026, periode operasional aktif Oktober tetap teresolusi (sebelum ditutup admin)", () => {
+      const resolved = resolveOperationalPeriod(samplePeriods, "2026-11-03");
+      assert.ok(resolved, "Harus menemukan periode operasional aktif");
+      assert.strictEqual(resolved?.id, "p-okt-active");
+      assert.strictEqual(resolved?.name, "Oktober 2026 — Operasional");
+    });
+
+    test("Periode CLOSED tidak boleh teresolusi sebagai periode operasional berjalan", () => {
+      const closedOnly = samplePeriods.filter((p) => p.status === "CLOSED");
+      const resolved = resolveOperationalPeriod(closedOnly, "2026-11-03");
+      assert.strictEqual(resolved, null, "Periode tertutup tidak boleh dijadikan periode aktif");
+    });
+
+    test("Periode uji coba/testing tidak boleh teresolusi meski status ACTIVE", () => {
+      const testingActive = [
+        {
+          id: "p-test",
+          name: "Periode Uji Coba Baru",
+          status: "ACTIVE",
+          start_date: "2026-10-01",
+          end_date: "2026-11-30",
+        },
+      ];
+      const resolved = resolveOperationalPeriod(testingActive, "2026-11-03");
+      assert.strictEqual(resolved, null, "Periode testing/uji coba harus diabaikan");
+    });
+
+    test("Periode masa depan (start_date > hari ini) tidak boleh aktif", () => {
+      const futurePeriods = [
+        {
+          id: "p-future",
+          name: "Desember 2026 Operasional",
+          status: "ACTIVE",
+          start_date: "2026-12-01",
+          end_date: "2026-12-31",
+        },
+      ];
+      const resolved = resolveOperationalPeriod(futurePeriods, "2026-11-03");
+      assert.strictEqual(resolved, null, "Periode masa depan tidak boleh aktif");
     });
   });
 });

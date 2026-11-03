@@ -433,8 +433,7 @@ function LaporanPage() {
         selectedPeriod
           ? supabase
               .from("validation_items")
-              .select("validation_id, item_code, points, student_id, day, validations!inner(status, period_id)")
-              .eq("validations.period_id", selectedPeriod.id)
+              .select("validation_id, item_code, points, student_id, day, validations!inner(status)")
               .gte("day", previousRange.start)
               .lt("day", previousRange.end)
           : Promise.resolve({
@@ -642,6 +641,22 @@ function LaporanPage() {
           </Button>
         </div>
       </header>
+
+      {periods.isError && (
+        <div className="no-print rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Gagal memuat data periode: {periods.error instanceof Error ? periods.error.message : "Kesalahan database"}
+        </div>
+      )}
+      {report.isError && (
+        <div className="no-print rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Gagal memuat data laporan: {report.error instanceof Error ? report.error.message : "Kesalahan database"}
+        </div>
+      )}
+      {!operationalPeriod && !periods.isLoading && (
+        <div className="no-print rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-300">
+          Tidak ada periode operasional aktif. Aktifkan atau kelola periode operasional di menu Periode.
+        </div>
+      )}
 
       {/* DOKUMEN CETAK TUNGGAL (TARGET PRINT RESMI) */}
       <FormalReportDocument d={d} month={selectedMonth} isModal={false} />
