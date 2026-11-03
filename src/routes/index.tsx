@@ -54,6 +54,7 @@ import { QrImage } from "@/components/eco/QrImage";
 import { EcoNewsTicker } from "@/components/eco/EcoNewsTicker";
 import { homeForRole, useMe } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { resolveOperationalPeriod, todayJakartaDate } from "@/lib/operationalPeriod";
 import logoAsset from "@/assets/logo-smpn99.png.asset.json";
 import kopiLogo from "@/assets/traktir-kopi.png";
 
@@ -118,23 +119,30 @@ const monthKeyForJakarta = (date: Date) => {
 
 const useSchoolStats = () =>
   useQuery({
-    queryKey: ["school-stats", monthKeyForJakarta(new Date())],
+    queryKey: ["school-stats"],
     queryFn: async () => {
       try {
-        const month = monthKeyForJakarta(new Date());
-        const [year, monthNumber] = month.split("-").map(Number);
-        const start = `${month}-01`;
-        const end = new Date(Date.UTC(year!, monthNumber!, 1)).toISOString().slice(0, 10);
-        const [{ data: students, error: studentsError }, { data: items, error: itemsError }] =
+        const [{ data: students, error: studentsError }, { data: periods }] =
           await Promise.all([
             supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
             supabase
-              .from("validation_items")
-              .select("validation_id, item_code, points, student_id, day, validations!inner(status)")
-              .gte("day", start)
-              .lt("day", end),
+              .from("periods")
+              .select("id, name, status, start_date, end_date")
+              .order("start_date", { ascending: false }),
           ]);
         if (studentsError) throw studentsError;
+
+        const activePeriod = resolveOperationalPeriod(periods ?? [], todayJakartaDate());
+
+        let itemsQuery = supabase
+          .from("validation_items")
+          .select("validation_id, item_code, points, student_id, day, validations!inner(status, period_id)");
+
+        if (activePeriod?.id) {
+          itemsQuery = itemsQuery.eq("validations.period_id", activePeriod.id);
+        }
+
+        const { data: items, error: itemsError } = await itemsQuery;
         if (itemsError) throw itemsError;
         const validStudents = (students ?? []).filter((student) => {
           const className = (student.classes as { name: string } | null)?.name?.trim();
@@ -1003,7 +1011,7 @@ function Index() {
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="rounded-full">
-                <Link to="/peringkat">Lihat Leaderboard</Link>
+                <a href="#leaderboard">Lihat Leaderboard</a>
               </Button>
             </div>
             <p className="label-xs mt-5 text-muted-foreground">
@@ -1778,7 +1786,7 @@ function Index() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="rounded-full">
-              <Link to="/peringkat">Lihat Papan Peringkat</Link>
+              <a href="#leaderboard">Lihat Papan Peringkat</a>
             </Button>
           </div>
         </div>
@@ -1818,7 +1826,7 @@ function Index() {
               <a href="#tentang">Tentang Program</a>
               <a href="#scanner">Scanner</a>
               <a href="#kopi">Traktir Kopi</a>
-              <Link to="/peringkat">Peringkat</Link>
+              <a href="#leaderboard">Peringkat</a>
             </div>
           </div>
         </div>

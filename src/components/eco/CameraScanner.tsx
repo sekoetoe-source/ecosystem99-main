@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { RefreshCw, Camera } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function CameraScanner({
   active,
@@ -11,6 +13,9 @@ export function CameraScanner({
 }) {
   const containerId = "eco-qr-reader";
   const [error, setError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
   const onResultRef = useRef(onResult);
   onResultRef.current = onResult;
 
@@ -23,46 +28,41 @@ export function CameraScanner({
   useEffect(() => {
     if (!active) return;
     let scannerInstance: {
-      start: (...args: any[]) => Promise<any>;
       stop: () => Promise<void>;
       clear: () => void;
       isScanning?: boolean;
     } | null = null;
     let isCancelled = false;
-    let isStarting = false;
-    let isStopped = false;
 
     const stopScanner = async () => {
       isCancelled = true;
-      if (isStarting) return;
-      if (!scannerInstance || isStopped) return;
-      isStopped = true;
+      if (!scannerInstance) return;
       try {
         if (scannerInstance.isScanning) {
           await scannerInstance.stop();
         }
       } catch {
-        // html5-qrcode can report an already-stopped instance during teardown.
+        // html5-qrcode can report already stopped
       }
       try {
         scannerInstance.clear();
       } catch {
-        // The container may already have been removed.
+        // container might be removed
       }
+      scannerInstance = null;
     };
 
     (async () => {
-      isStarting = true;
+      setIsInitializing(true);
       setError(null);
+
       try {
-        const { Html5Qrcode } = await import("html5-qrcode");
-        if (isCancelled) {
-          isStarting = false;
-          return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Perangkat atau browser ini tidak mendukung akses kamera (getUserMedia tidak tersedia).");
         }
 
-        const instance = new Html5Qrcode(containerId);
-        scannerInstance = instance;
+        const { Html5Qrcode } = await import("html5-qrcode");
+        if (isCancelled) return;
 
         const qrSuccessCallback = (rawText: string) => {
           const text = rawText.trim();
@@ -77,73 +77,87 @@ export function CameraScanner({
 
         const qrConfig = { fps: 10, qrbox: { width: 240, height: 240 } };
 
-        // Attempt 1: Strict environment facing mode (ideal for mobile back camera)
+        // 1. Dapatkan daftar kamera fisik yang tersedia
+        let targetCamera: string | { facingMode: string } = { facingMode: "environment" };
+        try {
+          const cameras = await Html5Qrcode.getCameras();
+          if (cameras && cameras.length > 0) {
+            const rearCamera = cameras.find((c) =>
+              /back|rear|belakang|environment/i.test(c.label),
+            );
+            targetCamera = rearCamera ? rearCamera.id : cameras[0].id;
+          }
+        } catch {
+          // getCameras mungkin gagal jika izin belum diberikan atau batasan browser, gunakan fallback
+          targetCamera = { facingMode: "environment" };
+        }
+
+        if (isCancelled) return;
+
+        // 2. Buat instance dan mulai scanner
+        let instance = new Html5Qrcode(containerId);
+        scannerInstance = instance;
+
         let started = false;
         try {
-          await instance.start(
-            { facingMode: "environment" },
-            qrConfig,
-            qrSuccessCallback,
-            () => {},
-          );
+          await instance.start(targetCamera, qrConfig, qrSuccessCallback, () => {});
           started = true;
-        } catch {
-          // Attempt 2: Query enumerated devices and select rear camera or first available camera
+        } catch (firstErr) {
+          // Jika gagal (misal OverconstrainedError pada environment kamera laptop), bersihkan dan gunakan instance baru
+          try {
+            instance.clear();
+          } catch {}
+
           if (!isCancelled) {
+            instance = new Html5Qrcode(containerId);
+            scannerInstance = instance;
             try {
-              const cameras = await Html5Qrcode.getCameras();
-              if (cameras && cameras.length > 0) {
-                const backCam = cameras.find((c) =>
-                  /back|rear|belakang|environment/i.test(c.label),
-                );
-                const targetCameraId = backCam ? backCam.id : cameras[0].id;
-                await instance.start(targetCameraId, qrConfig, qrSuccessCallback, () => {});
-                started = true;
-              } else {
-                // Attempt 3: User facing mode fallback (laptop/front camera)
-                await instance.start(
-                  { facingMode: "user" },
-                  qrConfig,
-                  qrSuccessCallback,
-                  () => {},
-                );
-                started = true;
-              }
-            } catch (fallbackErr) {
-              try {
-                await instance.start(
-                  { facingMode: "user" },
-                  qrConfig,
-                  qrSuccessCallback,
-                  () => {},
-                );
-                started = true;
-              } catch {
-                throw fallbackErr;
-              }
+              await instance.start({ facingMode: "user" }, qrConfig, qrSuccessCallback, () => {});
+              started = true;
+            } catch (secondErr) {
+              throw secondErr || firstErr;
             }
           }
         }
 
-        isStarting = false;
         if (isCancelled && started) {
           await stopScanner();
         }
       } catch (reason) {
-        isStarting = false;
         if (!isCancelled) {
-          const message =
-            reason instanceof Error ? reason.message.toLowerCase() : String(reason).toLowerCase();
-          const detail =
-            message.includes("permission") || message.includes("notallowed")
-              ? "Izin kamera ditolak. Berikan izin kamera pada browser Anda atau gunakan input NIS manual."
-              : message.includes("notfound") ||
-                  message.includes("devicesnotfound") ||
-                  message.includes("no camera")
-                ? "Perangkat kamera tidak ditemukan. Gunakan input NIS manual."
-                : "Kamera tidak tersedia atau gagal dimulai. Gunakan input NIS manual.";
-          setError(detail);
+          const rawMsg = reason instanceof Error ? reason.message : String(reason);
+          const lower = rawMsg.toLowerCase();
+
+          let friendlyMessage: string;
+          if (
+            lower.includes("permission") ||
+            lower.includes("notallowed") ||
+            lower.includes("denied")
+          ) {
+            friendlyMessage =
+              "Izin kamera belum diberikan. Klik ikon gembok / kamera di sebelah kiri alamat web browser (URL), pilih 'Izinkan' (Allow) untuk kamera, lalu klik tombol 'Coba Lagi'.";
+          } else if (
+            lower.includes("notfound") ||
+            lower.includes("devicesnotfound") ||
+            lower.includes("no camera")
+          ) {
+            friendlyMessage =
+              "Perangkat kamera tidak terdeteksi pada laptop/komputer ini. Pastikan webcam terpasang atau gunakan input NIS manual siswa.";
+          } else if (
+            lower.includes("notreadable") ||
+            lower.includes("in use") ||
+            lower.includes("trackstart")
+          ) {
+            friendlyMessage =
+              "Kamera sedang digunakan oleh aplikasi lain (misal Zoom/Meet). Tutup aplikasi tersebut lalu klik 'Coba Lagi'.";
+          } else {
+            friendlyMessage =
+              "Kamera tidak tersedia atau gagal dimulai. Pastikan izin kamera aktif pada browser atau gunakan input NIS manual.";
+          }
+          setError(friendlyMessage);
         }
+      } finally {
+        setIsInitializing(false);
       }
     })();
 
@@ -151,15 +165,23 @@ export function CameraScanner({
       isCancelled = true;
       void stopScanner();
     };
-  }, [active]);
+  }, [active, retryCount]);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div
         id={containerId}
         className="overflow-hidden rounded-2xl border border-border bg-muted relative"
         style={{ minHeight: active ? 260 : 0 }}
       >
+        {isInitializing && (
+          <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] flex items-center justify-center z-10">
+            <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-background shadow border border-border flex items-center gap-2">
+              <Camera className="size-3.5 animate-pulse text-primary" />
+              Menghubungkan kamera...
+            </span>
+          </div>
+        )}
         {isLocked && (
           <div className="absolute inset-0 bg-background/40 backdrop-blur-[1px] flex items-center justify-center z-10">
             <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-background/80 shadow border border-border">
@@ -168,7 +190,23 @@ export function CameraScanner({
           </div>
         )}
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {error && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive space-y-2">
+          <p className="leading-relaxed">{error}</p>
+          <div className="flex gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setRetryCount((c) => c + 1)}
+              className="h-7 text-xs gap-1 border-destructive/30 text-destructive hover:bg-destructive/10"
+            >
+              <RefreshCw className="size-3" /> Coba Lagi
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
