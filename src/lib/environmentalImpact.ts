@@ -91,6 +91,38 @@ export function calculateEnvironmentalImpact(
 }
 
 /**
+ * Hitung metrik dampak lingkungan langsung dari jumlah penggunaan tumbler & lunchbox.
+ */
+export function calculateEnvironmentalImpactFromCounts(
+  approvedValidationsCount: number,
+  tumblerCount: number,
+  lunchboxCount: number,
+): EnvironmentalImpactMetrics {
+  const bottleWasteAvoidedG =
+    Math.round(tumblerCount * ENVIRONMENTAL_IMPACT_CONFIG.single_use_bottle_weight_grams * 10) / 10;
+
+  const foodLinerWasteAvoidedG =
+    Math.round(
+      lunchboxCount * ENVIRONMENTAL_IMPACT_CONFIG.single_use_canteen_food_liner_weight_grams * 10,
+    ) / 10;
+
+  const totalWasteAvoidedG = Math.round((bottleWasteAvoidedG + foodLinerWasteAvoidedG) * 10) / 10;
+  const totalWasteAvoidedKg = Math.round((totalWasteAvoidedG / 1000) * 100) / 100;
+
+  return {
+    validatedActivities: approvedValidationsCount,
+    validatedTumblerUses: tumblerCount,
+    validatedLunchboxUses: lunchboxCount,
+    bottleWasteAvoidedG,
+    foodLinerWasteAvoidedG,
+    totalWasteAvoidedG,
+    totalWasteAvoidedKg,
+    methodology:
+      "Estimasi dihitung berdasarkan 1 penggunaan tumbler = 15,5 gram botol sekali pakai dan 1 penggunaan kotak makan = 3,9 gram alas makan kantin sekali pakai.",
+  };
+}
+
+/**
  * Format berat dalam satuan kilogram (atau gram jika < 1 kg) untuk UI Indonesia
  */
 export function formatWasteWeight(weightGrams: number): string {

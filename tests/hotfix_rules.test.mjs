@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { calculateStudentStreak } from "../src/lib/studentStreak.ts";
 import {
   calculateEnvironmentalImpact,
+  calculateEnvironmentalImpactFromCounts,
   ENVIRONMENTAL_IMPACT_CONFIG,
   formatWasteWeight,
 } from "../src/lib/environmentalImpact.ts";
@@ -141,6 +142,17 @@ describe("Ecosystem99 Hotfix Test Suite", () => {
     test("Format berat sampah menghasilkan teks yang mudah dibaca", () => {
       assert.strictEqual(formatWasteWeight(500), "500 g");
       assert.strictEqual(formatWasteWeight(15500), "15,5 kg");
+    });
+
+    test("Perhitungan dampak lingkungan dari jumlah agregat (calculateEnvironmentalImpactFromCounts) identik dengan perhitungan per-item", () => {
+      const impactFromCounts = calculateEnvironmentalImpactFromCounts(3, 3, 2);
+      assert.strictEqual(impactFromCounts.validatedActivities, 3);
+      assert.strictEqual(impactFromCounts.validatedTumblerUses, 3);
+      assert.strictEqual(impactFromCounts.validatedLunchboxUses, 2);
+      assert.strictEqual(impactFromCounts.bottleWasteAvoidedG, 46.5);
+      assert.strictEqual(impactFromCounts.foodLinerWasteAvoidedG, 7.8);
+      assert.strictEqual(impactFromCounts.totalWasteAvoidedG, 54.3);
+      assert.strictEqual(impactFromCounts.totalWasteAvoidedKg, 0.05);
     });
   });
 

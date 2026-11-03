@@ -77,47 +77,56 @@ export function CameraScanner({
 
         const qrConfig = { fps: 10, qrbox: { width: 240, height: 240 } };
 
-        // 1. Dapatkan daftar kamera fisik yang tersedia
-        let targetCamera: string | { facingMode: string } = { facingMode: "environment" };
-        try {
-          const cameras = await Html5Qrcode.getCameras();
-          if (cameras && cameras.length > 0) {
-            const rearCamera = cameras.find((c) =>
-              /back|rear|belakang|environment/i.test(c.label),
-            );
-            targetCamera = rearCamera ? rearCamera.id : cameras[0].id;
-          }
-        } catch {
-          // getCameras mungkin gagal jika izin belum diberikan atau batasan browser, gunakan fallback
-          targetCamera = { facingMode: "environment" };
-        }
-
-        if (isCancelled) return;
-
-        // 2. Buat instance dan mulai scanner
-        let instance = new Html5Qrcode(containerId);
-        scannerInstance = instance;
+        // Strategi inisialisasi kamera tanpa getCameras() churn:
+        // 1. Coba kamera belakang (environment) langsung — standar ideal untuk scanner QR di HP.
+        // 2. Jika gagal karena batasan laptop (OverconstrainedError), fallback ke webcam depan (user).
+        // 3. Jika gagal lagi, fallback ke perangkat video generik (any videoinput).
+        const attempts: Array<MediaTrackConstraints | { facingMode: string } | string> = [
+          { facingMode: { ideal: "environment" } },
+          { facingMode: "user" },
+          {},
+        ];
 
         let started = false;
-        try {
-          await instance.start(targetCamera, qrConfig, qrSuccessCallback, () => {});
-          started = true;
-        } catch (firstErr) {
-          // Jika gagal (misal OverconstrainedError pada environment kamera laptop), bersihkan dan gunakan instance baru
-          try {
-            instance.clear();
-          } catch {}
+        let lastError: unknown = null;
 
-          if (!isCancelled) {
+        for (let i = 0; i < attempts.length; i++) {
+          if (isCancelled) return;
+          const targetConstraint = attempts[i];
+
+          // Pastikan kontainer bersih dari sisa elemen DOM sebelum instance baru
+          const containerElem = document.getElementById(containerId);
+          if (containerElem) {
+            containerElem.innerHTML = "";
+          }
+
+          let instance: any = null;
+          try {
             instance = new Html5Qrcode(containerId);
             scannerInstance = instance;
-            try {
-              await instance.start({ facingMode: "user" }, qrConfig, qrSuccessCallback, () => {});
-              started = true;
-            } catch (secondErr) {
-              throw secondErr || firstErr;
+            await instance.start(targetConstraint, qrConfig, qrSuccessCallback, () => {});
+            started = true;
+            break;
+          } catch (err) {
+            lastError = err;
+            if (instance) {
+              try {
+                if (instance.isScanning) {
+                  await instance.stop();
+                }
+              } catch {}
+              try {
+                instance.clear();
+              } catch {}
+              scannerInstance = null;
             }
+            // Beri jeda 120ms agar driver kamera browser selesai melepaskan stream sebelum mencoba constraint lain
+            await new Promise((r) => setTimeout(r, 120));
           }
+        }
+
+        if (!started && !isCancelled) {
+          throw lastError || new Error("Gagal menginisialisasi kamera.");
         }
 
         if (isCancelled && started) {

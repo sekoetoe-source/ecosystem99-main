@@ -39,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   calculateEnvironmentalImpact,
+  calculateEnvironmentalImpactFromCounts,
   formatWasteWeight,
   ENVIRONMENTAL_IMPACT_CONFIG,
 } from "@/lib/environmentalImpact";
@@ -122,6 +123,42 @@ const useSchoolStats = () =>
     queryKey: ["school-stats"],
     queryFn: async () => {
       try {
+        // 1. Prioritaskan RPC server-side get_landing_stats (cepat, akurat 100%, bebas limit pagination)
+        const { data: rpcStats, error: rpcError } = await (supabase.rpc as any)("get_landing_stats");
+        if (!rpcError && rpcStats) {
+          const stats = rpcStats as {
+            period_id: string;
+            period_name: string;
+            total_points: number;
+            total_items: number;
+            student_count: number;
+            validated_activities: number;
+            tumbler_uses: number;
+            lunchbox_uses: number;
+            classes: Array<{
+              class_name: string;
+              student_count: number;
+              total_points: number;
+              avg_points: number;
+            }>;
+          };
+
+          const impact = calculateEnvironmentalImpactFromCounts(
+            Number(stats.validated_activities ?? 0),
+            Number(stats.tumbler_uses ?? 0),
+            Number(stats.lunchbox_uses ?? 0),
+          );
+
+          return {
+            totalPoints: Number(stats.total_points ?? 0),
+            totalItems: Number(stats.total_items ?? 0),
+            studentCount: Number(stats.student_count ?? 0),
+            impact,
+            classes: stats.classes ?? [],
+          };
+        }
+
+        // 2. Fallback query data siswa dan periode jika RPC tidak tersedia
         const [{ data: students, error: studentsError }, { data: periods }] =
           await Promise.all([
             supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
@@ -134,16 +171,41 @@ const useSchoolStats = () =>
 
         const activePeriod = resolveOperationalPeriod(periods ?? [], todayJakartaDate());
 
-        let itemsQuery = supabase
-          .from("validation_items")
-          .select("validation_id, item_code, points, student_id, day, validations!inner(status, period_id)");
+        // Ambil data validation_items secara terpaginasi agar tidak terpotong batas 1.000 PostgREST
+        let allItems: Array<{
+          validation_id: string | null;
+          item_code: string;
+          points: number | null;
+          student_id: string;
+          day: string;
+          validations: { status: string; period_id: string } | null;
+        }> = [];
 
-        if (activePeriod?.id) {
-          itemsQuery = itemsQuery.eq("validations.period_id", activePeriod.id);
+        let from = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          let query = supabase
+            .from("validation_items")
+            .select("validation_id, item_code, points, student_id, day, validations!inner(status, period_id)")
+            .range(from, from + pageSize - 1);
+
+          if (activePeriod?.id) {
+            query = query.eq("validations.period_id", activePeriod.id);
+          }
+
+          const { data: batch, error: batchErr } = await query;
+          if (batchErr) throw batchErr;
+          if (batch && batch.length > 0) {
+            allItems = allItems.concat(batch as any);
+            from += pageSize;
+            if (batch.length < pageSize) hasMore = false;
+          } else {
+            hasMore = false;
+          }
         }
 
-        const { data: items, error: itemsError } = await itemsQuery;
-        if (itemsError) throw itemsError;
         const validStudents = (students ?? []).filter((student) => {
           const className = (student.classes as { name: string } | null)?.name?.trim();
           return Boolean(
@@ -154,7 +216,7 @@ const useSchoolStats = () =>
           );
         });
         const validStudentIds = new Set(validStudents.map((student) => student.id));
-        const approved = (items ?? []).filter(
+        const approved = allItems.filter(
           (item) =>
             (item.validations as { status: string } | null)?.status === "approved" &&
             validStudentIds.has(item.student_id),
