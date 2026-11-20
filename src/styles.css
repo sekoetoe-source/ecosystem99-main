@@ -488,8 +488,8 @@
     margin-top: 7mm !important;
   }
 
-  #report-print-root .print-report-sheet .min-w-\\[34rem\\] th,
-  #report-print-root .print-report-sheet .min-w-\\[34rem\\] td {
+  #report-print-root .print-report-sheet [class~="min-w-[34rem]"] th,
+  #report-print-root .print-report-sheet [class~="min-w-[34rem]"] td {
     padding: 2.5pt 4pt !important;
     font-size: 8pt !important;
     line-height: 1.2 !important;
