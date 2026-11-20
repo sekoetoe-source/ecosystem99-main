@@ -115,21 +115,55 @@ const useSchoolStats = () =>
     queryKey: ["school-stats", monthKeyForJakarta(new Date())],
     queryFn: async () => {
       try {
+        // Keep the landing page on the same reporting window as /admin/laporan:
+        // previous calendar month through the current Jakarta date, inclusive.
         const month = monthKeyForJakarta(new Date());
         const [year, monthNumber] = month.split("-").map(Number);
-        const start = `${month}-01`;
-        const end = new Date(Date.UTC(year!, monthNumber!, 1)).toISOString().slice(0, 10);
-        const [{ data: students, error: studentsError }, { data: items, error: itemsError }] =
-          await Promise.all([
-            supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
-            supabase
-              .from("validation_items")
-              .select("item_code, points, student_id, validations!inner(status)")
-              .gte("day", start)
-              .lt("day", end),
-          ]);
+        const previousMonth = monthKeyForJakarta(
+          new Date(Date.UTC(year!, monthNumber! - 2, 1)),
+        );
+        const start = `${previousMonth}-01`;
+        const currentMonthEnd = new Date(Date.UTC(year!, monthNumber!, 1))
+          .toISOString()
+          .slice(0, 10);
+        const todayJakarta = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Asia/Jakarta",
+        }).format(new Date());
+        const tomorrowJakartaDate = new Date(`${todayJakarta}T00:00:00.000Z`);
+        tomorrowJakartaDate.setUTCDate(tomorrowJakartaDate.getUTCDate() + 1);
+        const tomorrowJakarta = tomorrowJakartaDate.toISOString().slice(0, 10);
+        const endExclusive =
+          tomorrowJakarta < currentMonthEnd ? tomorrowJakarta : currentMonthEnd;
+
+        const [{ data: students, error: studentsError }] = await Promise.all([
+          supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
+        ]);
         if (studentsError) throw studentsError;
-        if (itemsError) throw itemsError;
+
+        // Match the report's complete PostgREST pagination and deterministic ordering.
+        const pageSize = 1000;
+        const items: Array<{
+          id: string;
+          item_code: string;
+          points: number;
+          student_id: string;
+          day: string;
+          validations: unknown;
+        }> = [];
+        for (let offset = 0; ; offset += pageSize) {
+          const { data: page, error } = await supabase
+            .from("validation_items")
+            .select("id, item_code, points, student_id, day, validations!inner(status)")
+            .gte("day", start)
+            .lt("day", endExclusive)
+            .order("id", { ascending: true })
+            .range(offset, offset + pageSize - 1);
+          if (error) throw error;
+          const rows = page ?? [];
+          items.push(...rows);
+          if (rows.length < pageSize) break;
+        }
+
         const validStudents = (students ?? []).filter((student) => {
           const className = (student.classes as { name: string } | null)?.name?.trim();
           return Boolean(
@@ -139,11 +173,10 @@ const useSchoolStats = () =>
               className.toLowerCase() !== "tanpa kelas",
           );
         });
-        const validStudentIds = new Set(validStudents.map((student) => student.id));
-        const approved = (items ?? []).filter(
-          (item) =>
-            (item.validations as { status: string } | null)?.status === "approved" &&
-            validStudentIds.has(item.student_id),
+        // The formal report totals all approved validation items, including records whose
+        // students do not have a class assignment; class rankings are restricted below.
+        const approved = items.filter(
+          (item) => (item.validations as { status: string } | null)?.status === "approved",
         );
         const totalPoints = approved.reduce((sum, item) => sum + Number(item.points ?? 0), 0);
         const classes = new Map<
@@ -182,11 +215,12 @@ const useSchoolStats = () =>
           totalItems: approved.length,
           studentCount: validStudents.length,
           co2Kg: Math.round((approved.length * 70) / 1000),
+          periodLabel: `${new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(new Date(`${previousMonth}-01T12:00:00Z`))} s.d. ${new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date())} WIB`,
           classes: computedClasses.slice(0, 5),
         };
       } catch (error) {
         console.error("Landing report stats unavailable:", error);
-        return { totalPoints: 0, totalItems: 0, studentCount: 0, co2Kg: 0, classes: [] };
+        return { totalPoints: 0, totalItems: 0, studentCount: 0, co2Kg: 0, periodLabel: "", classes: [] };
       }
     },
     retry: 1,
@@ -679,6 +713,7 @@ function Index() {
     totalPoints: liveStats?.totalPoints ?? 0,
     co2Kg: liveStats?.co2Kg ?? 0,
     classes: liveStats?.classes ?? [],
+    periodLabel: liveStats?.periodLabel ?? "",
   };
   const { me } = useMe();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1035,7 +1070,9 @@ function Index() {
           ))}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Statistik ditarik langsung dari data operasional sistem.
+          {data.periodLabel
+            ? `Data akumulasi ${data.periodLabel}, menggunakan cakupan yang sama dengan Laporan Bulanan.`
+            : "Statistik ditarik langsung dari data operasional sistem."}
         </p>
       </section>
 
