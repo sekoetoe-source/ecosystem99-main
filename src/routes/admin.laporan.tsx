@@ -126,28 +126,7 @@ function FormalReportDocument({
                       </div>
                     </div>
       <div className="report-content">
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 border-b-2 border-foreground pb-5 mb-6">
-                <img
-                  src={logoAsset.url}
-                  alt="Logo SMP Negeri 99 Jakarta"
-                  className="size-16 shrink-0 object-contain sm:size-20"
-                />
-                <div className="min-w-0 text-center">
-                  <h2 className="text-lg font-extrabold tracking-tight sm:text-3xl text-foreground">
-                    {SCHOOL.name}
-                  </h2>
-                  <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.address}</p>
-                  <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.contact}</p>
-                  <p className="text-xs text-muted-foreground sm:text-sm">{SCHOOL.emailWebsite}</p>
-                </div>
-              </div>
-            </td>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td className="w-full">
-              <div className="text-center">
+<div className="text-center">
                 <h3 className="text-base font-extrabold uppercase tracking-tight sm:text-xl text-foreground">
                   LAPORAN BULANAN PROGRAM LINGKUNGAN
                 </h3>
