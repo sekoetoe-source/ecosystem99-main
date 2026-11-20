@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Eye, FileText, Printer, X } from "lucide-react";
+import { Download, FileText, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import logoAsset from "@/assets/logo-smpn99.png.asset.json";
-import { resolveOperationalPeriod, todayJakartaDate } from "@/lib/operationalPeriod";
+import { todayJakartaDate } from "@/lib/operationalPeriod";
 
 export const Route = createFileRoute("/admin/laporan")({
   head: () => ({
@@ -278,19 +278,6 @@ function FormalReportDocument({
 
 function LaporanPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
-  const periods = useQuery({
-    queryKey: ["periods"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("periods")
-        .select("id, name, status, start_date, end_date")
-        .order("start_date", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-    refetchInterval: 30_000,
-  });
-  const operationalPeriod = resolveOperationalPeriod(periods.data ?? [], todayJakartaDate());
   // Reports follow the current calendar month in Jakarta, not the active operational period.
   const selectedMonth = monthKey(new Date());
   const report = useQuery({
@@ -315,13 +302,15 @@ function LaporanPage() {
           student_id: string;
           day: string;
           validations: unknown;
+          id: string;
         }> = [];
         for (let offset = 0; ; offset += pageSize) {
           const { data, error } = await supabase
             .from("validation_items")
-            .select("item_code, points, student_id, day, validations!inner(status)")
+            .select("id, item_code, points, student_id, day, validations!inner(status)")
             .gte("day", startDay)
             .lt("day", endDay)
+            .order("id", { ascending: true })
             .range(offset, offset + pageSize - 1);
           if (error) throw error;
           const page = data ?? [];
