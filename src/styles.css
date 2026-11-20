@@ -323,3 +323,143 @@
     overflow: visible !important;
   }
 }
+
+
+/* A dedicated copy of the report is mounted directly under <body> for printing.
+   This keeps Radix Dialog's max-height and overflow scroll container out of print layout. */
+.print-only-report {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 9mm 10mm;
+  }
+
+  html,
+  body {
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body > *:not(#report-print-root) {
+    display: none !important;
+  }
+
+  #report-print-root,
+  .print-only-report {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  #report-print-root .print-report-sheet,
+  #report-print-root .print-report-sheet * {
+    visibility: visible !important;
+  }
+
+  #report-print-root .print-report-sheet {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-size: 9pt !important;
+    line-height: 1.35 !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #report-print-root .print-report-sheet table {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  #report-print-root .print-report-sheet [class~="min-w-[34rem]"] {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  #report-print-root .print-report-sheet .overflow-x-auto,
+  #report-print-root .print-report-sheet .overflow-y-auto,
+  #report-print-root .print-report-sheet .overflow-hidden {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  #report-print-root .print-report-sheet thead {
+    display: table-header-group !important;
+  }
+
+  #report-print-root .print-report-sheet tfoot {
+    display: table-footer-group !important;
+  }
+
+  #report-print-root .print-report-sheet tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  #report-print-root .print-report-sheet th,
+  #report-print-root .print-report-sheet td {
+    padding: 4pt 5pt !important;
+    overflow-wrap: anywhere !important;
+    vertical-align: middle !important;
+  }
+
+  #report-print-root .print-report-sheet h3,
+  #report-print-root .print-report-sheet h4 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  #report-print-root .print-report-sheet img {
+    max-width: 100% !important;
+    object-fit: contain !important;
+  }
+
+  #report-print-root .print-report-sheet .mt-12 {
+    margin-top: 8mm !important;
+  }
+
+  #report-print-root .print-report-sheet .rounded-2xl {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
