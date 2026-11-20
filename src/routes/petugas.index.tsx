@@ -255,16 +255,8 @@ function ScannerPage() {
       const today = todayJakarta();
 
       if (isLate) {
-        const todayDate = new Date(`${today}T00:00:00+07:00`);
-        const oldestAllowed = new Date(todayDate);
-        oldestAllowed.setDate(oldestAllowed.getDate() - 7);
-        const oldestAllowedDate = new Intl.DateTimeFormat("en-CA", {
-          timeZone: "Asia/Jakarta",
-        }).format(oldestAllowed);
-        if (scanDate > today || scanDate < oldestAllowedDate) {
-          throw new Error(
-            "Tanggal susulan harus hari ini atau maksimal tujuh hari kalender ke belakang.",
-          );
+        if (scanDate > today) {
+          throw new Error("Tanggal pemindaian susulan tidak boleh di masa depan.");
         }
         const configuredStart = activePeriod.late_scan_start_date;
         const configuredEnd = activePeriod.late_scan_end_date;
@@ -519,7 +511,15 @@ function ScannerPage() {
   };
 
   const currentSessionMeta = SCAN_SESSIONS[session];
-  const lateDeadlinePassed = false;
+  const selectedSessionNumber = session === "entry" ? 1 : 2;
+  const selectedOperationalSession = (operationalSessions.data ?? []).find(
+    (configured) => configured.session_number === selectedSessionNumber,
+  );
+  const lateDeadlinePassed = !(
+    currentPeriod.data?.late_scan_start_date &&
+    currentPeriod.data?.late_scan_end_date &&
+    selectedOperationalSession?.enabled
+  );
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
