@@ -411,7 +411,7 @@
     page-break-inside: auto !important;
   }
 
-  #report-print-root .print-report-sheet .min-w-\\[34rem\\] {
+  #report-print-root .print-report-sheet [class~="min-w-[34rem]"] {
     min-width: 0 !important;
     width: 100% !important;
   }
