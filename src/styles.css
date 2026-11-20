@@ -463,3 +463,35 @@
     page-break-inside: avoid !important;
   }
 }
+
+
+/* Keep the school letterhead only on the first printed page.
+   The ranking table keeps its own repeating column header. */
+@media print {
+  #report-print-root .print-report-sheet > table > thead.report-letterhead {
+    display: table-row-group !important;
+  }
+
+  #report-print-root .print-report-sheet .report-signatures {
+    margin-top: 4mm !important;
+    gap: 6mm !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  #report-print-root .print-report-sheet .report-signature-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  #report-print-root .print-report-sheet .report-signature-block .mt-16 {
+    margin-top: 7mm !important;
+  }
+
+  #report-print-root .print-report-sheet [class~="min-w-[34rem]"] th,
+  #report-print-root .print-report-sheet [class~="min-w-[34rem]"] td {
+    padding: 2.5pt 4pt !important;
+    font-size: 8pt !important;
+    line-height: 1.2 !important;
+  }
+}

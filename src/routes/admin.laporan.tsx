@@ -111,7 +111,7 @@ function FormalReportDocument({
       }`}
     >
       <table className="w-full border-collapse table-fixed">
-        <thead>
+        <thead className="report-letterhead">
           <tr>
             <td className="w-full">
               <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 border-b-2 border-foreground pb-5 mb-6">
@@ -261,8 +261,8 @@ function FormalReportDocument({
                 )}
               </div>
 
-              <div className="mt-12 grid gap-10 text-center text-sm sm:grid-cols-2 text-foreground">
-                <div>
+              <div className="report-signatures mt-12 grid gap-10 text-center text-sm sm:grid-cols-2 text-foreground">
+                <div className="report-signature-block">
                   <p>Mengetahui,</p>
                   <p>Kepala Sekolah</p>
                   <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
@@ -270,7 +270,7 @@ function FormalReportDocument({
                     <p className="text-xs text-primary">{SCHOOL.principalNip}</p>
                   </div>
                 </div>
-                <div>
+                <div className="report-signature-block">
                   <p>Jakarta, {month ? monthLabel(month) : "-"}</p>
                   <p>Koordinator Program</p>
                   <div className="mx-auto mt-16 w-56 border-t border-foreground pt-2">
