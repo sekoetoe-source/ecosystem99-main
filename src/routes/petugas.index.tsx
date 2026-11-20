@@ -175,6 +175,7 @@ function ScannerPage() {
       if (error) throw error;
       return resolveOperationalPeriod(data ?? [], currentDate);
     },
+    refetchInterval: 30_000,
   });
   const lateScanConfig = { data: currentPeriod.data };
   useEffect(() => {
@@ -201,6 +202,7 @@ function ScannerPage() {
       if (error) throw error;
       return data ?? [];
     },
+    refetchInterval: 30_000,
   });
 
   const submit = useMutation({
