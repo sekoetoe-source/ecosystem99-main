@@ -60,6 +60,11 @@ function monthLabel(key: string) {
   );
 }
 
+function previousMonthKey(key: string) {
+  const [year, month] = key.split("-").map(Number);
+  return monthKey(new Date(Date.UTC(year!, month! - 2, 1)));
+}
+
 function monthRange(key: string) {
   const [y, m] = key.split("-").map(Number);
   const start = `${key}-01`;
@@ -136,6 +141,11 @@ function FormalReportDocument({
                 <p className="mt-1 text-sm font-bold text-primary">
                   Periode: {month ? monthLabel(month) : "-"}
                 </p>
+                {month && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Akumulasi sejak {monthLabel(previousMonthKey(month))} s.d. {todayJakartaDate()} WIB
+                  </p>
+                )}
               </div>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -167,7 +177,7 @@ function FormalReportDocument({
               </h4>
               <div className="mt-3 grid gap-3 lg:grid-cols-2">
                 <div className="rounded-2xl border border-border p-5">
-                  <p className="text-sm font-semibold text-foreground">Ringkasan Bulan Ini</p>
+                  <p className="text-sm font-semibold text-foreground">Ringkasan Akumulasi</p>
                   <dl className="mt-3 space-y-2 text-sm">
                     {[
                       ["Siswa aktif terdaftar", (d?.totalStudents ?? 0).toLocaleString("id-ID")],
@@ -199,7 +209,7 @@ function FormalReportDocument({
                         : `${d.growth > 0 ? "+" : ""}${d.growth}%`}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Perkembangan dari Bulan Lalu
+                      Akumulasi dibanding bulan lalu
                     </p>
                   </div>
                 </div>
@@ -289,9 +299,7 @@ function LaporanPage() {
       const tomorrowJakarta = todayUtc.toISOString().slice(0, 10);
       const currentEndExclusive =
         tomorrowJakarta < currentRange.end ? tomorrowJakarta : currentRange.end;
-      const [year, month] = selectedMonth.split("-").map(Number);
-      const previousMonthDate = new Date(Date.UTC(year!, month! - 2, 1));
-      const previousRange = monthRange(monthKey(previousMonthDate));
+      const previousRange = monthRange(previousMonthKey(selectedMonth));
 
       // Read every PostgREST page explicitly; the default response cap can truncate at 1,000 rows.
       const fetchAllItems = async (startDay: string, endDay: string) => {
@@ -322,7 +330,7 @@ function LaporanPage() {
 
       const [studentsRes, items, prevItems] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
-        fetchAllItems(currentRange.start, currentEndExclusive),
+        fetchAllItems(previousRange.start, currentEndExclusive),
         fetchAllItems(previousRange.start, previousRange.end),
       ]);
       if (studentsRes.error) throw studentsRes.error;
@@ -458,7 +466,7 @@ function LaporanPage() {
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-xl border border-input bg-background px-3 py-2 text-sm font-semibold">
-            Laporan {monthLabel(selectedMonth)} · s.d. {todayJakartaDate()} WIB
+            Laporan {monthLabel(selectedMonth)} · akumulasi sejak {monthLabel(previousMonthKey(selectedMonth))}
           </span>
           <Button
             variant="outline"
@@ -498,7 +506,7 @@ function LaporanPage() {
                 </Badge>
               </div>
               <DialogDescription className="text-xs text-muted-foreground">
-                Periode: <strong>{monthLabel(selectedMonth)}</strong> · SMP Negeri 99 Jakarta
+                Periode: <strong>{monthLabel(selectedMonth)}</strong> · Akumulasi sejak {monthLabel(previousMonthKey(selectedMonth))} · SMP Negeri 99 Jakarta
               </DialogDescription>
             </div>
 
