@@ -438,12 +438,13 @@ function LaporanPage() {
     ];
     const csv = lines.map((line) => line.map(escapeCsv).join(",")).join("\r\n");
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(
+    const downloadUrl = URL.createObjectURL(
       new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }),
     );
+    a.href = downloadUrl;
     a.download = `laporan-lingkungan-${selectedMonth}.csv`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
   }
   function handlePrintDirect() {
     window.print();
