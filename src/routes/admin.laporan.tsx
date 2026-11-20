@@ -439,7 +439,7 @@ function LaporanPage() {
     const csv = lines.map((line) => line.map(escapeCsv).join(",")).join("\r\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(
-      new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" }),
+      new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }),
     );
     a.download = `laporan-lingkungan-${selectedMonth}.csv`;
     a.click();
