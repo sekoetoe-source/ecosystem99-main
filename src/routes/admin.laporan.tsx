@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Eye, FileText, Printer, X } from "lucide-react";
+import { Download, FileText, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import logoAsset from "@/assets/logo-smpn99.png.asset.json";
-import { resolveOperationalPeriod, todayJakartaDate } from "@/lib/operationalPeriod";
+import { todayJakartaDate } from "@/lib/operationalPeriod";
 
 export const Route = createFileRoute("/admin/laporan")({
   head: () => ({
@@ -278,58 +278,55 @@ function FormalReportDocument({
 
 function LaporanPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
-  const periods = useQuery({
-    queryKey: ["periods"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("periods")
-        .select("id, name, status, start_date, end_date")
-        .order("start_date", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-    refetchInterval: 30_000,
-  });
-  const operationalPeriod = resolveOperationalPeriod(periods.data ?? [], todayJakartaDate());
-  const selectedMonth = operationalPeriod?.start_date.slice(0, 7) ?? "";
+  // Reports follow the current calendar month in Jakarta, not the active operational period.
+  const selectedMonth = monthKey(new Date());
   const report = useQuery({
-    queryKey: ["formal-report", selectedMonth, periods.dataUpdatedAt],
+    queryKey: ["formal-report", selectedMonth],
     queryFn: async () => {
       const currentRange = monthRange(selectedMonth);
+      const todayUtc = new Date(`${todayJakartaDate()}T00:00:00.000Z`);
+      todayUtc.setUTCDate(todayUtc.getUTCDate() + 1);
+      const tomorrowJakarta = todayUtc.toISOString().slice(0, 10);
+      const currentEndExclusive =
+        tomorrowJakarta < currentRange.end ? tomorrowJakarta : currentRange.end;
       const [year, month] = selectedMonth.split("-").map(Number);
       const previousMonthDate = new Date(Date.UTC(year!, month! - 2, 1));
       const previousRange = monthRange(monthKey(previousMonthDate));
-      const selectedPeriod = operationalPeriod;
-      const [studentsRes, itemsRes, prevItemsRes] = await Promise.all([
+
+      // Read every PostgREST page explicitly; the default response cap can truncate at 1,000 rows.
+      const fetchAllItems = async (startDay: string, endDay: string) => {
+        const pageSize = 1000;
+        const all: Array<{
+          item_code: string;
+          points: number;
+          student_id: string;
+          day: string;
+          validations: unknown;
+          id: string;
+        }> = [];
+        for (let offset = 0; ; offset += pageSize) {
+          const { data, error } = await supabase
+            .from("validation_items")
+            .select("id, item_code, points, student_id, day, validations!inner(status)")
+            .gte("day", startDay)
+            .lt("day", endDay)
+            .order("id", { ascending: true })
+            .range(offset, offset + pageSize - 1);
+          if (error) throw error;
+          const page = data ?? [];
+          all.push(...page);
+          if (page.length < pageSize) break;
+        }
+        return all;
+      };
+
+      const [studentsRes, items, prevItems] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
-        selectedPeriod
-          ? supabase
-              .from("validation_items")
-              .select("item_code, points, student_id, day, validations!inner(status, period_id)")
-              .eq("validations.period_id", selectedPeriod.id)
-              .gte("day", currentRange.start)
-              .lt("day", currentRange.end)
-          : Promise.resolve({
-              data: [] as Array<{
-                item_code: string;
-                points: number;
-                student_id: string;
-                day: string;
-                validations: unknown;
-              }>,
-              error: null,
-            }),
-        Promise.resolve({
-          data: [] as Array<{ item_code: string; validations: unknown }>,
-          error: null,
-        }),
+        fetchAllItems(currentRange.start, currentEndExclusive),
+        fetchAllItems(previousRange.start, previousRange.end),
       ]);
       if (studentsRes.error) throw studentsRes.error;
-      if (itemsRes.error) throw itemsRes.error;
-      if (prevItemsRes.error) throw prevItemsRes.error;
       const students = studentsRes.data;
-      const items = itemsRes.data;
-      const prevItems = prevItemsRes;
       const validStudents = (students ?? []).filter((s) => {
         const className = (s.classes as { name: string } | null)?.name?.trim();
         return Boolean(
@@ -339,7 +336,7 @@ function LaporanPage() {
       const approved = (items ?? []).filter(
         (i) => (i.validations as { status: string } | null)?.status === "approved",
       );
-      const prevApproved = (prevItems.data ?? []).filter(
+      const prevApproved = prevItems.filter(
         (i) => (i.validations as { status: string } | null)?.status === "approved",
       );
       const classOf = new Map(
@@ -419,15 +416,35 @@ function LaporanPage() {
   });
   const d = report.data;
   function exportCsv() {
-    const header =
-      "Peringkat,Kelas,Siswa,Poin,Persentase Penggunaan Tumbler,Persentase Penggunaan Kotak Makan\n";
-    const body = (d?.rows ?? [])
-      .map((r, i) => `${i + 1},${r.name},${r.students},${r.points},${r.tumbler}%,${r.lunchbox}%`)
-      .join("\n");
+    const escapeCsv = (value: string | number) =>
+      `"${String(value).replace(/"/g, '""')}"`;
+    const lines = [
+      [
+        "Peringkat",
+        "Kelas",
+        "Siswa",
+        "Poin",
+        "Persentase Penggunaan Tumbler",
+        "Persentase Penggunaan Kotak Makan",
+      ],
+      ...(d?.rows ?? []).map((r, i) => [
+        i + 1,
+        r.name,
+        r.students,
+        r.points,
+        `${r.tumbler}%`,
+        `${r.lunchbox}%`,
+      ]),
+    ];
+    const csv = lines.map((line) => line.map(escapeCsv).join(",")).join("\r\n");
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([header + body], { type: "text/csv;charset=utf-8;" }));
+    const downloadUrl = URL.createObjectURL(
+      new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }),
+    );
+    a.href = downloadUrl;
     a.download = `laporan-lingkungan-${selectedMonth}.csv`;
     a.click();
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
   }
   function handlePrintDirect() {
     window.print();
@@ -441,20 +458,20 @@ function LaporanPage() {
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-xl border border-input bg-background px-3 py-2 text-sm font-semibold">
-            {operationalPeriod ? operationalPeriod.name : "Tidak ada periode berjalan"}
+            Laporan {monthLabel(selectedMonth)} · s.d. {todayJakartaDate()} WIB
           </span>
           <Button
             variant="outline"
             size="sm"
             onClick={exportCsv}
-            disabled={!operationalPeriod || report.isLoading}
+            disabled={!selectedMonth || report.isLoading}
           >
             <Download className="size-4" /> Ekspor CSV
           </Button>
           <Button
             size="sm"
             onClick={() => setPreviewOpen(true)}
-            disabled={!operationalPeriod || report.isLoading}
+            disabled={!selectedMonth || report.isLoading}
             className="font-bold gap-1.5 shadow-sm"
           >
             <Printer className="size-4" /> Cetak / PDF
