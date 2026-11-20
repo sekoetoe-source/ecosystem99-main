@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileText, Printer } from "lucide-react";
@@ -459,6 +460,7 @@ function LaporanPage() {
   }
 
   return (
+    <>
     <div id="partisipasi-hari-ini" className="space-y-5 scroll-mt-5">
       <header className="no-print grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
         <h1 className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">
@@ -538,5 +540,13 @@ function LaporanPage() {
         </DialogContent>
       </Dialog>
     </div>
+    {typeof document !== "undefined" &&
+      createPortal(
+        <div id="report-print-root" className="print-only-report" aria-hidden="true">
+          <FormalReportDocument d={d} month={selectedMonth} isModal={false} />
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
