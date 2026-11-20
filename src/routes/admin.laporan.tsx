@@ -281,7 +281,7 @@ function LaporanPage() {
   // Reports follow the current calendar month in Jakarta, not the active operational period.
   const selectedMonth = monthKey(new Date());
   const report = useQuery({
-    queryKey: ["formal-report", selectedMonth, periods.dataUpdatedAt],
+    queryKey: ["formal-report", selectedMonth],
     queryFn: async () => {
       const currentRange = monthRange(selectedMonth);
       const todayUtc = new Date(`${todayJakartaDate()}T00:00:00.000Z`);
