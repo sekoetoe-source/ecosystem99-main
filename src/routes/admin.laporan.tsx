@@ -291,11 +291,17 @@ function LaporanPage() {
     refetchInterval: 30_000,
   });
   const operationalPeriod = resolveOperationalPeriod(periods.data ?? [], todayJakartaDate());
-  const selectedMonth = operationalPeriod?.start_date.slice(0, 7) ?? "";
+  // Reports follow the current calendar month in Jakarta, not the active operational period.
+  const selectedMonth = monthKey(new Date());
   const report = useQuery({
     queryKey: ["formal-report", selectedMonth, periods.dataUpdatedAt],
     queryFn: async () => {
       const currentRange = monthRange(selectedMonth);
+      const todayUtc = new Date(`${todayJakartaDate()}T00:00:00.000Z`);
+      todayUtc.setUTCDate(todayUtc.getUTCDate() + 1);
+      const tomorrowJakarta = todayUtc.toISOString().slice(0, 10);
+      const currentEndExclusive =
+        tomorrowJakarta < currentRange.end ? tomorrowJakarta : currentRange.end;
       const [year, month] = selectedMonth.split("-").map(Number);
       const previousMonthDate = new Date(Date.UTC(year!, month! - 2, 1));
       const previousRange = monthRange(monthKey(previousMonthDate));
@@ -327,7 +333,7 @@ function LaporanPage() {
 
       const [studentsRes, items, prevItems] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
-        fetchAllItems(currentRange.start, currentRange.end),
+        fetchAllItems(currentRange.start, currentEndExclusive),
         fetchAllItems(previousRange.start, previousRange.end),
       ]);
       if (studentsRes.error) throw studentsRes.error;
@@ -421,15 +427,34 @@ function LaporanPage() {
   });
   const d = report.data;
   function exportCsv() {
-    const header =
-      "Peringkat,Kelas,Siswa,Poin,Persentase Penggunaan Tumbler,Persentase Penggunaan Kotak Makan\n";
-    const body = (d?.rows ?? [])
-      .map((r, i) => `${i + 1},${r.name},${r.students},${r.points},${r.tumbler}%,${r.lunchbox}%`)
-      .join("\n");
+    const escapeCsv = (value: string | number) =>
+      `"${String(value).replace(/"/g, '""')}"`;
+    const lines = [
+      [
+        "Peringkat",
+        "Kelas",
+        "Siswa",
+        "Poin",
+        "Persentase Penggunaan Tumbler",
+        "Persentase Penggunaan Kotak Makan",
+      ],
+      ...(d?.rows ?? []).map((r, i) => [
+        i + 1,
+        r.name,
+        r.students,
+        r.points,
+        `${r.tumbler}%`,
+        `${r.lunchbox}%`,
+      ]),
+    ];
+    const csv = lines.map((line) => line.map(escapeCsv).join(",")).join("\r\n");
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([header + body], { type: "text/csv;charset=utf-8;" }));
+    a.href = URL.createObjectURL(
+      new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" }),
+    );
     a.download = `laporan-lingkungan-${selectedMonth}.csv`;
     a.click();
+    URL.revokeObjectURL(a.href);
   }
   function handlePrintDirect() {
     window.print();
@@ -443,20 +468,20 @@ function LaporanPage() {
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-xl border border-input bg-background px-3 py-2 text-sm font-semibold">
-            {operationalPeriod ? operationalPeriod.name : "Tidak ada periode berjalan"}
+            Laporan {monthLabel(selectedMonth)} · s.d. {todayJakartaDate()} WIB
           </span>
           <Button
             variant="outline"
             size="sm"
             onClick={exportCsv}
-            disabled={!operationalPeriod || report.isLoading}
+            disabled={!selectedMonth || report.isLoading}
           >
             <Download className="size-4" /> Ekspor CSV
           </Button>
           <Button
             size="sm"
             onClick={() => setPreviewOpen(true)}
-            disabled={!operationalPeriod || report.isLoading}
+            disabled={!selectedMonth || report.isLoading}
             className="font-bold gap-1.5 shadow-sm"
           >
             <Printer className="size-4" /> Cetak / PDF
