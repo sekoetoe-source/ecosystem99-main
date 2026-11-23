@@ -937,7 +937,7 @@ function Index() {
     },
     { label: "Perkiraan Pengurangan Emisi Karbon Dioksida", value: `${data.co2Kg} kg`, icon: Leaf },
     {
-      label: "Total Poin Lingkungan",
+      label: "Poin Tervalidasi (Akumulasi)",
       value: `${data.totalPoints.toLocaleString("id-ID")}`,
       icon: Trophy,
     },
@@ -1058,15 +1058,15 @@ function Index() {
               </div>
             </div>
             <div className="surface-card absolute right-0 top-8 hidden px-4 py-3 text-xs font-bold sm:block">
-              +250 Eco Points
-              <span className="label-xs block text-muted-foreground">Tumbler + Lunchbox</span>
+              {pointText(comboPoints)} Eco-Points
+              <span className="label-xs block text-muted-foreground">Combo Sesi 2 · Tumbler + Lunchbox</span>
             </div>
             <div className="surface-card absolute bottom-24 left-0 hidden px-4 py-3 text-xs font-bold sm:block">
-              #1 {champion?.class_name ?? "VIII A"}
+              #1 {champion?.class_name ?? "Belum ada data"}
               <span className="label-xs block text-muted-foreground">Eco Class</span>
             </div>
             <div className="surface-card absolute -bottom-4 right-1 flex items-center gap-2 px-3 py-2 text-xs font-bold sm:bottom-6 sm:right-2 sm:px-4 sm:py-3">
-              <Flame className="size-4 text-warning" /> 7 Hari Streak
+              <Flame className="size-4 text-warning" /> Eco-Streak
             </div>
           </div>
         </div>
