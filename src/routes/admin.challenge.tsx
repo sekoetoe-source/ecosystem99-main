@@ -196,7 +196,7 @@ function ChallengeManagementPage() {
               ? ["tumbler", "lunchbox", "break_combo"].includes(targetItemCode)
               : false;
         if (!validItem) throw new Error("Kombinasi barang dan sesi scan tidak valid.");
-        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(effectiveFrom)) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)) {
           throw new Error("Tanggal mulai berlaku wajib dipilih.");
         }
       }
@@ -265,7 +265,7 @@ function ChallengeManagementPage() {
               ? ["tumbler", "lunchbox", "break_combo"].includes(targetItemCode)
               : false;
         if (!validItem) throw new Error("Kombinasi barang dan sesi scan tidak valid.");
-        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(activeChallenge.effective_from ?? "")) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(activeChallenge.effective_from ?? "")) {
           throw new Error("Tanggal mulai berlaku wajib dipilih.");
         }
       }
