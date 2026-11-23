@@ -172,7 +172,34 @@ function ChallengeManagementPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!name || !title || !body) throw new Error("Semua kolom wajib diisi");
+      if (!name.trim() || !title.trim() || !body.trim()) {
+        throw new Error("Nama program, motto, dan deskripsi wajib diisi.");
+      }
+      const progress = Number(pct);
+      if (!Number.isInteger(progress) || progress < 0 || progress > 100) {
+        throw new Error("Progres manual harus berupa bilangan bulat 0–100.");
+      }
+      if (autoAward) {
+        if (pill !== "ACTIVE") {
+          throw new Error("Ubah status challenge menjadi ACTIVE sebelum mengaktifkan bonus otomatis.");
+        }
+        if (!Number.isInteger(targetCount) || targetCount < 1 || targetCount > 5) {
+          throw new Error("Target hari sekolah harus berupa bilangan bulat 1–5.");
+        }
+        if (!Number.isInteger(bonusPoints) || bonusPoints <= 0) {
+          throw new Error("Bonus poin wajib lebih besar dari 0.");
+        }
+        const validItem =
+          targetSession === "entry"
+            ? ["tumbler", "lunchbox"].includes(targetItemCode)
+            : targetSession === "break"
+              ? ["tumbler", "lunchbox", "break_combo"].includes(targetItemCode)
+              : false;
+        if (!validItem) throw new Error("Kombinasi barang dan sesi scan tidak valid.");
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(effectiveFrom)) {
+          throw new Error("Tanggal mulai berlaku wajib dipilih.");
+        }
+      }
       const { error } = await (supabase as any).from("challenges").insert({
         pill,
         name,
@@ -210,6 +237,38 @@ function ChallengeManagementPage() {
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (!activeChallenge) return;
+      if (!activeChallenge.name?.trim() || !activeChallenge.title?.trim() || !activeChallenge.body?.trim()) {
+        throw new Error("Nama program, motto, dan deskripsi wajib diisi.");
+      }
+      const progress = Number(activeChallenge.pct);
+      if (!Number.isInteger(progress) || progress < 0 || progress > 100) {
+        throw new Error("Progres manual harus berupa bilangan bulat 0–100.");
+      }
+      if (activeChallenge.auto_award) {
+        const targetCount = Number(activeChallenge.target_count);
+        const bonusPoints = Number(activeChallenge.bonus_points);
+        const targetSession = activeChallenge.target_session;
+        const targetItemCode = activeChallenge.target_item_code;
+        if (activeChallenge.pill !== "ACTIVE") {
+          throw new Error("Ubah status challenge menjadi ACTIVE sebelum mengaktifkan bonus otomatis.");
+        }
+        if (!Number.isInteger(targetCount) || targetCount < 1 || targetCount > 5) {
+          throw new Error("Target hari sekolah harus berupa bilangan bulat 1–5.");
+        }
+        if (!Number.isInteger(bonusPoints) || bonusPoints <= 0) {
+          throw new Error("Bonus poin wajib lebih besar dari 0. Isi, misalnya, 150 poin.");
+        }
+        const validItem =
+          targetSession === "entry"
+            ? ["tumbler", "lunchbox"].includes(targetItemCode)
+            : targetSession === "break"
+              ? ["tumbler", "lunchbox", "break_combo"].includes(targetItemCode)
+              : false;
+        if (!validItem) throw new Error("Kombinasi barang dan sesi scan tidak valid.");
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(activeChallenge.effective_from ?? "")) {
+          throw new Error("Tanggal mulai berlaku wajib dipilih.");
+        }
+      }
       const { error } = await (supabase as any)
         .from("challenges")
         .update({
@@ -611,130 +670,232 @@ function ChallengeManagementPage() {
 
       {/* DIALOG EDIT CHALLENGE */}
       <Dialog open={!!activeChallenge} onOpenChange={(open) => !open && setActiveChallenge(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Challenge</DialogTitle>
-            <DialogDescription>Modifikasi detail tantangan eco saat ini.</DialogDescription>
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-2xl max-h-[calc(100dvh-1.5rem)] flex flex-col gap-0 overflow-hidden rounded-3xl border border-border bg-background p-0 shadow-2xl">
+          <DialogHeader className="shrink-0 border-b border-border bg-muted/20 px-6 py-5 text-left">
+            <DialogTitle className="text-xl font-extrabold">Edit Challenge</DialogTitle>
+            <DialogDescription className="text-sm">
+              Atur informasi program dan aturan bonus Eco-Points. Perubahan hanya disimpan setelah menekan Simpan Perubahan.
+            </DialogDescription>
           </DialogHeader>
+
           {activeChallenge && (
-            <div className="space-y-4 py-2">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Kategori/Status (Pill)</label>
-                <select
-                  value={activeChallenge.pill}
-                  onChange={(e) => setActiveChallenge({ ...activeChallenge, pill: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
-                >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="COMING SOON">COMING SOON</option>
-                  <option value="COMPLETED">COMPLETED</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Nama Program</label>
-                <input
-                  type="text"
-                  value={activeChallenge.name}
-                  onChange={(e) => setActiveChallenge({ ...activeChallenge, name: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Motto/Headline</label>
-                <input
-                  type="text"
-                  value={activeChallenge.title}
-                  onChange={(e) => setActiveChallenge({ ...activeChallenge, title: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Deskripsi Tantangan</label>
-                <textarea
-                  value={activeChallenge.body}
-                  onChange={(e) => setActiveChallenge({ ...activeChallenge, body: e.target.value })}
-                  className="w-full min-h-[80px] p-3 rounded-xl border border-input bg-background text-sm focus:outline-primary resize-y"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Progres manual (%)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={activeChallenge.pct}
-                  onChange={(e) => setActiveChallenge({ ...activeChallenge, pct: Number(e.target.value) })}
-                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
-                />
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Persentase ini diubah manual dan tidak menentukan pemberian bonus. Bonus otomatis mengikuti target scan approved pada pengaturan di bawah.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
-                <label className="flex items-center gap-2 text-sm font-bold">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+              <div className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-muted-foreground">Kategori/Status</label>
+                    <select
+                      value={activeChallenge.pill}
+                      onChange={(e) => setActiveChallenge({ ...activeChallenge, pill: e.target.value })}
+                      className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-primary"
+                    >
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="COMING SOON">COMING SOON</option>
+                      <option value="COMPLETED">COMPLETED</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-muted-foreground">Progres manual (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={activeChallenge.pct}
+                      onChange={(e) => setActiveChallenge({ ...activeChallenge, pct: Number(e.target.value) })}
+                      className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground">Nama Program</label>
                   <input
-                    type="checkbox"
-                    checked={Boolean(activeChallenge.auto_award)}
-                    onChange={(e) => setActiveChallenge({ ...activeChallenge, auto_award: e.target.checked })}
-                    className="size-4 accent-emerald-600"
+                    type="text"
+                    value={activeChallenge.name}
+                    onChange={(e) => setActiveChallenge({ ...activeChallenge, name: e.target.value })}
+                    className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-primary"
                   />
-                  Aktifkan bonus Eco-Points otomatis
-                </label>
-                {activeChallenge.auto_award && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold">Barang</label>
-                      <select value={activeChallenge.target_item_code ?? "tumbler"} onChange={(e) => setActiveChallenge({ ...activeChallenge, target_item_code: e.target.value })} className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm">
-                        <option value="tumbler">Tumbler</option><option value="lunchbox">Kotak Makan</option>{activeChallenge.target_session === "break" && <option value="break_combo">Combo</option>}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold">Sesi</label>
-                      <select
-                        value={activeChallenge.target_session ?? "entry"}
-                        onChange={(e) => {
-                          const nextSession = e.target.value;
-                          setActiveChallenge({
-                            ...activeChallenge,
-                            target_session: nextSession,
-                            target_item_code:
-                              nextSession === "entry" && activeChallenge.target_item_code === "break_combo"
-                                ? "tumbler"
-                                : activeChallenge.target_item_code,
-                          });
-                        }}
-                        className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm"
-                      >
-                        <option value="entry">Sesi 1 · Masuk</option><option value="break">Sesi 2 · Istirahat</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold">Target hari sekolah</label>
-                      <input type="number" min="1" max="5" step="1" value={activeChallenge.target_count ?? 5} onChange={(e) => setActiveChallenge({ ...activeChallenge, target_count: Number(e.target.value) })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold">Bonus poin</label>
-                      <input type="number" min="1" step="1" value={activeChallenge.bonus_points ?? 150} onChange={(e) => setActiveChallenge({ ...activeChallenge, bonus_points: Number(e.target.value) })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
-                    </div>
-                    <div className="col-span-2 space-y-1">
-                      <label className="text-xs font-semibold">Mulai berlaku</label>
-                      <input type="date" value={activeChallenge.effective_from ?? ""} onChange={(e) => setActiveChallenge({ ...activeChallenge, effective_from: e.target.value })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground">Motto/Headline</label>
+                  <input
+                    type="text"
+                    value={activeChallenge.title}
+                    onChange={(e) => setActiveChallenge({ ...activeChallenge, title: e.target.value })}
+                    className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-primary"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground">Deskripsi Tantangan</label>
+                  <textarea
+                    rows={3}
+                    value={activeChallenge.body}
+                    onChange={(e) => setActiveChallenge({ ...activeChallenge, body: e.target.value })}
+                    className="min-h-24 w-full rounded-xl border border-input bg-background p-3 text-sm leading-relaxed focus:outline-primary"
+                  />
+                </div>
+
+                <section className="space-y-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="edit-challenge-auto-award"
+                      type="checkbox"
+                      checked={Boolean(activeChallenge.auto_award)}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        setActiveChallenge((current: any) => {
+                          if (!current) return current;
+                          return {
+                            ...current,
+                            auto_award: enabled,
+                            target_item_code: enabled
+                              ? current.target_item_code ?? "tumbler"
+                              : current.target_item_code,
+                            target_session: enabled
+                              ? current.target_session ?? "entry"
+                              : current.target_session,
+                            target_count: enabled
+                              ? Number(current.target_count) >= 1 && Number(current.target_count) <= 5
+                                ? Number(current.target_count)
+                                : 5
+                              : current.target_count,
+                            bonus_points: enabled
+                              ? Number(current.bonus_points) > 0
+                                ? Number(current.bonus_points)
+                                : 150
+                              : current.bonus_points,
+                            effective_from: enabled
+                              ? current.effective_from ??
+                                new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date())
+                              : current.effective_from,
+                          };
+                        });
+                      }}
+                      className="mt-0.5 size-4 shrink-0 accent-emerald-600"
+                    />
+                    <div className="min-w-0">
+                      <label htmlFor="edit-challenge-auto-award" className="cursor-pointer text-sm font-extrabold">
+                        Aktifkan bonus Eco-Points otomatis
+                      </label>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        Centang untuk memberi bonus setelah target scan yang disetujui terpenuhi. Saat diaktifkan, nilai awal otomatis diisi 150 poin jika belum ada aturan sebelumnya.
+                      </p>
                     </div>
                   </div>
-                )}
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Bonus diberikan satu kali per siswa per minggu kalender, setelah jumlah hari sekolah berbeda terpenuhi. Scan harus approved.
-                </p>
+
+                  {activeChallenge.auto_award ? (
+                    <>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold">Barang yang divalidasi</label>
+                          <select
+                            value={activeChallenge.target_item_code ?? "tumbler"}
+                            onChange={(e) => setActiveChallenge({ ...activeChallenge, target_item_code: e.target.value })}
+                            className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                          >
+                            <option value="tumbler">Tumbler</option>
+                            <option value="lunchbox">Kotak Makan</option>
+                            {activeChallenge.target_session === "break" && (
+                              <option value="break_combo">Combo Tumbler + Lunchbox</option>
+                            )}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold">Sesi scan</label>
+                          <select
+                            value={activeChallenge.target_session ?? "entry"}
+                            onChange={(e) => {
+                              const nextSession = e.target.value;
+                              setActiveChallenge({
+                                ...activeChallenge,
+                                target_session: nextSession,
+                                target_item_code:
+                                  nextSession === "entry" && activeChallenge.target_item_code === "break_combo"
+                                    ? "tumbler"
+                                    : activeChallenge.target_item_code ?? "tumbler",
+                              });
+                            }}
+                            className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                          >
+                            <option value="entry">Sesi 1 · Masuk Sekolah</option>
+                            <option value="break">Sesi 2 · Istirahat/Kantin</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold">Target hari sekolah</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="5"
+                            step="1"
+                            value={activeChallenge.target_count ?? 5}
+                            onChange={(e) => setActiveChallenge({ ...activeChallenge, target_count: e.target.value === "" ? "" : Number(e.target.value) })}
+                            className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                          />
+                          <p className="text-[11px] text-muted-foreground">Bilangan hari berbeda dalam satu minggu sekolah (maksimal 5).</p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold">Bonus poin</label>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={activeChallenge.bonus_points ?? 150}
+                            onChange={(e) => setActiveChallenge({ ...activeChallenge, bonus_points: e.target.value === "" ? "" : Number(e.target.value) })}
+                            className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                          />
+                          <p className="text-[11px] text-muted-foreground">Harus bilangan bulat lebih besar dari 0. Contoh: 150 poin.</p>
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <label className="text-xs font-bold">Mulai berlaku</label>
+                          <input
+                            type="date"
+                            value={activeChallenge.effective_from ?? ""}
+                            onChange={(e) => setActiveChallenge({ ...activeChallenge, effective_from: e.target.value })}
+                            className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-background/80 p-3 text-xs leading-relaxed text-muted-foreground">
+                        <strong className="text-foreground">Contoh 5 Hari Tumbler:</strong> Tumbler · Sesi 1 · 5 hari (Senin–Jumat) · +150 poin. Bonus diberikan satu kali per siswa per minggu setelah kelima hari memiliki scan berstatus approved.
+                      </div>
+                    </>
+                  ) : (
+                    <p className="rounded-xl bg-background/80 p-3 text-xs leading-relaxed text-muted-foreground">
+                      Bonus otomatis nonaktif. Challenge tetap dapat ditampilkan dan progres manual tetap bisa diperbarui tanpa mengubah saldo poin siswa.
+                    </p>
+                  )}
+                </section>
               </div>
-              <Button
-                className="w-full rounded-full mt-2"
-                onClick={() => updateMutation.mutate()}
-                disabled={updateMutation.isPending}
-              >
-                Simpan Perubahan
-              </Button>
             </div>
           )}
+
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-background px-6 py-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setActiveChallenge(null)}
+              disabled={updateMutation.isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              className="min-w-40 rounded-xl font-bold"
+              onClick={() => updateMutation.mutate()}
+              disabled={updateMutation.isPending || !activeChallenge}
+            >
+              {updateMutation.isPending ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
