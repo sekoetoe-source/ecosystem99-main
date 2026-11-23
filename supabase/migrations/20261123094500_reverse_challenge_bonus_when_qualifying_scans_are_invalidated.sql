@@ -322,7 +322,7 @@ REVOKE ALL ON FUNCTION public.evaluate_automatic_challenge_awards(uuid) FROM PUB
 REVOKE ALL ON FUNCTION public.reconcile_automatic_challenge_awards(uuid,date) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.trigger_evaluate_challenge_from_item() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.trigger_evaluate_challenge_on_approval() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.trigger_reconcile_challenge_award_on_validation_delete() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trigger_reconcile_challenge_on_validation_delete() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.prevent_challenge_point_award_mutation() FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE VIEW public.challenge_point_awards_public
