@@ -498,7 +498,7 @@ function ChallengeManagementPage() {
                 </div>
               )}
               <p className="text-[11px] text-muted-foreground">
-                Untuk program 5 Hari Tumbler: pilih Tumbler, Sesi 1, target 5 hari, bonus 150 poin. Satu minggu dihitung Senin–Jumat.
+                Untuk program 5 Hari Tumbler: pilih Tumbler, Sesi 1, target 5 hari sekolah (Senin–Jumat), dan bonus 150 poin. Satu bonus diberikan per siswa setiap minggu kalender.
               </p>
             </div>
           </div>
@@ -573,7 +573,7 @@ function ChallengeManagementPage() {
                   className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
                 />
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Persentase ini diubah manual. Sistem belum menghitung capaian peserta dan belum memberi bonus poin otomatis.
+                  Persentase ini diubah manual dan tidak menentukan pemberian bonus. Bonus otomatis mengikuti target scan approved pada pengaturan di bawah.
                 </p>
               </div>
               <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
