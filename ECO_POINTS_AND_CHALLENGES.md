@@ -63,7 +63,7 @@ Ledger menyimpan:
 - nilai bonus;
 - validasi pemicu serta waktu pemberian.
 
-Jika salah satu scan yang menjadi syarat kemudian ditolak atau dikoreksi sehingga jumlah hari yang memenuhi syarat kurang dari lima, bonus aktif dibatalkan melalui `reversed_at` dan `reversal_reason`. Catatan ledger tidak dihapus. Bila validasi diperbaiki dan syarat kembali terpenuhi, sistem dapat membuat award aktif kembali; hanya satu award aktif yang dapat dihitung pada satu minggu.
+Jika salah satu scan yang menjadi syarat kemudian ditolak, atau item scan yang memenuhi syarat diubah/dihapus sehingga jumlah hari yang memenuhi syarat kurang dari lima, bonus aktif dibatalkan melalui `reversed_at` dan `reversal_reason`. Catatan ledger tidak dihapus. Penghapusan permanen atas validasi pemicu bonus dibatasi oleh foreign key agar jejak audit tidak hilang; gunakan status rejected/koreksi, bukan hard-delete. Bila validasi diperbaiki dan syarat kembali terpenuhi, sistem dapat membuat award aktif kembali; hanya satu award aktif yang dapat dihitung pada satu minggu.
 
 Akun siswa hanya dapat membaca ledger miliknya. Admin dapat mengaudit ledger. Penulisan bonus dilakukan oleh trigger database, bukan oleh browser atau permintaan langsung siswa.
 
@@ -111,6 +111,7 @@ Fitur ini ditambahkan melalui migrasi:
 - `20261123093000_automatic_five_day_tumbler_bonus.sql`
 - `20261123094500_reverse_challenge_bonus_when_qualifying_scans_are_invalidated.sql`
 - `20261123101500_harden_automatic_challenge_award_evaluation.sql`
+- `20261123103000_validate_automatic_challenge_item_session.sql`
 
 Objek utama:
 - `challenges`: konfigurasi target dan bonus otomatis.
