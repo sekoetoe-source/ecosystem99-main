@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS public.challenge_point_awards (
   earned_day date NOT NULL,
   qualifying_days date[] NOT NULL,
   bonus_points integer NOT NULL CHECK (bonus_points > 0),
-  trigger_validation_id uuid REFERENCES public.validations(id) ON DELETE SET NULL,
+  trigger_validation_id uuid REFERENCES public.validations(id) ON DELETE RESTRICT,
   awarded_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT challenge_point_awards_one_per_week
     UNIQUE (challenge_id, student_id, week_start),
