@@ -30,7 +30,7 @@ export const AI_CHALLENGE_PROMPTS: AiChallengePrompt[] = [
     pill: "ACTIVE",
     name: "5 Hari Tumbler",
     title: "Build the streak.",
-    body: "Minimal 5 kali validasi membawa tumbler pribadi ke sekolah dalam 1 minggu untuk membuka bonus +150 Eco-Points.",
+    body: "Minimal 5 kali validasi membawa tumbler pribadi ke sekolah dalam 1 minggu. Progres diperbarui manual oleh admin; bonus Eco-Points otomatis belum tersedia.",
     pct: 65,
   },
   {
@@ -96,7 +96,7 @@ export function generateAiChallenge(key?: string): AiChallengePrompt {
     pill: "ACTIVE",
     name: "5 Hari Tumbler",
     title: "Build the streak.",
-    body: "Minimal 5 kali validasi membawa tumbler pribadi.",
+    body: "Minimal 5 kali validasi membawa tumbler pribadi dalam satu minggu. Progres diperbarui manual oleh admin; bonus Eco-Points otomatis belum tersedia.",
     pct: 50,
   };
 }
@@ -240,7 +240,7 @@ function ChallengeManagementPage() {
               <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
                 <span className="block h-full rounded-full bg-eco" style={{ width: `${c.pct}%` }} />
               </div>
-              <p className="mt-2 text-sm font-bold">{c.pct}% progress</p>
+              <p className="mt-2 text-sm font-bold">{c.pct}% · progres manual admin</p>
             </div>
             
             <div className="mt-6 flex justify-end gap-2 border-t pt-4">
@@ -376,7 +376,7 @@ function ChallengeManagementPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-foreground">Progress Default (%)</label>
+              <label className="text-xs font-bold text-foreground">Progres manual (%)</label>
               <input
                 type="number"
                 min="0"
@@ -385,6 +385,9 @@ function ChallengeManagementPage() {
                 onChange={(e) => setPct(Number(e.target.value))}
                 className="w-full h-10 px-3.5 rounded-xl border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
               />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Diisi manual oleh admin sebagai indikator pelaksanaan. Angka ini bukan hasil hitung otomatis dari scan/peserta dan tidak menambahkan Eco-Points.
+              </p>
             </div>
           </div>
 
@@ -448,7 +451,7 @@ function ChallengeManagementPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Progress (%)</label>
+                <label className="text-xs font-bold text-muted-foreground">Progres manual (%)</label>
                 <input
                   type="number"
                   min="0"
@@ -457,6 +460,9 @@ function ChallengeManagementPage() {
                   onChange={(e) => setActiveChallenge({ ...activeChallenge, pct: Number(e.target.value) })}
                   className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
                 />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Persentase ini diubah manual. Sistem belum menghitung capaian peserta dan belum memberi bonus poin otomatis.
+                </p>
               </div>
               <Button
                 className="w-full rounded-full mt-2"

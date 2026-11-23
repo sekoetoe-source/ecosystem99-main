@@ -707,6 +707,38 @@ function MobileUserGuideSection() {
 
 function Index() {
   const { data: liveStats } = useSchoolStats();
+  const { data: liveChallenges = [] } = useQuery({
+    queryKey: ["landing-challenges"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("challenges")
+        .select("id, pill, name, title, body, pct, created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        pill: string;
+        name: string;
+        title: string;
+        body: string;
+        pct: number;
+        created_at: string;
+      }>;
+    },
+  });
+  const { data: liveEcoItems = [] } = useQuery({
+    queryKey: ["landing-eco-point-rules"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("eco_items")
+        .select("code, label, points, active")
+        .eq("active", true);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   const data = {
     studentCount: liveStats?.studentCount ?? 0,
     totalItems: liveStats?.totalItems ?? 0,
@@ -718,6 +750,12 @@ function Index() {
   const { me } = useMe();
   const [menuOpen, setMenuOpen] = useState(false);
   const dashHref = me ? homeForRole[me.primaryRole] : "/auth";
+  const pointMap = new Map(liveEcoItems.map((item) => [item.code, Number(item.points)]));
+  const tumblerPoints = pointMap.get("tumbler");
+  const lunchboxPoints = pointMap.get("lunchbox");
+  const comboPoints = pointMap.get("break_combo");
+  const pointText = (value: number | undefined) =>
+    value == null ? "—" : `+${value.toLocaleString("id-ID")}`;
 
   // Payment states & URL redirect handler
   const [selectedNominal, setSelectedNominal] = useState<number | "other">(10000);
@@ -886,30 +924,6 @@ function Index() {
     }
   }
 
-  const challengesList = [
-    {
-      pill: "ACTIVE",
-      name: "5 Hari Tumbler",
-      title: "Build the streak.",
-      body: "Minimal 5 record valid membawa tumbler dalam periode challenge.",
-      pct: 72,
-    },
-    {
-      pill: "COMING SOON",
-      name: "Full Reusable Class",
-      title: "One class, one goal.",
-      body: "Target reusable untuk kelas dengan progress yang dapat dipantau.",
-      pct: 48,
-    },
-    {
-      pill: "ACTIVE",
-      name: "Most Improved",
-      title: "Progress matters.",
-      body: "Apresiasi peningkatan, bukan hanya posisi tertinggi.",
-      pct: 61,
-    },
-  ];
-
   const stats = [
     {
       label: "Siswa aktif terdaftar",
@@ -923,7 +937,7 @@ function Index() {
     },
     { label: "Perkiraan Pengurangan Emisi Karbon Dioksida", value: `${data.co2Kg} kg`, icon: Leaf },
     {
-      label: "Total Poin Lingkungan",
+      label: "Poin Tervalidasi (Akumulasi)",
       value: `${data.totalPoints.toLocaleString("id-ID")}`,
       icon: Trophy,
     },
@@ -1044,15 +1058,15 @@ function Index() {
               </div>
             </div>
             <div className="surface-card absolute right-0 top-8 hidden px-4 py-3 text-xs font-bold sm:block">
-              +250 Eco Points
-              <span className="label-xs block text-muted-foreground">Tumbler + Lunchbox</span>
+              {pointText(comboPoints)} Eco-Points
+              <span className="label-xs block text-muted-foreground">Combo Sesi 2 · Tumbler + Lunchbox</span>
             </div>
             <div className="surface-card absolute bottom-24 left-0 hidden px-4 py-3 text-xs font-bold sm:block">
-              #1 {champion?.class_name ?? "VIII A"}
+              #1 {champion?.class_name ?? "Belum ada data"}
               <span className="label-xs block text-muted-foreground">Eco Class</span>
             </div>
             <div className="surface-card absolute -bottom-4 right-1 flex items-center gap-2 px-3 py-2 text-xs font-bold sm:bottom-6 sm:right-2 sm:px-4 sm:py-3">
-              <Flame className="size-4 text-warning" /> 7 Hari Streak
+              <Flame className="size-4 text-warning" /> Eco-Streak
             </div>
           </div>
         </div>
@@ -1185,46 +1199,60 @@ function Index() {
       {/* GAMIFIKASI */}
       <section className="mx-auto max-w-6xl px-4 py-20">
         <SectionHead
-          kicker="Engagement"
-          title="Biar Kebiasaan Baik Jadi Seru."
-          lead="Gamifikasi memberi feedback positif tanpa mengubah program menjadi kompetisi yang toxic."
+          kicker="Eco-Points"
+          title="Poin Mengikuti Barang dan Sesi Scan."
+          lead="Poin masuk setelah scan disetujui. Nilai di bawah dibaca dari pengaturan barang aktif di database, bukan angka contoh."
         />
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="gradient-eco rounded-3xl p-8 text-eco-foreground">
-            <h3 className="text-2xl font-extrabold">Eco Points</h3>
-            <p className="mt-2 text-sm opacity-80">
-              Setiap perilaku tervalidasi punya nilai jelas.
-            </p>
-            <p className="mt-6 text-6xl font-extrabold tracking-tight">+150</p>
-            <p className="text-xs opacity-80">Tumbler + Lunchbox (Masuk Sekolah)</p>
-            <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-eco-foreground/20">
-              <span className="block h-full w-[74%] rounded-full bg-eco-foreground" />
+          <article className="gradient-eco rounded-3xl p-8 text-eco-foreground">
+            <h3 className="text-2xl font-extrabold">Sesi 1 — Masuk Sekolah</h3>
+            <p className="mt-2 text-sm opacity-80">Poin per barang, tanpa nilai combo.</p>
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center justify-between border-b border-eco-foreground/20 pb-3">
+                <span>Tumbler</span><b className="text-2xl">{pointText(tumblerPoints)}</b>
+              </div>
+              <div className="flex items-center justify-between border-b border-eco-foreground/20 pb-3">
+                <span>Kotak makan</span><b className="text-2xl">{pointText(lunchboxPoints)}</b>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Bawa keduanya</span>
+                <b className="text-2xl">
+                  {tumblerPoints != null && lunchboxPoints != null
+                    ? `+${(tumblerPoints + lunchboxPoints).toLocaleString("id-ID")}`
+                    : "—"}
+                </b>
+              </div>
             </div>
-            <div className="mt-2 flex justify-between text-xs opacity-80">
-              <span>Monthly progress</span>
-              <b>74%</b>
+            <p className="mt-4 text-xs opacity-80">Maksimal Sesi 1 saat ini: Tumbler + Kotak Makan.</p>
+          </article>
+          <article className="rounded-3xl bg-ink p-8 text-primary-foreground">
+            <h3 className="text-2xl font-extrabold">Sesi 2 — Istirahat / Kantin</h3>
+            <p className="mt-2 text-sm opacity-75">Barang tunggal mengikuti poin masing-masing; dua barang sekaligus memakai aturan combo.</p>
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center justify-between border-b border-white/15 pb-3">
+                <span>Tumbler saja</span><b className="text-2xl">{pointText(tumblerPoints)}</b>
+              </div>
+              <div className="flex items-center justify-between border-b border-white/15 pb-3">
+                <span>Kotak makan saja</span><b className="text-2xl">{pointText(lunchboxPoints)}</b>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Combo Tumbler + Kotak Makan</span><b className="text-2xl">{pointText(comboPoints)}</b>
+              </div>
             </div>
+            <p className="mt-4 text-xs opacity-75">Nilai combo menggantikan poin per barang pada Sesi 2, bukan ditambahkan lagi ke 100 + 50.</p>
+          </article>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="surface-card p-5">
+            <p className="label-xs text-muted-foreground">Total poin tervalidasi pada periode laporan</p>
+            <p className="mt-2 text-3xl font-extrabold">{data.totalPoints.toLocaleString("id-ID")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{data.periodLabel || "Mengikuti periode laporan aktif"}</p>
           </div>
-          <div className="rounded-3xl bg-ink p-8 text-primary-foreground">
-            <h3 className="text-2xl font-extrabold">Badge & Streak</h3>
-            <p className="mt-2 text-sm opacity-75">
-              Progress dibuat terlihat dan terasa rewarding.
+          <div className="surface-card p-5">
+            <p className="font-bold">Apakah EcoChallenge memberi bonus poin?</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Belum ada bonus EcoChallenge otomatis. Poin yang dihitung saat ini berasal dari scan barang yang disetujui. Deskripsi tantangan tidak otomatis menambah saldo siswa.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              {["🌱", "🥤", "🍱", "♻️", "🏆"].map((b, i) => (
-                <span
-                  key={b}
-                  className={cn(
-                    "grid size-14 place-items-center rounded-2xl bg-surface text-2xl",
-                    i === 4 && "opacity-30",
-                  )}
-                >
-                  {b}
-                </span>
-              ))}
-            </div>
-            <p className="mt-6 font-extrabold">🔥 7 Hari Eco Streak</p>
-            <p className="text-xs opacity-75">3/5 badge unlocked</p>
           </div>
         </div>
       </section>
@@ -1237,23 +1265,34 @@ function Index() {
             title="Jangan Cuma Scan. Ikuti Challenge."
             lead="Challenge membuat program bergerak dari rutinitas pencatatan menuju perilaku yang konsisten dan terukur."
           />
+          <p className="mb-4 rounded-xl border border-border bg-background px-4 py-3 text-xs text-muted-foreground">
+            Persentase pada kartu adalah <strong>progres manual yang diisi administrator</strong>. Angka ini belum dihitung otomatis dari jumlah peserta atau hasil scan dan tidak memberikan bonus poin.
+          </p>
           <div className="grid gap-4 md:grid-cols-3">
-            {challengesList.map(({ pill, name, title, body, pct }) => (
-              <article key={name} className="surface-card p-6">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="label-xs rounded-full bg-accent px-2 py-1 text-accent-foreground">
-                    {pill}
-                  </span>
-                  <b className="text-sm">{name}</b>
-                </div>
-                <h3 className="mt-4 text-lg font-bold">{title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{body}</p>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-                  <span className="block h-full rounded-full bg-eco" style={{ width: `${pct}%` }} />
-                </div>
-                <p className="mt-2 text-sm font-bold">{pct}% progress</p>
-              </article>
-            ))}
+            {liveChallenges.map((challenge) => {
+              const pct = Math.max(0, Math.min(100, Number(challenge.pct) || 0));
+              return (
+                <article key={challenge.id} className="surface-card p-6">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="label-xs rounded-full bg-accent px-2 py-1 text-accent-foreground">
+                      {challenge.pill}
+                    </span>
+                    <b className="text-sm">{challenge.name}</b>
+                  </div>
+                  <h3 className="mt-4 text-lg font-bold">{challenge.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{challenge.body}</p>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+                    <span className="block h-full rounded-full bg-eco" style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="mt-2 text-sm font-bold">{pct}% · Progres manual admin</p>
+                </article>
+              );
+            })}
+            {liveChallenges.length === 0 && (
+              <p className="surface-card p-6 text-sm text-muted-foreground md:col-span-3">
+                Belum ada EcoChallenge yang dipublikasikan dari pengaturan admin.
+              </p>
+            )}
           </div>
         </div>
       </section>
