@@ -740,7 +740,7 @@ function Index() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("challenges")
-        .select("id, pill, name, title, body, pct, created_at")
+        .select("id, pill, name, title, body, pct, created_at, auto_award, bonus_points, target_count, target_item_code, target_session")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Array<{
@@ -751,6 +751,11 @@ function Index() {
         body: string;
         pct: number;
         created_at: string;
+        auto_award: boolean;
+        bonus_points: number;
+        target_count: number | null;
+        target_item_code: string | null;
+        target_session: string | null;
       }>;
     },
   });
@@ -1278,7 +1283,7 @@ function Index() {
           <div className="surface-card p-5">
             <p className="font-bold">Apakah EcoChallenge memberi bonus poin?</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Belum ada bonus EcoChallenge otomatis. Poin yang dihitung saat ini berasal dari scan barang yang disetujui. Deskripsi tantangan tidak otomatis menambah saldo siswa.
+              Tantangan dengan bonus otomatis akan menambah saldo setelah target scan approved terpenuhi. Program 5 Hari Tumbler memberi +150 poin setelah Tumbler tervalidasi pada Sesi 1 selama lima hari sekolah berbeda (Senin–Jumat) dalam satu minggu. Bonus diberikan satu kali per siswa per minggu.
             </p>
           </div>
         </div>
@@ -1312,6 +1317,11 @@ function Index() {
                     <span className="block h-full rounded-full bg-eco" style={{ width: `${pct}%` }} />
                   </div>
                   <p className="mt-2 text-sm font-bold">{pct}% · Progres manual admin</p>
+                  {challenge.auto_award && (
+                    <p className="mt-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                      Bonus otomatis +{Number(challenge.bonus_points).toLocaleString("id-ID")} poin setelah {challenge.target_count} hari sekolah tervalidasi
+                    </p>
+                  )}
                 </article>
               );
             })}
