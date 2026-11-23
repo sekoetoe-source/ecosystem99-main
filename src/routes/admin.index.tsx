@@ -51,13 +51,24 @@ function AdminDashboard() {
     enabled: !!activePeriod.data?.id,
     queryFn: async () => {
       const period = activePeriod.data!;
-      const [studentsRes, todayItems, scoresRes, pendingAccountsRes] = await Promise.all([
+      const [
+        studentsRes,
+        todayItems,
+        todayChallengeAwards,
+        scoresRes,
+        pendingAccountsRes,
+      ] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").not("class_id", "is", null),
         supabase
           .from("validation_items")
           .select("student_id, points, validations!inner(status, period_id)")
           .eq("day", todayJakarta())
           .eq("validations.period_id", period.id),
+        (supabase as any)
+          .from("challenge_point_awards_public")
+          .select("bonus_points")
+          .eq("period_id", period.id)
+          .eq("earned_day", todayJakarta()),
         supabase
           .from("period_student_scores")
           .select("earned_points, total_items, class_name")
@@ -78,6 +89,7 @@ function AdminDashboard() {
         const c = (s.class_name ?? "").trim();
         return Boolean(c && c !== "-" && c.toLowerCase() !== "tanpa kelas");
       });
+      if (todayChallengeAwards.error) throw todayChallengeAwards.error;
       const approvedToday = (todayItems.data ?? []).filter(
         (i) => (i.validations as { status: string } | null)?.status === "approved",
       );
@@ -86,7 +98,13 @@ function AdminDashboard() {
       return {
         studentCount: validStudents.length,
         participants,
-        pointsToday: approvedToday.reduce((a, i) => a + i.points, 0),
+        pointsToday:
+          approvedToday.reduce((a, i) => a + Number(i.points ?? 0), 0) +
+          (todayChallengeAwards.data ?? []).reduce(
+            (total: number, award: { bonus_points: number }) =>
+              total + Number(award.bonus_points ?? 0),
+            0,
+          ),
         pendingCount: pendingAccountsRes.count ?? 0,
         co2Kg: Math.round((totalItems * 70) / 1000),
       };
