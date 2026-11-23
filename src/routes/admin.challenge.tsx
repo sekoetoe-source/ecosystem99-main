@@ -21,6 +21,11 @@ export type AiChallengePrompt = {
   title: string;
   body: string;
   pct: number;
+  autoAward?: boolean;
+  targetItemCode?: string;
+  targetSession?: string;
+  targetCount?: number;
+  bonusPoints?: number;
 };
 
 export const AI_CHALLENGE_PROMPTS: AiChallengePrompt[] = [
@@ -30,8 +35,13 @@ export const AI_CHALLENGE_PROMPTS: AiChallengePrompt[] = [
     pill: "ACTIVE",
     name: "5 Hari Tumbler",
     title: "Build the streak.",
-    body: "Minimal 5 kali validasi membawa tumbler pribadi ke sekolah dalam 1 minggu. Progres diperbarui manual oleh admin; bonus Eco-Points otomatis belum tersedia.",
+    body: "Scan Tumbler pada Sesi 1 selama 5 hari sekolah berbeda (Senin–Jumat) dalam satu minggu untuk mendapatkan bonus otomatis +150 Eco-Points.",
     pct: 65,
+    autoAward: true,
+    targetItemCode: "tumbler",
+    targetSession: "entry",
+    targetCount: 5,
+    bonusPoints: 150,
   },
   {
     key: "full-reusable-class",
@@ -96,8 +106,13 @@ export function generateAiChallenge(key?: string): AiChallengePrompt {
     pill: "ACTIVE",
     name: "5 Hari Tumbler",
     title: "Build the streak.",
-    body: "Minimal 5 kali validasi membawa tumbler pribadi dalam satu minggu. Progres diperbarui manual oleh admin; bonus Eco-Points otomatis belum tersedia.",
+    body: "Scan Tumbler pada Sesi 1 selama 5 hari sekolah berbeda (Senin–Jumat) dalam satu minggu untuk mendapatkan bonus otomatis +150 Eco-Points.",
     pct: 50,
+    autoAward: true,
+    targetItemCode: "tumbler",
+    targetSession: "entry",
+    targetCount: 5,
+    bonusPoints: 150,
   };
 }
 
@@ -119,6 +134,14 @@ function ChallengeManagementPage() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [pct, setPct] = useState(0);
+  const [autoAward, setAutoAward] = useState(false);
+  const [targetItemCode, setTargetItemCode] = useState("tumbler");
+  const [targetSession, setTargetSession] = useState("entry");
+  const [targetCount, setTargetCount] = useState(5);
+  const [bonusPoints, setBonusPoints] = useState(150);
+  const [effectiveFrom, setEffectiveFrom] = useState(
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date()),
+  );
 
   const challenges = useQuery({
     queryKey: ["admin-challenges"],
@@ -131,6 +154,22 @@ function ChallengeManagementPage() {
     },
   });
 
+  const challengeAwards = useQuery({
+    queryKey: ["admin-challenge-award-history"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("challenge_point_awards")
+        .select(
+          "id, week_start, earned_day, qualifying_days, bonus_points, awarded_at, reversed_at, reversal_reason, challenges(name), students(full_name, nis, classes(name))",
+        )
+        .order("awarded_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 30_000,
+  });
+
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!name || !title || !body) throw new Error("Semua kolom wajib diisi");
@@ -140,6 +179,12 @@ function ChallengeManagementPage() {
         title,
         body,
         pct: Number(pct),
+        auto_award: autoAward,
+        target_item_code: autoAward ? targetItemCode : null,
+        target_session: autoAward ? targetSession : null,
+        target_count: autoAward ? Number(targetCount) : null,
+        bonus_points: autoAward ? Number(bonusPoints) : 0,
+        effective_from: effectiveFrom,
       });
       if (error) throw error;
     },
@@ -151,6 +196,12 @@ function ChallengeManagementPage() {
       setBody("");
       setPill("ACTIVE");
       setPct(0);
+      setAutoAward(false);
+      setTargetItemCode("tumbler");
+      setTargetSession("entry");
+      setTargetCount(5);
+      setBonusPoints(150);
+      setEffectiveFrom(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date()));
       queryClient.invalidateQueries({ queryKey: ["admin-challenges"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Gagal membuat challenge"),
@@ -167,6 +218,12 @@ function ChallengeManagementPage() {
           title: activeChallenge.title,
           body: activeChallenge.body,
           pct: Number(activeChallenge.pct),
+          auto_award: Boolean(activeChallenge.auto_award),
+          target_item_code: activeChallenge.auto_award ? activeChallenge.target_item_code : null,
+          target_session: activeChallenge.auto_award ? activeChallenge.target_session : null,
+          target_count: activeChallenge.auto_award ? Number(activeChallenge.target_count) : null,
+          bonus_points: activeChallenge.auto_award ? Number(activeChallenge.bonus_points) : 0,
+          effective_from: activeChallenge.effective_from,
         })
         .eq("id", activeChallenge.id);
       if (error) throw error;
@@ -212,6 +269,12 @@ function ChallengeManagementPage() {
               setTitle(ai.title);
               setBody(ai.body);
               setPct(ai.pct);
+              setAutoAward(Boolean(ai.autoAward));
+              setTargetItemCode(ai.targetItemCode ?? "tumbler");
+              setTargetSession(ai.targetSession ?? "entry");
+              setTargetCount(ai.targetCount ?? 5);
+              setBonusPoints(ai.bonusPoints ?? 150);
+              setEffectiveFrom(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date()));
               setIsAddOpen(true);
               toast.success(`✨ AI Challenge Generator dibuka! Tantangan "${ai.name}" disiapkan.`);
             }}
@@ -241,6 +304,11 @@ function ChallengeManagementPage() {
                 <span className="block h-full rounded-full bg-eco" style={{ width: `${c.pct}%` }} />
               </div>
               <p className="mt-2 text-sm font-bold">{c.pct}% · progres manual admin</p>
+              {c.auto_award && (
+                <p className="mt-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                  Bonus otomatis +{Number(c.bonus_points).toLocaleString("id-ID")} poin · {c.target_count} hari sekolah
+                </p>
+              )}
             </div>
             
             <div className="mt-6 flex justify-end gap-2 border-t pt-4">
@@ -268,7 +336,75 @@ function ChallengeManagementPage() {
         )}
       </div>
 
-      {/* DIALOG TAMBAH CHALLENGE */}
+      <section className="surface-card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="font-extrabold">Riwayat Bonus EcoChallenge</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Ledger audit 100 pemberian terbaru. Bonus yang dibatalkan tetap terlihat sebagai riwayat, tetapi tidak dihitung ke saldo.
+          </p>
+        </div>
+        {challengeAwards.isLoading ? (
+          <p className="p-5 text-sm text-muted-foreground">Memuat riwayat bonus...</p>
+        ) : challengeAwards.isError ? (
+          <p className="p-5 text-sm text-destructive">Riwayat bonus gagal dimuat. Periksa akses admin ke ledger.</p>
+        ) : (challengeAwards.data ?? []).length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-muted/50 text-left">
+                <tr>
+                  <th className="px-4 py-3">Siswa</th>
+                  <th className="px-4 py-3">Challenge</th>
+                  <th className="px-4 py-3">Minggu</th>
+                  <th className="px-4 py-3">Tanggal pencapaian</th>
+                  <th className="px-4 py-3 text-right">Bonus</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(challengeAwards.data ?? []).map((award: any) => {
+                  const student = award.students;
+                  const className = student?.classes?.name ?? "Tanpa kelas";
+                  return (
+                    <tr key={award.id}>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold">{student?.full_name ?? "Siswa"}</p>
+                        <p className="text-xs text-muted-foreground">NIS {student?.nis ?? "—"} · {className}</p>
+                      </td>
+                      <td className="px-4 py-3">{award.challenges?.name ?? "EcoChallenge"}</td>
+                      <td className="px-4 py-3 tabular-nums">{award.week_start}</td>
+                      <td className="px-4 py-3">
+                        <p>{award.earned_day}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(award.qualifying_days ?? []).length} hari tervalidasi
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold tabular-nums">
+                        +{Number(award.bonus_points).toLocaleString("id-ID")}
+                      </td>
+                      <td className="px-4 py-3">
+                        {award.reversed_at ? (
+                          <div>
+                            <span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive">Dibatalkan</span>
+                            <p className="mt-1 max-w-[200px] text-[11px] text-muted-foreground">{award.reversal_reason}</p>
+                          </div>
+                        ) : (
+                          <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">Aktif</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="p-6 text-center text-sm text-muted-foreground">
+            Belum ada bonus yang diberikan. Bonus pertama tercatat setelah siswa memenuhi lima hari scan Tumbler yang disetujui.
+          </p>
+        )}
+      </section>
+
+            {/* DIALOG TAMBAH CHALLENGE */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl border border-border shadow-2xl">
           <DialogHeader className="p-6 pb-3 border-b border-border/40 bg-muted/20 shrink-0">
@@ -304,6 +440,12 @@ function ChallengeManagementPage() {
                       setTitle(ai.title);
                       setBody(ai.body);
                       setPct(ai.pct);
+              setAutoAward(Boolean(ai.autoAward));
+              setTargetItemCode(ai.targetItemCode ?? "tumbler");
+              setTargetSession(ai.targetSession ?? "entry");
+              setTargetCount(ai.targetCount ?? 5);
+              setBonusPoints(ai.bonusPoints ?? 150);
+              setEffectiveFrom(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date()));
                       toast.success(`✨ Challenge AI "${ai.label}" berhasil digenerate!`);
                     }}
                     className="text-[10px] font-bold bg-background hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 border border-border hover:border-emerald-600 px-2.5 py-1 rounded-xl transition-all shadow-xs"
@@ -325,6 +467,12 @@ function ChallengeManagementPage() {
                   setTitle(ai.title);
                   setBody(ai.body);
                   setPct(ai.pct);
+              setAutoAward(Boolean(ai.autoAward));
+              setTargetItemCode(ai.targetItemCode ?? "tumbler");
+              setTargetSession(ai.targetSession ?? "entry");
+              setTargetCount(ai.targetCount ?? 5);
+              setBonusPoints(ai.bonusPoints ?? 150);
+              setEffectiveFrom(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date()));
                   toast.success(`✨ AI berhasil meng-generate challenge acak!`);
                 }}
               >
@@ -387,6 +535,64 @@ function ChallengeManagementPage() {
               />
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 Diisi manual oleh admin sebagai indikator pelaksanaan. Angka ini bukan hasil hitung otomatis dari scan/peserta dan tidak menambahkan Eco-Points.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-bold">
+                <input
+                  type="checkbox"
+                  checked={autoAward}
+                  onChange={(e) => setAutoAward(e.target.checked)}
+                  className="size-4 accent-emerald-600"
+                />
+                Aktifkan bonus Eco-Points otomatis
+              </label>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Bonus diberikan satu kali per siswa per minggu setelah jumlah hari sekolah berbeda terpenuhi dengan scan berstatus approved.
+              </p>
+              {autoAward && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold">Barang yang divalidasi</label>
+                    <select value={targetItemCode} onChange={(e) => setTargetItemCode(e.target.value)} className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm">
+                      <option value="tumbler">Tumbler</option>
+                      <option value="lunchbox">Kotak Makan</option>
+                      {targetSession === "break" && <option value="break_combo">Combo Tumbler + Lunchbox</option>}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold">Sesi scan</label>
+                    <select
+                      value={targetSession}
+                      onChange={(e) => {
+                        const nextSession = e.target.value;
+                        setTargetSession(nextSession);
+                        if (nextSession === "entry" && targetItemCode === "break_combo") {
+                          setTargetItemCode("tumbler");
+                        }
+                      }}
+                      className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm"
+                    >
+                      <option value="entry">Sesi 1 · Masuk</option>
+                      <option value="break">Sesi 2 · Istirahat</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold">Target hari sekolah</label>
+                    <input type="number" min="1" max="5" step="1" value={targetCount} onChange={(e) => setTargetCount(Number(e.target.value))} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold">Bonus poin</label>
+                    <input type="number" min="1" step="1" value={bonusPoints} onChange={(e) => setBonusPoints(Number(e.target.value))} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <label className="text-xs font-semibold">Mulai berlaku</label>
+                    <input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                  </div>
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Untuk program 5 Hari Tumbler: pilih Tumbler, Sesi 1, target 5 hari sekolah (Senin–Jumat), dan bonus 150 poin. Satu bonus diberikan per siswa setiap minggu kalender.
               </p>
             </div>
           </div>
@@ -461,7 +667,63 @@ function ChallengeManagementPage() {
                   className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm focus:outline-primary"
                 />
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Persentase ini diubah manual. Sistem belum menghitung capaian peserta dan belum memberi bonus poin otomatis.
+                  Persentase ini diubah manual dan tidak menentukan pemberian bonus. Bonus otomatis mengikuti target scan approved pada pengaturan di bawah.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+                <label className="flex items-center gap-2 text-sm font-bold">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(activeChallenge.auto_award)}
+                    onChange={(e) => setActiveChallenge({ ...activeChallenge, auto_award: e.target.checked })}
+                    className="size-4 accent-emerald-600"
+                  />
+                  Aktifkan bonus Eco-Points otomatis
+                </label>
+                {activeChallenge.auto_award && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Barang</label>
+                      <select value={activeChallenge.target_item_code ?? "tumbler"} onChange={(e) => setActiveChallenge({ ...activeChallenge, target_item_code: e.target.value })} className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm">
+                        <option value="tumbler">Tumbler</option><option value="lunchbox">Kotak Makan</option>{activeChallenge.target_session === "break" && <option value="break_combo">Combo</option>}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Sesi</label>
+                      <select
+                        value={activeChallenge.target_session ?? "entry"}
+                        onChange={(e) => {
+                          const nextSession = e.target.value;
+                          setActiveChallenge({
+                            ...activeChallenge,
+                            target_session: nextSession,
+                            target_item_code:
+                              nextSession === "entry" && activeChallenge.target_item_code === "break_combo"
+                                ? "tumbler"
+                                : activeChallenge.target_item_code,
+                          });
+                        }}
+                        className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm"
+                      >
+                        <option value="entry">Sesi 1 · Masuk</option><option value="break">Sesi 2 · Istirahat</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Target hari sekolah</label>
+                      <input type="number" min="1" max="5" step="1" value={activeChallenge.target_count ?? 5} onChange={(e) => setActiveChallenge({ ...activeChallenge, target_count: Number(e.target.value) })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Bonus poin</label>
+                      <input type="number" min="1" step="1" value={activeChallenge.bonus_points ?? 150} onChange={(e) => setActiveChallenge({ ...activeChallenge, bonus_points: Number(e.target.value) })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-xs font-semibold">Mulai berlaku</label>
+                      <input type="date" value={activeChallenge.effective_from ?? ""} onChange={(e) => setActiveChallenge({ ...activeChallenge, effective_from: e.target.value })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                    </div>
+                  </div>
+                )}
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Bonus diberikan satu kali per siswa per minggu kalender, setelah jumlah hari sekolah berbeda terpenuhi. Scan harus approved.
                 </p>
               </div>
               <Button

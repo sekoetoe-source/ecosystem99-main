@@ -62,17 +62,27 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         .gte("day", activePeriod.data.start_date)
         .lt("day", periodEnd);
 
-      const [{ data: items, error: itemsError }, { data: students, error: studentsError }] =
-        await Promise.all([
-          query,
-          supabase
-            .from("students")
-            .select("id, full_name, nis, class_id, classes(name)")
-            .eq("active", true),
-        ]);
+      const [
+        { data: items, error: itemsError },
+        { data: students, error: studentsError },
+        { data: challengeAwards, error: challengeAwardsError },
+      ] = await Promise.all([
+        query,
+        supabase
+          .from("students")
+          .select("id, full_name, nis, class_id, classes(name)")
+          .eq("active", true),
+        (supabase as any)
+          .from("challenge_point_awards_public")
+          .select("student_id, bonus_points")
+          .eq("period_id", activePeriod.data.id)
+          .gte("earned_day", activePeriod.data.start_date)
+          .lt("earned_day", periodEnd),
+      ]);
 
       if (itemsError) throw itemsError;
       if (studentsError) throw studentsError;
+      if (challengeAwardsError) throw challengeAwardsError;
 
       const validStudents = (students ?? []).filter((s) => {
         const className = (s.classes as { name: string } | null)?.name?.trim();
@@ -89,6 +99,13 @@ export function Leaderboard({ highlightStudentId }: { highlightStudentId?: strin
         pointTotals.set(
           item.student_id,
           (pointTotals.get(item.student_id) ?? 0) + Number(item.points ?? 0),
+        );
+      }
+      for (const award of challengeAwards ?? []) {
+        if (!validStudentMap.has(award.student_id)) continue;
+        pointTotals.set(
+          award.student_id,
+          (pointTotals.get(award.student_id) ?? 0) + Number(award.bonus_points ?? 0),
         );
       }
 

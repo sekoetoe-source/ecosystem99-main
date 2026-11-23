@@ -22,3 +22,10 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+
+## Eco-Points & EcoChallenge
+
+See [ECO_POINTS_AND_CHALLENGES.md](./ECO_POINTS_AND_CHALLENGES.md) for the operational point rules, automatic five-day Tumbler challenge, award ledger and reversal behavior, admin settings, and database migration references.
+
+The automatic **5 Hari Tumbler** challenge awards **+150 Eco-Points** after five distinct approved Tumbler scans in Sesi 1 (Monday–Friday, one ISO week), once per student per week. Its effective date is **23 November 2026 (Asia/Jakarta)**. Bonus points are included in student balances, period scores, reports, and leaderboards, but are not counted as physical item scans or CO2-reduction events.
