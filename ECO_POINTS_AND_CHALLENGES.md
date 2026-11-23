@@ -103,6 +103,8 @@ Untuk aturan standar 5 Hari Tumbler gunakan:
 - Bonus: 150;
 - Mulai berlaku: 23 November 2026 atau tanggal kebijakan baru yang disetujui.
 
+Halaman Admin EcoChallenge juga menampilkan 100 riwayat bonus terbaru, status aktif/dibatalkan, siswa penerima, minggu, dan tanggal pencapaian. Riwayat ini hanya untuk audit; bonus tidak dapat diedit manual.
+
 Persentase `pct` pada kartu challenge tetap merupakan indikator manual admin. Angka tersebut bukan persentase siswa yang lulus tantangan. Pemberian bonus otomatis dihitung terpisah oleh database dari data validasi approved.
 
 ## 6. Komponen database dan migrasi
