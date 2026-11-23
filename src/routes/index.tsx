@@ -164,6 +164,21 @@ const useSchoolStats = () =>
           if (rows.length < pageSize) break;
         }
 
+        const challengeAwards: Array<{student_id: string; bonus_points: number; earned_day: string}> = [];
+        for (let offset = 0; ; offset += pageSize) {
+          const { data: page, error } = await (supabase as any)
+            .from("challenge_point_awards_public")
+            .select("student_id, bonus_points, earned_day")
+            .gte("earned_day", start)
+            .lt("earned_day", endExclusive)
+            .order("earned_day", { ascending: true })
+            .range(offset, offset + pageSize - 1);
+          if (error) throw error;
+          const rows = (page ?? []) as Array<{student_id: string; bonus_points: number; earned_day: string}>;
+          challengeAwards.push(...rows);
+          if (rows.length < pageSize) break;
+        }
+
         const validStudents = (students ?? []).filter((student) => {
           const className = (student.classes as { name: string } | null)?.name?.trim();
           return Boolean(
@@ -178,7 +193,13 @@ const useSchoolStats = () =>
         const approved = items.filter(
           (item) => (item.validations as { status: string } | null)?.status === "approved",
         );
-        const totalPoints = approved.reduce((sum, item) => sum + Number(item.points ?? 0), 0);
+        const challengeBonusPoints = challengeAwards.reduce(
+          (sum, award) => sum + Number(award.bonus_points ?? 0),
+          0,
+        );
+        const totalPoints =
+          approved.reduce((sum, item) => sum + Number(item.points ?? 0), 0) +
+          challengeBonusPoints;
         const classes = new Map<
           string,
           { class_name: string; total_points: number; student_count: number }
@@ -204,6 +225,11 @@ const useSchoolStats = () =>
           if (!className) continue;
           classes.get(className)!.total_points += Number(item.points ?? 0);
         }
+        for (const award of challengeAwards) {
+          const className = studentClass.get(award.student_id);
+          if (!className) continue;
+          classes.get(className)!.total_points += Number(award.bonus_points ?? 0);
+        }
         const computedClasses = [...classes.values()]
           .map((row) => ({
             ...row,
@@ -212,6 +238,7 @@ const useSchoolStats = () =>
           .sort((a, b) => b.total_points - a.total_points);
         return {
           totalPoints,
+          challengeBonusPoints,
           totalItems: approved.length,
           studentCount: validStudents.length,
           co2Kg: Math.round((approved.length * 70) / 1000),
@@ -220,7 +247,7 @@ const useSchoolStats = () =>
         };
       } catch (error) {
         console.error("Landing report stats unavailable:", error);
-        return { totalPoints: 0, totalItems: 0, studentCount: 0, co2Kg: 0, periodLabel: "", classes: [] };
+        return { totalPoints: 0, challengeBonusPoints: 0, totalItems: 0, studentCount: 0, co2Kg: 0, periodLabel: "", classes: [] };
       }
     },
     retry: 1,
