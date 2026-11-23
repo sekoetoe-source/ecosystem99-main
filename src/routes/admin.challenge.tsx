@@ -154,6 +154,22 @@ function ChallengeManagementPage() {
     },
   });
 
+  const challengeAwards = useQuery({
+    queryKey: ["admin-challenge-award-history"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("challenge_point_awards")
+        .select(
+          "id, week_start, earned_day, qualifying_days, bonus_points, awarded_at, reversed_at, reversal_reason, challenges(name), students(full_name, nis, classes(name))",
+        )
+        .order("awarded_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data ?? [];
+    },
+    refetchInterval: 30_000,
+  });
+
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!name || !title || !body) throw new Error("Semua kolom wajib diisi");
@@ -320,7 +336,75 @@ function ChallengeManagementPage() {
         )}
       </div>
 
-      {/* DIALOG TAMBAH CHALLENGE */}
+      <section className="surface-card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="font-extrabold">Riwayat Bonus EcoChallenge</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Ledger audit 100 pemberian terbaru. Bonus yang dibatalkan tetap terlihat sebagai riwayat, tetapi tidak dihitung ke saldo.
+          </p>
+        </div>
+        {challengeAwards.isLoading ? (
+          <p className="p-5 text-sm text-muted-foreground">Memuat riwayat bonus...</p>
+        ) : challengeAwards.isError ? (
+          <p className="p-5 text-sm text-destructive">Riwayat bonus gagal dimuat. Periksa akses admin ke ledger.</p>
+        ) : (challengeAwards.data ?? []).length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-muted/50 text-left">
+                <tr>
+                  <th className="px-4 py-3">Siswa</th>
+                  <th className="px-4 py-3">Challenge</th>
+                  <th className="px-4 py-3">Minggu</th>
+                  <th className="px-4 py-3">Tanggal pencapaian</th>
+                  <th className="px-4 py-3 text-right">Bonus</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(challengeAwards.data ?? []).map((award: any) => {
+                  const student = award.students;
+                  const className = student?.classes?.name ?? "Tanpa kelas";
+                  return (
+                    <tr key={award.id}>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold">{student?.full_name ?? "Siswa"}</p>
+                        <p className="text-xs text-muted-foreground">NIS {student?.nis ?? "—"} · {className}</p>
+                      </td>
+                      <td className="px-4 py-3">{award.challenges?.name ?? "EcoChallenge"}</td>
+                      <td className="px-4 py-3 tabular-nums">{award.week_start}</td>
+                      <td className="px-4 py-3">
+                        <p>{award.earned_day}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(award.qualifying_days ?? []).length} hari tervalidasi
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold tabular-nums">
+                        +{Number(award.bonus_points).toLocaleString("id-ID")}
+                      </td>
+                      <td className="px-4 py-3">
+                        {award.reversed_at ? (
+                          <div>
+                            <span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive">Dibatalkan</span>
+                            <p className="mt-1 max-w-[200px] text-[11px] text-muted-foreground">{award.reversal_reason}</p>
+                          </div>
+                        ) : (
+                          <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">Aktif</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="p-6 text-center text-sm text-muted-foreground">
+            Belum ada bonus yang diberikan. Bonus pertama tercatat setelah siswa memenuhi lima hari scan Tumbler yang disetujui.
+          </p>
+        )}
+      </section>
+
+            {/* DIALOG TAMBAH CHALLENGE */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl border border-border shadow-2xl">
           <DialogHeader className="p-6 pb-3 border-b border-border/40 bg-muted/20 shrink-0">
