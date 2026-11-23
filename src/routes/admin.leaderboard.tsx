@@ -85,7 +85,12 @@ export function JawaraTab({ periodId }: { periodId: string; periodName?: string 
         .eq("id", periodId)
         .maybeSingle();
       if (periodError) throw periodError;
-      if (!period) return { items: [] as JawaraItem[], students: [] as JawaraStudent[] };
+      if (!period)
+        return {
+          items: [] as JawaraItem[],
+          awards: [] as JawaraAward[],
+          students: [] as JawaraStudent[],
+        };
       const monthStart =
         reportRange.start > period.start_date ? reportRange.start : period.start_date;
       const periodEndExclusive = new Date(`${period.end_date}T00:00:00+07:00`);
@@ -284,7 +289,11 @@ function AdminLeaderboardPage() {
       const periodEnd = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
         periodEndExclusive,
       );
-      const [{ data, error }, { data: students, error: studentsError }] = await Promise.all([
+      const [
+        { data, error },
+        { data: students, error: studentsError },
+        { data: challengeAwards, error: challengeAwardsError },
+      ] = await Promise.all([
         supabase
           .from("validation_items")
           .select("student_id, points, validations!inner(period_id, day, status)")
@@ -296,9 +305,16 @@ function AdminLeaderboardPage() {
           .from("students")
           .select("id, full_name, nis, class_id, classes(name)")
           .eq("active", true),
+        (supabase as any)
+          .from("challenge_point_awards_public")
+          .select("student_id, bonus_points")
+          .eq("period_id", effectivePeriodId)
+          .gte("earned_day", periodStart)
+          .lt("earned_day", periodEnd),
       ]);
       if (error) throw error;
       if (studentsError) throw studentsError;
+      if (challengeAwardsError) throw challengeAwardsError;
 
       const validStudents = (students ?? []).filter((student) => {
         const className = (student.classes as { name: string } | null)?.name?.trim();
@@ -316,6 +332,13 @@ function AdminLeaderboardPage() {
         pointTotals.set(
           item.student_id,
           (pointTotals.get(item.student_id) ?? 0) + Number(item.points ?? 0),
+        );
+      }
+      for (const award of challengeAwards ?? []) {
+        if (!validStudentIds.has(award.student_id)) continue;
+        pointTotals.set(
+          award.student_id,
+          (pointTotals.get(award.student_id) ?? 0) + Number(award.bonus_points ?? 0),
         );
       }
       return validStudents
