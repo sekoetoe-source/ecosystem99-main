@@ -557,23 +557,33 @@ function ChallengeManagementPage() {
                     <select value={targetItemCode} onChange={(e) => setTargetItemCode(e.target.value)} className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm">
                       <option value="tumbler">Tumbler</option>
                       <option value="lunchbox">Kotak Makan</option>
-                      <option value="break_combo">Combo Tumbler + Lunchbox</option>
+                      {targetSession === "break" && <option value="break_combo">Combo Tumbler + Lunchbox</option>}
                     </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold">Sesi scan</label>
-                    <select value={targetSession} onChange={(e) => setTargetSession(e.target.value)} className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm">
+                    <select
+                      value={targetSession}
+                      onChange={(e) => {
+                        const nextSession = e.target.value;
+                        setTargetSession(nextSession);
+                        if (nextSession === "entry" && targetItemCode === "break_combo") {
+                          setTargetItemCode("tumbler");
+                        }
+                      }}
+                      className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm"
+                    >
                       <option value="entry">Sesi 1 · Masuk</option>
                       <option value="break">Sesi 2 · Istirahat</option>
                     </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold">Target hari sekolah</label>
-                    <input type="number" min="1" max="5" value={targetCount} onChange={(e) => setTargetCount(Number(e.target.value))} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                    <input type="number" min="1" max="5" step="1" value={targetCount} onChange={(e) => setTargetCount(Number(e.target.value))} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold">Bonus poin</label>
-                    <input type="number" min="1" value={bonusPoints} onChange={(e) => setBonusPoints(Number(e.target.value))} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                    <input type="number" min="1" step="1" value={bonusPoints} onChange={(e) => setBonusPoints(Number(e.target.value))} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
                   </div>
                   <div className="col-span-2 space-y-1">
                     <label className="text-xs font-semibold">Mulai berlaku</label>
@@ -675,22 +685,36 @@ function ChallengeManagementPage() {
                     <div className="space-y-1">
                       <label className="text-xs font-semibold">Barang</label>
                       <select value={activeChallenge.target_item_code ?? "tumbler"} onChange={(e) => setActiveChallenge({ ...activeChallenge, target_item_code: e.target.value })} className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm">
-                        <option value="tumbler">Tumbler</option><option value="lunchbox">Kotak Makan</option><option value="break_combo">Combo</option>
+                        <option value="tumbler">Tumbler</option><option value="lunchbox">Kotak Makan</option>{activeChallenge.target_session === "break" && <option value="break_combo">Combo</option>}
                       </select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold">Sesi</label>
-                      <select value={activeChallenge.target_session ?? "entry"} onChange={(e) => setActiveChallenge({ ...activeChallenge, target_session: e.target.value })} className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm">
+                      <select
+                        value={activeChallenge.target_session ?? "entry"}
+                        onChange={(e) => {
+                          const nextSession = e.target.value;
+                          setActiveChallenge({
+                            ...activeChallenge,
+                            target_session: nextSession,
+                            target_item_code:
+                              nextSession === "entry" && activeChallenge.target_item_code === "break_combo"
+                                ? "tumbler"
+                                : activeChallenge.target_item_code,
+                          });
+                        }}
+                        className="w-full h-10 px-2 rounded-xl border border-input bg-background text-sm"
+                      >
                         <option value="entry">Sesi 1 · Masuk</option><option value="break">Sesi 2 · Istirahat</option>
                       </select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold">Target hari sekolah</label>
-                      <input type="number" min="1" max="5" value={activeChallenge.target_count ?? 5} onChange={(e) => setActiveChallenge({ ...activeChallenge, target_count: Number(e.target.value) })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                      <input type="number" min="1" max="5" step="1" value={activeChallenge.target_count ?? 5} onChange={(e) => setActiveChallenge({ ...activeChallenge, target_count: Number(e.target.value) })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold">Bonus poin</label>
-                      <input type="number" min="1" value={activeChallenge.bonus_points ?? 150} onChange={(e) => setActiveChallenge({ ...activeChallenge, bonus_points: Number(e.target.value) })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
+                      <input type="number" min="1" step="1" value={activeChallenge.bonus_points ?? 150} onChange={(e) => setActiveChallenge({ ...activeChallenge, bonus_points: Number(e.target.value) })} className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"/>
                     </div>
                     <div className="col-span-2 space-y-1">
                       <label className="text-xs font-semibold">Mulai berlaku</label>
