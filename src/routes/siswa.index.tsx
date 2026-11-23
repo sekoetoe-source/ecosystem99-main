@@ -38,7 +38,7 @@ function StudentDashboard() {
     queryKey: ["student-summary", studentId],
     enabled: !!studentId,
     queryFn: async () => {
-      const [score, streak, todayVals, history] = await Promise.all([
+      const [score, streak, todayVals, history, challengeAwards] = await Promise.all([
         supabase
           .from("student_scores")
           .select("earned_points, balance_points, class_name, total_items")
@@ -57,14 +57,21 @@ function StudentDashboard() {
           .eq("student_id", studentId!)
           .order("created_at", { ascending: false })
           .limit(8),
+        (supabase as any)
+          .from("challenge_point_awards")
+          .select("id, bonus_points, earned_day, week_start")
+          .eq("student_id", studentId!)
+          .order("awarded_at", { ascending: false }),
       ]);
       return {
         score: score.data,
         streak: (streak.data as number | null) ?? 0,
         todayVals: (todayVals.data as any[]) ?? [],
         history: (history.data as any[]) ?? [],
+        challengeAwards: (challengeAwards.data as Array<{id:string;bonus_points:number;earned_day:string;week_start:string}>) ?? [],
       };
     },
+    refetchInterval: 30_000,
   });
 
   const rewards = useQuery({
@@ -97,6 +104,10 @@ function StudentDashboard() {
   });
 
   const balance = summary.data?.score?.balance_points ?? 0;
+  const challengeBonusPoints = (summary.data?.challengeAwards ?? []).reduce(
+    (total, award) => total + Number(award.bonus_points ?? 0),
+    0,
+  );
 
   // Map today's validations by session
   const todayEntry = summary.data?.todayVals.find((v) => (v.session || "entry") === "entry");
@@ -129,6 +140,9 @@ function StudentDashboard() {
           <p className="mt-2 text-4xl font-extrabold">{balance.toLocaleString("id-ID")}</p>
           <p className="mt-1 text-sm text-primary-foreground/80">
             Total diperoleh {(summary.data?.score?.earned_points ?? 0).toLocaleString("id-ID")} poin
+          </p>
+          <p className="mt-1 text-xs text-primary-foreground/80">
+            Termasuk bonus EcoChallenge {challengeBonusPoints.toLocaleString("id-ID")} poin
           </p>
         </div>
         <div className="surface-card p-6">
