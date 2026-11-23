@@ -177,6 +177,10 @@ function FormalReportDocument({
                         "Aktivitas lingkungan tervalidasi",
                         (d?.totalItems ?? 0).toLocaleString("id-ID"),
                       ],
+                      [
+                        "Bonus EcoChallenge",
+                        (d?.challengeBonusPoints ?? 0).toLocaleString("id-ID"),
+                      ],
                       ["Total Poin Lingkungan", (d?.totalPoin ?? 0).toLocaleString("id-ID")],
                       [
                         "Perkiraan Pengurangan Emisi Karbon Dioksida",
@@ -318,10 +322,30 @@ function LaporanPage() {
         return all;
       };
 
-      const [studentsRes, items, prevItems] = await Promise.all([
+      const fetchAllAwards = async (startDay: string, endDay: string) => {
+        const pageSize = 1000;
+        const all: Array<{ student_id: string; bonus_points: number; earned_day: string }> = [];
+        for (let offset = 0; ; offset += pageSize) {
+          const { data, error } = await (supabase as any)
+            .from("challenge_point_awards_public")
+            .select("student_id, bonus_points, earned_day")
+            .gte("earned_day", startDay)
+            .lt("earned_day", endDay)
+            .order("earned_day", { ascending: true })
+            .range(offset, offset + pageSize - 1);
+          if (error) throw error;
+          const page = (data ?? []) as Array<{ student_id: string; bonus_points: number; earned_day: string }>;
+          all.push(...page);
+          if (page.length < pageSize) break;
+        }
+        return all;
+      };
+
+      const [studentsRes, items, prevItems, challengeAwards] = await Promise.all([
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
         fetchAllItems(previousRange.start, currentEndExclusive),
         fetchAllItems(previousRange.start, previousRange.end),
+        fetchAllAwards(previousRange.start, currentEndExclusive),
       ]);
       if (studentsRes.error) throw studentsRes.error;
       const students = studentsRes.data;
@@ -368,6 +392,11 @@ function LaporanPage() {
           lunchboxUsers.add(i.student_id);
         }
       }
+      for (const award of challengeAwards) {
+        const name = classOf.get(award.student_id);
+        if (!name) continue;
+        classes.get(name)!.points += Number(award.bonus_points ?? 0);
+      }
       const rows = [...classes.values()]
         .map((r) => ({
           ...r,
@@ -379,7 +408,12 @@ function LaporanPage() {
           ),
         }))
         .sort((a, b) => a.name.localeCompare(b.name, "id"));
-      const totalPoin = approved.reduce((a, i) => a + Number(i.points ?? 0), 0);
+      const challengeBonusPoints = challengeAwards.reduce(
+        (total, award) => total + Number(award.bonus_points ?? 0),
+        0,
+      );
+      const totalPoin =
+        approved.reduce((a, i) => a + Number(i.points ?? 0), 0) + challengeBonusPoints;
       const usageCount = (values: typeof approved) =>
         values.reduce(
           (total, item) =>
@@ -401,6 +435,7 @@ function LaporanPage() {
         totalStudents: validStudents.length,
         totalItems: approved.length,
         totalPoin,
+        challengeBonusPoints,
         tumblerRate: Math.round((tumblerUsers.size / Math.max(1, validStudents.length)) * 100),
         lunchboxRate: Math.round((lunchboxUsers.size / Math.max(1, validStudents.length)) * 100),
         growth:
