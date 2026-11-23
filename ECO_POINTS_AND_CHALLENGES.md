@@ -110,10 +110,10 @@ Persentase `pct` pada kartu challenge tetap merupakan indikator manual admin. An
 ## 6. Komponen database dan migrasi
 
 Fitur ini ditambahkan melalui migrasi:
-- `20261123093000_automatic_five_day_tumbler_bonus.sql`
-- `20261123094500_reverse_challenge_bonus_when_qualifying_scans_are_invalidated.sql`
-- `20261123101500_harden_automatic_challenge_award_evaluation.sql`
-- `20261123103000_validate_automatic_challenge_item_session.sql`
+- `20261123042153_automatic_five_day_tumbler_bonus.sql`
+- `20261123042806_reverse_challenge_bonus_when_qualifying_scans_are_invalidated.sql`
+- `20261123042928_harden_automatic_challenge_award_evaluation.sql`
+- `20261123043142_validate_automatic_challenge_item_session.sql`
 
 Objek utama:
 - `challenges`: konfigurasi target dan bonus otomatis.
