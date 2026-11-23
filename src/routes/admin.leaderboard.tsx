@@ -50,6 +50,10 @@ type JawaraClassRow = {
   tumbler: number;
   lunchbox: number;
 };
+type JawaraAward = {
+  student_id: string;
+  bonus_points: number;
+};
 
 export function JawaraTab({ periodId }: { periodId: string; periodName?: string }) {
   const reportMonth = new Intl.DateTimeFormat("en-CA", {
@@ -90,7 +94,11 @@ export function JawaraTab({ periodId }: { periodId: string; periodName?: string 
         periodEndExclusive,
       );
       const monthEnd = [reportRange.end, throughToday, periodEndNext].sort()[0]!;
-      const [{ data, error }, { data: students, error: studentsError }] = await Promise.all([
+      const [
+        { data, error },
+        { data: students, error: studentsError },
+        { data: challengeAwards, error: challengeAwardsError },
+      ] = await Promise.all([
         supabase
           .from("validation_items")
           .select("student_id, points, item_code, day, validations!inner(period_id, status)")
@@ -99,11 +107,19 @@ export function JawaraTab({ periodId }: { periodId: string; periodName?: string 
           .gte("day", monthStart)
           .lt("day", monthEnd),
         supabase.from("students").select("id, class_id, classes(name)").eq("active", true),
+        (supabase as any)
+          .from("challenge_point_awards_public")
+          .select("student_id, bonus_points")
+          .eq("period_id", periodId)
+          .gte("earned_day", monthStart)
+          .lt("earned_day", monthEnd),
       ]);
       if (error) throw error;
       if (studentsError) throw studentsError;
+      if (challengeAwardsError) throw challengeAwardsError;
       return {
         items: (data ?? []) as unknown as JawaraItem[],
+        awards: (challengeAwards ?? []) as JawaraAward[],
         students: (students ?? []) as unknown as JawaraStudent[],
       };
     },
@@ -149,6 +165,11 @@ export function JawaraTab({ periodId }: { periodId: string; periodName?: string 
         if (!classLunchbox.has(className)) classLunchbox.set(className, new Set());
         classLunchbox.get(className)!.add(item.student_id);
       }
+    }
+    for (const award of dailyData.data?.awards ?? []) {
+      const className = classOf.get(award.student_id);
+      if (!className) continue;
+      classes.get(className)!.points += Number(award.bonus_points ?? 0);
     }
     return [...classes.values()]
       .map((row) => ({
